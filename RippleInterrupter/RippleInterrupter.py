@@ -69,14 +69,15 @@ if __name__ == "__main__":
 	SPK_BIN_WIDTH = 5 #ms
 	TRODES_SAMP_FREQ = 30000
 	
-	NUM_SPK_BINS = np.round(REFRAC_PERIOD / SPK_BIN_WIDTH)
-	bin_time = np.zeros(1,NUM_SPK_BINS)
-	spk_cnts = np.zeros(1,NUM_SPK_BINS)
+	NUM_SPK_BINS = int(np.round(REFRAC_PERIOD / SPK_BIN_WIDTH))
+	bin_time = np.zeros((1,NUM_SPK_BINS))
+	spk_cnts = np.zeros((1,NUM_SPK_BINS))
+	latest_bin = 0
 
 	#for keeping track of moving average and std of ripple power for each tetrode
 	m_n = 1
-	m_oldM = np.zeros(len(trodes), 1) 
-	m_oldS = np.zeros(len(trodes), 1)
+	m_oldM = np.zeros((1, len(trodes))) 
+	m_oldS = np.zeros((1, len(trodes)))
 
 	graph_bool = False
 	
@@ -111,7 +112,8 @@ if __name__ == "__main__":
 	iter = 0
 	max_iter = 1000000
 	#havent' done any calibrating on this threshold zscore
-	thresh_zrms = 3
+	#thresh_zrms = 3 * len(trodes)
+	thresh_zrms = 1
 	
 	#subplot 1: spike rate centered on stimulation time
 	#subplot 2: ripple-filtered signal every once in a while
@@ -150,18 +152,8 @@ if __name__ == "__main__":
 				sum_zrms = np.sum(zrms)
 
 				iter = iter + 1
-				if iter % 1000 == 0:
-					print(iter)
-					print(avg_rms)
-					print(rms)
-					print(std_rms)
-
-					plt.subplot(2,1,2)
-					plt.plot(rr[1,:])
-					plt.draw()
-					plt.pause(0.001)
-
-					plt.subplot(2,1,1)
+				if iter % 100 == 0:
+					pass
 
 				millis = int(round(time.time() * 1000))
 
@@ -173,6 +165,18 @@ if __name__ == "__main__":
 					refrac_end = millis + REFRAC_PERIOD
 					graph_time = millis + REFRAC_PERIOD/2
 					graph_bool = True
+					
+					print(iter)
+					print(avg_rms)
+					print(rms)
+					print(std_rms)
+
+					plt.subplot(2,1,2)
+					plt.plot(rr[1,:])
+					plt.draw()
+					plt.pause(0.001)
+
+					plt.subplot(2,1,1)
 
 		n = spkstream.available(0)
 		for i in range(n):
