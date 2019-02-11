@@ -13,3 +13,6 @@ LFP_FILTER_ORDER  = int(LFP_FILTER_LENGTH * LFP_FREQUENCY)
 # ripple events and tell if they were real ripples or not!
 RIPPLE_LO_FREQ    = 150 
 RIPPLE_HI_FREQ    = 250
+
+# Custom constants
+LFP_ANIMATION_INTERVAL = 25     # Animation Frame rate

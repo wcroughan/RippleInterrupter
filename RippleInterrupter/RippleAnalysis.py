@@ -1,6 +1,8 @@
 # System imports
 from scipy import signal, stats
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import sys
 import time
@@ -9,6 +11,62 @@ import serial
 # Local file imports
 import TrodesInterface
 import RippleDefinitions as RiD
+
+def animateLFP(timestamps, lfp, frame_size, statistic=None):
+    """
+    Animate a given LFP by plotting a fixed size sliding frame.
+
+    :timestamps: time-points for the LFP data
+    :lfp: LFP (Raw/Filtered) for a single tetrode
+    :frame_size: Size of the frame that should be seen at once
+    :statistic: Function handle that should be applied to the data to generate
+        a scalar quantity that can also be plotted!
+    """
+
+    # Change this to '3d' if the need every arises for a multi-dimensional plot
+    lfp_fig   = plt.figure()
+    plot_axes = plt.axes(projection=None)
+
+    # Start with an empty plot, it can be then updated by animation functions
+    # NOTE: The way frame is accessed in animation internals forces us to
+    # make this an array if nothing else is being passed in. Having text
+    # removes this requirement.
+    lfp_frame,   = plot_axes.plot([], [], animated=True)
+    txt_template = 't = %.2fs'
+    lfp_measure  = plot_axes.text(0.5, 0.09, '', transform=plot_axes.transAxes)
+
+
+    # Local functions for setting up animation frames and cycling through them
+    def _nextAnimFrame(step=0):
+        """
+        # Making sure that the step index and data are coming in properly
+        print(step)
+        print(lfp[step])
+        """
+        lfp_frame.set_data(timestamps[step:step+frame_size], lfp[step:step+frame_size])
+        lfp_measure.set_text(txt_template % timestamps[step])
+        # Updating the limits is needed still so that the correct range of data
+        # is displayed! It doesn't update the axis labels though - That's a
+        # different ballgame!
+        plot_axes.set_xlim(timestamps[step], timestamps[step+frame_size])
+        return lfp_frame, lfp_measure
+
+    def _initAnimFrame():
+        # NOTE: Init function called twice! I have seen this before but still
+        # don't understand why it works this way!
+        # print("Initializing animation frame...")
+        plot_axes.set_xlabel('Time (s)')
+        plot_axes.set_ylabel('EEG (uV)')
+        plot_axes.set_ylim(min(lfp), max(lfp))
+        plot_axes.set_xlim(timestamps[0], timestamps[frame_size])
+        return _nextAnimFrame()
+
+    n_frames = len(timestamps) - frame_size
+    lfp_anim = animation.FuncAnimation(lfp_fig, _nextAnimFrame, np.arange(0, n_frames), \
+            init_func=_initAnimFrame, interval=RiD.LFP_ANIMATION_INTERVAL, \
+            blit=True, repeat=False)
+    plt.figure(lfp_fig.number)
+    plt.show(plot_axes)
 
 def getRippleStatistics(tetrodes, analysis_time=10):
     """
@@ -46,7 +104,7 @@ def getRippleStatistics(tetrodes, analysis_time=10):
     # TODO: Change this to account for the user specified time for analysis.
     # For now, we will just enforce a fixed number of iterations for which LFP
     # data is brought in and analyzed.
-    N_DATA_SAMPLES = 1000
+    N_DATA_SAMPLES = 3000
 
     # Each LFP frame (I think it is just a single time point) is returned in
     # lfp_frame_buffer. The entire timeseries is stored in raw_lfp_buffer.
@@ -75,15 +133,21 @@ def getRippleStatistics(tetrodes, analysis_time=10):
             if (iter_idx >= N_DATA_SAMPLES):
                 break
 
-    # Plots - Pick a tetrode to plot the data from
+    print("Collected raw LFP Data. Visualizing.")
 
-    # Some very desparate debugging here!
-    # print(raw_lfp_buffer)
+    # Plots - Pick a tetrode to plot the data from
+    # Static plots
+    """
+    n_tetrodes = 1
     for tetrode_idx in range(n_tetrodes):
         plt.figure()
         plt.plot(timestamps, raw_lfp_buffer[tetrode_idx,:])
         plt.ion()
         plt.show()
+    """
+
+    # Animation
+    animateLFP(timestamps, raw_lfp_buffer[1,:], 100)
 
     # Program exits with a segmentation fault! Can't help this.
     wait_for_user_input = input('Press any key to continue')
