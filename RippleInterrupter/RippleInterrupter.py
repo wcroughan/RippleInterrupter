@@ -161,15 +161,23 @@ if __name__ == "__main__":
 					if DELIVER_HARDWARE_STIM:
 						serial_port.write(WRITE_DATA)
 					
-					print("stimulating")
+					print("Stimulating @" + str(millis))
 					refrac_end = millis + REFRAC_PERIOD
 					graph_time = millis + REFRAC_PERIOD/2
 					graph_bool = True
 					
+					"""
+					2019/02/19 - Archit Gupta
+					At the current calibration, too many
+					events are recorded as potential
+					interruptions and it results in too
+					much data being printed out!
+
 					print(iter)
 					print(avg_rms)
 					print(rms)
 					print(std_rms)
+					"""
 
 					plt.subplot(2,1,2)
 					plt.plot(rr[1,:])
