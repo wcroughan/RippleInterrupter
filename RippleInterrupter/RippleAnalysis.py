@@ -12,12 +12,21 @@ import serial
 import TrodesInterface
 import RippleDefinitions as RiD
 
-def animateLFP(timestamps, lfp, frame_size, statistic=None):
+def normalizeData(in_data):
+    # TODO: Might need tiling of data if there are multiple dimensions
+    data_mean = np.mean(in_data, axis=0)
+    data_std  = np.std(in_data, axis=0)
+    norm_data = np.divide((in_data - data_mean), data_std)
+    return norm_data
+
+def animateLFP(timestamps, lfp, ripple_power, frame_size, statistic=None):
     """
     Animate a given LFP by plotting a fixed size sliding frame.
 
     :timestamps: time-points for the LFP data
     :lfp: LFP (Raw/Filtered) for a single tetrode
+    :ripple_power: Ripple power calculated over a moving winow centered at all
+        the data points.
     :frame_size: Size of the frame that should be seen at once
     :statistic: Function handle that should be applied to the data to generate
         a scalar quantity that can also be plotted!
@@ -32,9 +41,13 @@ def animateLFP(timestamps, lfp, frame_size, statistic=None):
     # make this an array if nothing else is being passed in. Having text
     # removes this requirement.
     lfp_frame,   = plot_axes.plot([], [], animated=True)
+    r_pow_frame, = plot_axes.plot([], [], animated=True)
     txt_template = 't = %.2fs'
     lfp_measure  = plot_axes.text(0.5, 0.09, '', transform=plot_axes.transAxes)
 
+    # Normalize both EEG and Ripple power so that they can be visualized together.
+    lfp = normalizeData(lfp)
+    ripple_power = normalizeData(ripple_power)
 
     # Local functions for setting up animation frames and cycling through them
     def _nextAnimFrame(step=0):
@@ -44,12 +57,13 @@ def animateLFP(timestamps, lfp, frame_size, statistic=None):
         print(lfp[step])
         """
         lfp_frame.set_data(timestamps[step:step+frame_size], lfp[step:step+frame_size])
+        r_pow_frame.set_data(timestamps[step:step+frame_size], ripple_power[step:step+frame_size])
         lfp_measure.set_text(txt_template % timestamps[step])
         # Updating the limits is needed still so that the correct range of data
         # is displayed! It doesn't update the axis labels though - That's a
         # different ballgame!
         plot_axes.set_xlim(timestamps[step], timestamps[step+frame_size])
-        return lfp_frame, lfp_measure
+        return lfp_frame, r_pow_frame, lfp_measure
 
     def _initAnimFrame():
         # NOTE: Init function called twice! I have seen this before but still
@@ -91,6 +105,13 @@ def getRippleStatistics(tetrodes, analysis_time=10):
             btype='bandpass', analog=False, output='sos', \
             fs=RiD.LFP_FREQUENCY)
 
+    # Filter the contents of the signal frame by frame
+    ripple_frame_filter = signal.sosfilt_zi(ripple_filter)
+
+    # Tile it to take in all the tetrodes at once
+    ripple_frame_filter = np.tile(np.reshape(ripple_frame_filter, \
+            (RiD.LFP_FILTER_ORDER, 1, 2)), (1, n_tetrodes, 1))
+
     # Initialize a new client
     client = TrodesInterface.SGClient("RippleAnalyst")
     if (client.initialize() != 0):
@@ -110,6 +131,7 @@ def getRippleStatistics(tetrodes, analysis_time=10):
     # lfp_frame_buffer. The entire timeseries is stored in raw_lfp_buffer.
     lfp_frame_buffer = lfp_stream.create_numpy_array()
     raw_lfp_buffer   = np.zeros((n_tetrodes, N_DATA_SAMPLES), dtype='float')
+    ripple_power     = np.zeros((n_tetrodes, N_DATA_SAMPLES), dtype='float')
 
     # Create a plot to look at the raw lfp data
     timestamps  = np.linspace(0, analysis_time, N_DATA_SAMPLES)
@@ -119,6 +141,21 @@ def getRippleStatistics(tetrodes, analysis_time=10):
         for frame_idx in range(n_lfp_frames):
             t_stamp = lfp_stream.getData()
             raw_lfp_buffer[:, iter_idx] = lfp_frame_buffer[:]
+
+            # If we have enough data to fill in a new filter buffer, filter the
+            # new data
+            if (iter_idx > 0) and (iter_idx % RiD.LFP_FILTER_ORDER == 0):
+                ripple_filtered_lfp, ripple_frame_filter = signal.sosfilt(ripple_filter, \
+                       raw_lfp_buffer, axis=1, zi=ripple_frame_filter)
+
+                # TODO: Might have to average over a longer window to be able
+                # to pick out ripples effectively. Ripple power is only being
+                # reported for each frame right now: Filling out the same value
+                # for the entire frame.
+                ripple_power[:,iter_idx-RiD.LFP_FILTER_ORDER:iter_idx] = \
+                        np.tile(np.reshape(np.sqrt(np.mean(np.power(ripple_filtered_lfp, 2), axis=1)), \
+                        (n_tetrodes, 1)), (1, RiD.LFP_FILTER_ORDER))
+
 
             # TODO: Look at shorter time windows and see if we can isolate
             # individual ripples in the raw LFP (by eye) and in the filtered
@@ -137,21 +174,19 @@ def getRippleStatistics(tetrodes, analysis_time=10):
 
     # Plots - Pick a tetrode to plot the data from
     # Static plots
-    """
     n_tetrodes = 1
     for tetrode_idx in range(n_tetrodes):
         plt.figure()
         plt.plot(timestamps, raw_lfp_buffer[tetrode_idx,:])
-        plt.ion()
         plt.show()
-    """
 
     # Animation
-    animateLFP(timestamps, raw_lfp_buffer[1,:], 100)
+    animateLFP(timestamps, raw_lfp_buffer[1,:], ripple_power[1,:], 400)
 
     # Program exits with a segmentation fault! Can't help this.
     wait_for_user_input = input('Press any key to continue')
 
 if (__name__ == "__main__"):
-    tetrodes_to_be_analyzed = [1,2,3,14,15,16,17,18,19,20,21,22,23,24,25,26,32,37,39,40]
+    # tetrodes_to_be_analyzed = [1,2,3,14,15,16,17,18,19,20,21,22,23,24,25,26,32,37,39,40]
+    tetrodes_to_be_analyzed = [25,14,17,18,39]
     getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed])

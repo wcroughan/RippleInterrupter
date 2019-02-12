@@ -5,7 +5,7 @@ respecify them at multiple locations
 
 # LFP sampling rate, and filter parameters
 LFP_FREQUENCY     = 1500
-LFP_FILTER_LENGTH = 0.1
+LFP_FILTER_LENGTH = 0.01     # 100ms long window for filtering ripples
 LFP_FILTER_ORDER  = int(LFP_FILTER_LENGTH * LFP_FREQUENCY)
 
 # Frequency range for Ripple. Keep in mind that a high range completely gets
@@ -15,4 +15,4 @@ RIPPLE_LO_FREQ    = 150
 RIPPLE_HI_FREQ    = 250
 
 # Custom constants
-LFP_ANIMATION_INTERVAL = 25     # Animation Frame rate
+LFP_ANIMATION_INTERVAL = 15     # Animation Frame rate
