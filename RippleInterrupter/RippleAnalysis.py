@@ -46,7 +46,7 @@ def animateLFP(timestamps, lfp, raw_ripple, ripple_power, frame_size, statistic=
     # make this an array if nothing else is being passed in. Having text
     # removes this requirement.
     lfp_frame,   = plot_axes.plot([], [], animated=True)
-    r_raw_frame,  = plot_axes.plot([], [], animated=True)
+    r_raw_frame, = plot_axes.plot([], [], animated=True)
     r_pow_frame, = plot_axes.plot([], [], animated=True)
     txt_template = 't = %.2fs'
     lfp_measure  = plot_axes.text(0.5, 0.09, '', transform=plot_axes.transAxes)
@@ -84,9 +84,12 @@ def animateLFP(timestamps, lfp, raw_ripple, ripple_power, frame_size, statistic=
             init_func=_initAnimFrame, interval=RiD.LFP_ANIMATION_INTERVAL, \
             blit=True, repeat=False)
     plt.figure(lfp_fig.number)
+
+    # Make the filtered ripple thinner
+    r_raw_frame.set_linewidth(0.5)
     plt.show(plot_axes)
 
-def getRippleStatistics(tetrodes, analysis_time=4):
+def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None):
     """
     Get ripple data statistics for a particular tetrode and a user defined time
     period.
@@ -101,6 +104,7 @@ def getRippleStatistics(tetrodes, analysis_time=4):
     """
 
     n_tetrodes = len(tetrodes)
+    report_ripples = (interruption_statistics is not None)
 
     # Create a ripple filter (discrete butterworth filter with cutoff
     # frequencies set at Ripple LO and HI cutoffs.)
@@ -138,15 +142,25 @@ def getRippleStatistics(tetrodes, analysis_time=4):
     # Create a plot to look at the raw lfp data
     timestamps  = np.linspace(0, analysis_time, N_DATA_SAMPLES)
     iter_idx    = 0
+    prev_ripple = -np.Inf
+    start_time  = 0.0
+
+    if report_ripples:
+        ripple_events = []
+        print('Using pre-recorded ripple statistics')
+        print('Mean: %.2f'%interruption_statistics[0])
+        print('Std: %.2f'%interruption_statistics[1])
+
     while (iter_idx < N_DATA_SAMPLES):
         n_lfp_frames = lfp_stream.available(0)
         for frame_idx in range(n_lfp_frames):
+            # print("t__%.2f"%(float(iter_idx)/float(RiD.LFP_FREQUENCY)))
             t_stamp = lfp_stream.getData()
             raw_lfp_buffer[:, iter_idx] = lfp_frame_buffer[:]
 
             # If we have enough data to fill in a new filter buffer, filter the
             # new data
-            if (iter_idx > 0) and (iter_idx % RiD.LFP_FILTER_ORDER == 0):
+            if (iter_idx > RiD.RIPPLE_SMOOTHING_WINDOW) and (iter_idx % RiD.LFP_FILTER_ORDER == 0):
                 # ripple_filtered_lfp is the entire LFP, passed through a ripple filter
                 ripple_filtered_lfp, ripple_frame_filter = signal.sosfilt(ripple_filter, \
                        raw_lfp_buffer, axis=1, zi=ripple_frame_filter)
@@ -155,19 +169,20 @@ def getRippleStatistics(tetrodes, analysis_time=4):
                 # to pick out ripples effectively. Ripple power is only being
                 # reported for each frame right now: Filling out the same value
                 # for the entire frame.
+                frame_ripple_power = np.sqrt(np.mean(np.power( \
+                        ripple_filtered_lfp[:,iter_idx-RiD.RIPPLE_SMOOTHING_WINDOW:iter_idx], 2), axis=1))
                 ripple_power[:,iter_idx-RiD.LFP_FILTER_ORDER:iter_idx] = \
-                        np.tile(np.reshape(np.sqrt(np.mean(np.power( \
-                        ripple_filtered_lfp[:,iter_idx-RiD.LFP_FILTER_ORDER:iter_idx], 2), axis=1)), \
-                        (n_tetrodes, 1)), (1, RiD.LFP_FILTER_ORDER))
-
-            # TODO: Look at shorter time windows and see if we can isolate
-            # individual ripples in the raw LFP (by eye) and in the filtered
-            # data.
-            """
-            if ((iter_idx % 1000) == 0):
-                # DEBUG: Just plot the raw LFP data frame by frame.
-                wait_for_user_input = input('Press any key to continue')
-            """
+                        np.tile(np.reshape(frame_ripple_power, (n_tetrodes, 1)), (1, RiD.LFP_FILTER_ORDER))
+                if report_ripples:
+                    # If any of the tetrodes has a ripple, let's call it a ripple for now
+                    ripple_to_baseline_ratio = (frame_ripple_power[0] - interruption_statistics[0])/ \
+                            interruption_statistics[1]
+                    if (ripple_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD):
+                        current_time = float(iter_idx)/float(RiD.LFP_FREQUENCY)
+                        if ((current_time - prev_ripple) > RiD.RIPPLE_REFRACTORY_PERIOD):
+                            ripple_events.append(current_time)
+                            prev_ripple = current_time
+                            print("Ripple @ %.2f, strength: %.1f"%(current_time, ripple_to_baseline_ratio))
 
             iter_idx += 1
             if (iter_idx >= N_DATA_SAMPLES):
@@ -177,9 +192,9 @@ def getRippleStatistics(tetrodes, analysis_time=4):
 
 
     # Normalize both EEG and Ripple power so that they can be visualized together.
-    norm_lfp, lfp_mean, lfp_std = normalizeData(raw_lfp_buffer[1,:])
-    norm_ripple_power, power_mean, power_std = normalizeData(ripple_power[1,:])
-    norm_raw_ripple, ripple_mean, ripple_std = normalizeData(ripple_filtered_lfp[1,:])
+    norm_lfp, lfp_mean, lfp_std = normalizeData(raw_lfp_buffer[0,:])
+    norm_ripple_power, power_mean, power_std = normalizeData(ripple_power[0,:])
+    norm_raw_ripple, ripple_mean, ripple_std = normalizeData(ripple_filtered_lfp[0,:])
 
     print("Ripple Statistics...")
     print("Mean: %.2f"%power_mean)
@@ -192,11 +207,15 @@ def getRippleStatistics(tetrodes, analysis_time=4):
     for tetrode_idx in range(n_tetrodes):
         fig, (ax1, ax2) = plt.subplots(2,1,sharex=True)
         ax1.plot(timestamps, norm_lfp)
+        if report_ripples:
+            ax1.scatter(ripple_events, np.zeros(len(ripple_events)), c="g")
         ax1.grid(True)
         ax2.plot(timestamps, norm_raw_ripple)
+        ax2.plot(timestamps, norm_ripple_power)
         ax2.grid(True)
         plt.show()
 
+    """
     # Plot a histogram of the LFP power
     plt.figure()
     hist_axes = plt.axes()
@@ -204,6 +223,7 @@ def getRippleStatistics(tetrodes, analysis_time=4):
     plt.grid(True)
     hist_axes.yaxis.set_major_formatter(PercentFormatter(xmax=1))
     plt.show()
+    """
 
     # Animation
     wait_for_user_input = input('Press ENTER to continue, or Q to ABORT.')
@@ -216,5 +236,6 @@ def getRippleStatistics(tetrodes, analysis_time=4):
 
 if (__name__ == "__main__"):
     # tetrodes_to_be_analyzed = [1,2,3,14,15,16,17,18,19,20,21,22,23,24,25,26,32,37,39,40]
-    tetrodes_to_be_analyzed = [25,14,17,18,39]
+    tetrodes_to_be_analyzed = [23,14,17,18,39]
+    # getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], interruption_statistics=[60.0, 40.0])
     getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed])
