@@ -20,12 +20,13 @@ def normalizeData(in_data):
     norm_data = np.divide((in_data - data_mean), data_std)
     return norm_data, data_mean, data_std
 
-def animateLFP(timestamps, lfp, ripple_power, frame_size, statistic=None):
+def animateLFP(timestamps, lfp, raw_ripple, ripple_power, frame_size, statistic=None):
     """
     Animate a given LFP by plotting a fixed size sliding frame.
 
     :timestamps: time-points for the LFP data
     :lfp: LFP (Raw/Filtered) for a single tetrode
+    :raw_ripple: LFP Passed through a ripple filter
     :ripple_power: Ripple power calculated over a moving winow centered at all
         the data points.
     :frame_size: Size of the frame that should be seen at once
@@ -45,6 +46,7 @@ def animateLFP(timestamps, lfp, ripple_power, frame_size, statistic=None):
     # make this an array if nothing else is being passed in. Having text
     # removes this requirement.
     lfp_frame,   = plot_axes.plot([], [], animated=True)
+    r_raw_frame,  = plot_axes.plot([], [], animated=True)
     r_pow_frame, = plot_axes.plot([], [], animated=True)
     txt_template = 't = %.2fs'
     lfp_measure  = plot_axes.text(0.5, 0.09, '', transform=plot_axes.transAxes)
@@ -57,13 +59,14 @@ def animateLFP(timestamps, lfp, ripple_power, frame_size, statistic=None):
         print(lfp[step])
         """
         lfp_frame.set_data(timestamps[step:step+frame_size], lfp[step:step+frame_size])
+        r_raw_frame.set_data(timestamps[step:step+frame_size], raw_ripple[step:step+frame_size])
         r_pow_frame.set_data(timestamps[step:step+frame_size], ripple_power[step:step+frame_size])
         lfp_measure.set_text(txt_template % timestamps[step])
         # Updating the limits is needed still so that the correct range of data
         # is displayed! It doesn't update the axis labels though - That's a
         # different ballgame!
         plot_axes.set_xlim(timestamps[step], timestamps[step+frame_size])
-        return lfp_frame, r_pow_frame, lfp_measure
+        return lfp_frame, r_raw_frame, r_pow_frame, lfp_measure
 
     def _initAnimFrame():
         # NOTE: Init function called twice! I have seen this before but still
@@ -73,6 +76,7 @@ def animateLFP(timestamps, lfp, ripple_power, frame_size, statistic=None):
         plot_axes.set_ylabel('EEG (uV)')
         plot_axes.set_ylim(min(lfp), max(lfp))
         plot_axes.set_xlim(timestamps[0], timestamps[frame_size])
+        plot_axes.grid(True)
         return _nextAnimFrame()
 
     n_frames = len(timestamps) - frame_size
@@ -143,6 +147,7 @@ def getRippleStatistics(tetrodes, analysis_time=4):
             # If we have enough data to fill in a new filter buffer, filter the
             # new data
             if (iter_idx > 0) and (iter_idx % RiD.LFP_FILTER_ORDER == 0):
+                # ripple_filtered_lfp is the entire LFP, passed through a ripple filter
                 ripple_filtered_lfp, ripple_frame_filter = signal.sosfilt(ripple_filter, \
                        raw_lfp_buffer, axis=1, zi=ripple_frame_filter)
 
@@ -151,9 +156,9 @@ def getRippleStatistics(tetrodes, analysis_time=4):
                 # reported for each frame right now: Filling out the same value
                 # for the entire frame.
                 ripple_power[:,iter_idx-RiD.LFP_FILTER_ORDER:iter_idx] = \
-                        np.tile(np.reshape(np.sqrt(np.mean(np.power(ripple_filtered_lfp, 2), axis=1)), \
+                        np.tile(np.reshape(np.sqrt(np.mean(np.power( \
+                        ripple_filtered_lfp[:,iter_idx-RiD.LFP_FILTER_ORDER:iter_idx], 2), axis=1)), \
                         (n_tetrodes, 1)), (1, RiD.LFP_FILTER_ORDER))
-
 
             # TODO: Look at shorter time windows and see if we can isolate
             # individual ripples in the raw LFP (by eye) and in the filtered
@@ -170,22 +175,27 @@ def getRippleStatistics(tetrodes, analysis_time=4):
 
     print("Collected raw LFP Data. Visualizing.")
 
+
+    # Normalize both EEG and Ripple power so that they can be visualized together.
+    norm_lfp, lfp_mean, lfp_std = normalizeData(raw_lfp_buffer[1,:])
+    norm_ripple_power, power_mean, power_std = normalizeData(ripple_power[1,:])
+    norm_raw_ripple, ripple_mean, ripple_std = normalizeData(ripple_filtered_lfp[1,:])
+
+    print("Ripple Statistics...")
+    print("Mean: %.2f"%power_mean)
+    print("Std: %.2f"%power_std)
+
     # Plots - Pick a tetrode to plot the data from
     # Static plots
     plt.ion()
     n_tetrodes = 1
     for tetrode_idx in range(n_tetrodes):
-        plt.figure()
-        plt.plot(timestamps, raw_lfp_buffer[tetrode_idx,:])
-        plt.grid(True)
+        fig, (ax1, ax2) = plt.subplots(2,1,sharex=True)
+        ax1.plot(timestamps, norm_lfp)
+        ax1.grid(True)
+        ax2.plot(timestamps, norm_raw_ripple)
+        ax2.grid(True)
         plt.show()
-
-    # Normalize both EEG and Ripple power so that they can be visualized together.
-    norm_lfp, lfp_mean, lfp_std = normalizeData(raw_lfp_buffer[1,:])
-    norm_ripple_power, power_mean, power_std = normalizeData(ripple_power[1,:])
-    print("Ripple Statistics...")
-    print("Mean: %.2f"%power_mean)
-    print("Std: %.2f"%power_std)
 
     # Plot a histogram of the LFP power
     plt.figure()
@@ -196,11 +206,13 @@ def getRippleStatistics(tetrodes, analysis_time=4):
     plt.show()
 
     # Animation
-    wait_for_user_input = input('Press ENTER to continue')
-    animateLFP(timestamps, norm_lfp, norm_ripple_power, 400)
+    wait_for_user_input = input('Press ENTER to continue, or Q to ABORT.')
+    if (wait_for_user_input == 'Q'):
+        return
+    animateLFP(timestamps, norm_lfp, norm_raw_ripple, norm_ripple_power, 400)
 
     # Program exits with a segmentation fault! Can't help this.
-    wait_for_user_input = input('Press any key to continue')
+    wait_for_user_input = input('Press ENTER to quit')
 
 if (__name__ == "__main__"):
     # tetrodes_to_be_analyzed = [1,2,3,14,15,16,17,18,19,20,21,22,23,24,25,26,32,37,39,40]
