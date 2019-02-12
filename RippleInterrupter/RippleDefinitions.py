@@ -24,3 +24,5 @@ RIPPLE_POWER_THRESHOLD = 5     # Multiplicative factor for calling something a r
 
 # Plotting and aesthetics
 N_POWER_BINS = 20
+INTERRUPTION_WINDOW = 0.25    # Time before/after interruption displayed
+INTERRUPTION_TPTS   = int(INTERRUPTION_WINDOW * LFP_FREQUENCY)
