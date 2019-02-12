@@ -2,6 +2,7 @@
 from scipy import signal, stats
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from matplotlib.ticker import PercentFormatter
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import sys
@@ -32,6 +33,9 @@ def animateLFP(timestamps, lfp, ripple_power, frame_size, statistic=None):
         a scalar quantity that can also be plotted!
     """
 
+    # Turn interactive plotting off. It messes up animation
+    plt.ioff()
+
     # Change this to '3d' if the need every arises for a multi-dimensional plot
     lfp_fig   = plt.figure()
     plot_axes = plt.axes(projection=None)
@@ -44,10 +48,6 @@ def animateLFP(timestamps, lfp, ripple_power, frame_size, statistic=None):
     r_pow_frame, = plot_axes.plot([], [], animated=True)
     txt_template = 't = %.2fs'
     lfp_measure  = plot_axes.text(0.5, 0.09, '', transform=plot_axes.transAxes)
-
-    # Normalize both EEG and Ripple power so that they can be visualized together.
-    lfp = normalizeData(lfp)
-    ripple_power = normalizeData(ripple_power)
 
     # Local functions for setting up animation frames and cycling through them
     def _nextAnimFrame(step=0):
@@ -174,14 +174,28 @@ def getRippleStatistics(tetrodes, analysis_time=10):
 
     # Plots - Pick a tetrode to plot the data from
     # Static plots
+    plt.ion()
     n_tetrodes = 1
     for tetrode_idx in range(n_tetrodes):
         plt.figure()
         plt.plot(timestamps, raw_lfp_buffer[tetrode_idx,:])
+        plt.grid(True)
         plt.show()
 
+    # Normalize both EEG and Ripple power so that they can be visualized together.
+    norm_lfp = normalizeData(raw_lfp_buffer[1,:])
+    norm_ripple_power = normalizeData(ripple_power[1,:])
+
+    # Plot a histogram of the LFP power
+    plt.figure()
+    hist_axes = plt.axes()
+    plt.hist(norm_ripple_power, bins=RiD.N_POWER_BINS, density=True)
+    plt.grid(True)
+    hist_axes.yaxis.set_major_formatter(PercentFormatter(xmax=1))
+    plt.show()
+
     # Animation
-    animateLFP(timestamps, raw_lfp_buffer[1,:], ripple_power[1,:], 400)
+    animateLFP(timestamps, norm_lfp, norm_ripple_power, 400)
 
     # Program exits with a segmentation fault! Can't help this.
     wait_for_user_input = input('Press any key to continue')

@@ -16,3 +16,6 @@ RIPPLE_HI_FREQ    = 250
 
 # Custom constants
 LFP_ANIMATION_INTERVAL = 15     # Animation Frame rate
+
+# Plotting and aesthetics
+N_POWER_BINS = 20
