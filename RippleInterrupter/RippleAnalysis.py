@@ -18,7 +18,7 @@ def normalizeData(in_data):
     data_mean = np.mean(in_data, axis=0)
     data_std  = np.std(in_data, axis=0)
     norm_data = np.divide((in_data - data_mean), data_std)
-    return norm_data
+    return norm_data, data_mean, data_std
 
 def animateLFP(timestamps, lfp, ripple_power, frame_size, statistic=None):
     """
@@ -181,8 +181,11 @@ def getRippleStatistics(tetrodes, analysis_time=4):
         plt.show()
 
     # Normalize both EEG and Ripple power so that they can be visualized together.
-    norm_lfp = normalizeData(raw_lfp_buffer[1,:])
-    norm_ripple_power = normalizeData(ripple_power[1,:])
+    norm_lfp, lfp_mean, lfp_std = normalizeData(raw_lfp_buffer[1,:])
+    norm_ripple_power, power_mean, power_std = normalizeData(ripple_power[1,:])
+    print("Ripple Statistics...")
+    print("Mean: %.2f"%power_mean)
+    print("Std: %.2f"%power_std)
 
     # Plot a histogram of the LFP power
     plt.figure()
@@ -193,7 +196,7 @@ def getRippleStatistics(tetrodes, analysis_time=4):
     plt.show()
 
     # Animation
-    wait_for_user_input = input('Press any key to continue')
+    wait_for_user_input = input('Press ENTER to continue')
     animateLFP(timestamps, norm_lfp, norm_ripple_power, 400)
 
     # Program exits with a segmentation fault! Can't help this.
