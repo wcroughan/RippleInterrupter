@@ -237,5 +237,5 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None)
 if (__name__ == "__main__"):
     # tetrodes_to_be_analyzed = [1,2,3,14,15,16,17,18,19,20,21,22,23,24,25,26,32,37,39,40]
     tetrodes_to_be_analyzed = [23,14,17,18,39]
-    # getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], interruption_statistics=[60.0, 40.0])
-    getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed])
+    getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], interruption_statistics=[60.0, 40.0])
+    # getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed])
