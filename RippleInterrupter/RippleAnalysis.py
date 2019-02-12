@@ -82,7 +82,7 @@ def animateLFP(timestamps, lfp, ripple_power, frame_size, statistic=None):
     plt.figure(lfp_fig.number)
     plt.show(plot_axes)
 
-def getRippleStatistics(tetrodes, analysis_time=10):
+def getRippleStatistics(tetrodes, analysis_time=4):
     """
     Get ripple data statistics for a particular tetrode and a user defined time
     period.
@@ -122,10 +122,8 @@ def getRippleStatistics(tetrodes, analysis_time=10):
     lfp_stream = client.subscribeLFPData(TrodesInterface.LFP_SUBSCRIPTION_ATTRIBUTE, tetrodes)
     lfp_stream.initialize()
 
-    # TODO: Change this to account for the user specified time for analysis.
-    # For now, we will just enforce a fixed number of iterations for which LFP
-    # data is brought in and analyzed.
-    N_DATA_SAMPLES = 3000
+    # LFP Sampling frequency TIMES desired analysis time period
+    N_DATA_SAMPLES = analysis_time * RiD.LFP_FREQUENCY
 
     # Each LFP frame (I think it is just a single time point) is returned in
     # lfp_frame_buffer. The entire timeseries is stored in raw_lfp_buffer.
@@ -195,6 +193,7 @@ def getRippleStatistics(tetrodes, analysis_time=10):
     plt.show()
 
     # Animation
+    wait_for_user_input = input('Press any key to continue')
     animateLFP(timestamps, norm_lfp, norm_ripple_power, 400)
 
     # Program exits with a segmentation fault! Can't help this.
