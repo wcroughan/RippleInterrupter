@@ -325,7 +325,8 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
     print("Collected raw LFP Data. Visualizing.")
     power_mean, power_std = visualizeLFP(timestamps, raw_lfp_buffer, ripple_power, \
             ripple_filtered_lfp, ripple_events, do_animation=False)
-    writeLogFile(trodes_timestamps, ripple_events, wall_ripple_times, interrupt_events)
+    if report_ripples:
+        writeLogFile(trodes_timestamps, ripple_events, wall_ripple_times, interrupt_events)
 
     # Program exits with a segmentation fault! Can't help this.
     wait_for_user_input = input('Press ENTER to quit')
