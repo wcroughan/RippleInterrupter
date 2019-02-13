@@ -21,6 +21,24 @@ def normalizeData(in_data):
     norm_data = np.divide((in_data - data_mean), data_std)
     return norm_data, data_mean, data_std
 
+def writeLogFile(trodes_timestamps, ripple_events, wall_ripple_times, interrupt_events):
+    outf = open(os.getcwd() + "/ripple_interruption_out__" +str(time.time()) + ".txt", "w")
+
+    # First write out the ripples
+    outf.write("Detected Ripple Events...\n")
+    for idx, t_stamp in enumerate(trodes_timestamps):
+        outf.write(str(t_stamp) + ", ")
+        outf.write(str(ripple_events[idx]) + ", ")
+        outf.write(str(wall_ripple_times[idx]) + ", ")
+        outf.write("\n")
+    outf.write("\n")
+
+    outf.write("Interruption Events...\n")
+    for i_event in interrupt_events:
+        outf.write(str(i_event) + "\n")
+
+    outf.close()
+
 def visualizeLFP(timestamps, raw_lfp_buffer, ripple_power, ripple_filtered_lfp, \
         ripple_events=None, do_animation=False):
     # Normalize both EEG and Ripple power so that they can be visualized together.
@@ -163,7 +181,6 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
     BAUDRATE     = 9600
     DEFAULT_PORT = '/dev/ttyS0'
 
-    outf = open(os.getcwd() + "/ripple_interruption_out__" +str(time.time()) + ".txt", "w")
     ser = None
     if interrupt_ripples:
         ser = serial.Serial(DEFAULT_PORT, BAUDRATE, timeout=0, stopbits=serial.STOPBITS_ONE, \
@@ -215,8 +232,12 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
     prev_ripple = -1.0
     prev_interrupt = -1.0
 
+    # Data to be logged for later use
+    ripple_events = []
+    trodes_timestamps = []
+    wall_ripple_times = []
+    interrupt_events = []
     if report_ripples:
-        ripple_events = []
         print('Using pre-recorded ripple statistics')
         print('Mean: %.2f'%interruption_statistics[0])
         print('Std: %.2f'%interruption_statistics[1])
@@ -271,6 +292,7 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
                                 interruption_axes.plot(timestamps[data_begin_idx:iter_idx], raw_lfp_buffer[0, \
                                         data_begin_idx:iter_idx])
                                 interruption_axes.scatter(prev_ripple, 0, c="r")
+                                plt.grid(True)
                                 plt.draw()
                                 plt.pause(0.001)
                                 # print(raw_lfp_buffer[0, data_begin_idx:iter_idx])
@@ -281,29 +303,29 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
                         if (ripple_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD):
                             current_time = float(iter_idx)/float(RiD.LFP_FREQUENCY)
                             if ((current_time - prev_ripple) > RiD.RIPPLE_REFRACTORY_PERIOD):
-                                ripple_events.append(current_time)
                                 prev_ripple = current_time
                                 current_wall_time = time.time() - start_wall_time
-                                print("Ripple @ %.2f, Real Time %.2f, strength: %.1f"%(current_time, current_wall_time, ripple_to_baseline_ratio))
+                                time_lag = (current_wall_time - current_time)
+                                print("Ripple @ %.2f, Real Time %.2f [Lag: %.2f], strength: %.1f"%(current_time, current_wall_time, time_lag, ripple_to_baseline_ratio))
                                 if interrupt_ripples and ((current_time - prev_interrupt) > RiD.INTERRUPT_REFRACTORY_PERIOD):
                                     prev_interrupt = current_time;
                                     sendBiphasicPulse(ser)
                                     # TODO: Add ripple interruption code
                                     interruption_time = time.time() - start_wall_time
                                     print("Ripple Interrupted@ %.2f!"% interruption_time)
-                                outf.write(str(trodes_time_stamp) + ", ")
-                                outf.write(str(current_time) + ", ")
-                                outf.write(str(current_wall_time))
-                                outf.write("\n")
+                                    interrupt_events.append(interruption_time)
+                                trodes_timestamps.append(trodes_time_stamp)
+                                ripple_events.append(current_time)
+                                wall_ripple_times.append(current_wall_time)
 
             iter_idx += 1
             if (iter_idx >= N_DATA_SAMPLES):
                 break
 
-    outf.close()
     print("Collected raw LFP Data. Visualizing.")
     visualizeLFP(timestamps, raw_lfp_buffer, ripple_power, ripple_filtered_lfp, \
             ripple_events, do_animation=False)
+    writeLogFile(trodes_timestamps, ripple_events, wall_ripple_times, interrupt_events)
 
     # Program exits with a segmentation fault! Can't help this.
     wait_for_user_input = input('Press ENTER to quit')
