@@ -16,7 +16,7 @@ RIPPLE_HI_FREQ    = 250
 
 # Refractory period for a ripple (in seconds)
 RIPPLE_SMOOTHING_WINDOW  = int(0.01 * LFP_FREQUENCY) # 10ms smoothing window
-RIPPLE_REFRACTORY_PERIOD = 0.2
+RIPPLE_REFRACTORY_PERIOD = 1.0
 
 # Custom constants
 LFP_ANIMATION_INTERVAL = 5     # Animation Frame rate (this is the delay between frames)

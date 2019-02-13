@@ -115,11 +115,12 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
     :returns: Distribution of ripple power, ripple amplitude and frequency
     """
     BAUDRATE     = 9600
-    DEFAULT_PORT = '/dev/ttyS1'
+    DEFAULT_PORT = '/dev/ttyS0'
 
+    outf = open("/home/fosterlab/Desktop/ripple_interruption_out__" +str(time.time()) + ".txt", "w")
     ser = None
     if interrupt_ripples:
-        ser = serial.Serial(port, BAUDRATE, timeout=0, stopbits=serial.STOPBITS_ONE, \
+        ser = serial.Serial(DEFAULT_PORT, BAUDRATE, timeout=0, stopbits=serial.STOPBITS_ONE, \
                 bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE)
 
     if show_interruptions:
@@ -153,7 +154,7 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
     lfp_stream.initialize()
 
     # LFP Sampling frequency TIMES desired analysis time period
-    N_DATA_SAMPLES = analysis_time * RiD.LFP_FREQUENCY
+    N_DATA_SAMPLES = int(analysis_time * RiD.LFP_FREQUENCY)
 
     # Each LFP frame (I think it is just a single time point) is returned in
     # lfp_frame_buffer. The entire timeseries is stored in raw_lfp_buffer.
@@ -166,6 +167,7 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
     iter_idx    = 0
     prev_ripple = -1.0
     start_time  = 0.0
+    start_wall_time = time.time()
 
     if report_ripples:
         ripple_events = []
@@ -182,12 +184,14 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
         plt.show()
 
     wait_for_user_input = input("Press Enter to start!")
-
+    interruption_iter = -1
+    is_first_ripple = True
     while (iter_idx < N_DATA_SAMPLES):
         n_lfp_frames = lfp_stream.available(0)
         for frame_idx in range(n_lfp_frames):
             # print("t__%.2f"%(float(iter_idx)/float(RiD.LFP_FREQUENCY)))
             t_stamp = lfp_stream.getData()
+            trodes_time_stamp = client.latestTrodesTimestamp()
             raw_lfp_buffer[:, iter_idx] = lfp_frame_buffer[:]
 
             # If we have enough data to fill in a new filter buffer, filter the
@@ -206,36 +210,46 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
                 ripple_power[:,iter_idx-RiD.LFP_FILTER_ORDER:iter_idx] = \
                         np.tile(np.reshape(frame_ripple_power, (n_tetrodes, 1)), (1, RiD.LFP_FILTER_ORDER))
                 if report_ripples:
-                    # Show the previous interruption after a sufficient time has elapsed
-                    if show_interruptions:
-                        if (iter_idx == int((prev_ripple + RiD.INTERRUPTION_WINDOW) * RiD.LFP_FREQUENCY)):
-                            data_begin_idx = int(max(0, iter_idx - 2*RiD.INTERRUPTION_TPTS))
-                            interruption_axes.clear()
-                            interruption_axes.plot(timestamps[data_begin_idx:iter_idx], raw_lfp_buffer[0, \
-                                    data_begin_idx:iter_idx])
-                            interruption_axes.scatter(prev_ripple, 0, c="g")
-                            plt.draw()
-                            plt.pause(0.001)
-                            # print(raw_lfp_buffer[0, data_begin_idx:iter_idx])
+                    if is_first_ripple:
+                        is_first_ripple = False
+                    else:
+                        # Show the previous interruption after a sufficient time has elapsed
+                        if show_interruptions:
+                            if (iter_idx == int((prev_ripple + RiD.INTERRUPTION_WINDOW) * RiD.LFP_FREQUENCY)):
+                                data_begin_idx = int(max(0, iter_idx - 2*RiD.INTERRUPTION_TPTS))
+                                interruption_axes.clear()
+                                interruption_axes.plot(timestamps[data_begin_idx:iter_idx], raw_lfp_buffer[0, \
+                                        data_begin_idx:iter_idx])
+                                interruption_axes.scatter(prev_ripple, 0, c="r")
+                                plt.draw()
+                                plt.pause(0.001)
+                                # print(raw_lfp_buffer[0, data_begin_idx:iter_idx])
 
-                    # If any of the tetrodes has a ripple, let's call it a ripple for now
-                    ripple_to_baseline_ratio = (frame_ripple_power[0] - interruption_statistics[0])/ \
-                            interruption_statistics[1]
-                    if (ripple_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD):
-                        current_time = float(iter_idx)/float(RiD.LFP_FREQUENCY)
-                        if ((current_time - prev_ripple) > RiD.RIPPLE_REFRACTORY_PERIOD):
-                            ripple_events.append(current_time)
-                            prev_ripple = current_time
-                            print("Ripple @ %.2f, strength: %.1f"%(current_time, ripple_to_baseline_ratio))
-                            if interrupt_ripples:
-                                # TODO: Add ripple interruption code
-                                sendBiphasicPulse(ser)
-                                print("Ripple Interrupted!")
+                        # If any of the tetrodes has a ripple, let's call it a ripple for now
+                        ripple_to_baseline_ratio = (frame_ripple_power[0] - interruption_statistics[0])/ \
+                                interruption_statistics[1]
+                        if (ripple_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD):
+                            current_time = float(iter_idx)/float(RiD.LFP_FREQUENCY)
+                            if ((current_time - prev_ripple) > RiD.RIPPLE_REFRACTORY_PERIOD):
+                                ripple_events.append(current_time)
+                                prev_ripple = current_time
+                                current_wall_time = time.time() - start_wall_time
+                                print("Ripple @ %.2f, Real Time %.2f, strength: %.1f"%(current_time, current_wall_time, ripple_to_baseline_ratio))
+                                if interrupt_ripples:
+                                    sendBiphasicPulse(ser)
+                                    # TODO: Add ripple interruption code
+                                    interruption_time = time.time() - start_wall_time
+                                    print("Ripple Interrupted@ %.2f!"% interruption_time)
+                                outf.write(str(trodes_time_stamp) + ", ")
+                                outf.write(str(current_time) + ", ")
+                                outf.write(str(current_wall_time))
+                                outf.write("\n")
 
             iter_idx += 1
             if (iter_idx >= N_DATA_SAMPLES):
                 break
 
+    outf.close()
     print("Collected raw LFP Data. Visualizing.")
 
 
@@ -282,10 +296,27 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
     # Program exits with a segmentation fault! Can't help this.
     wait_for_user_input = input('Press ENTER to quit')
 
-if (__name__ == "__main__"):
+def main():
     # tetrodes_to_be_analyzed = [1,2,3,14,15,16,17,18,19,20,21,22,23,24,25,26,32,37,39,40]
-    tetrodes_to_be_analyzed = [23,14,17,18,39]
+    # tetrodes_to_be_analyzed = [23,14,17,18,39]
+    tetrodes_to_be_analyzed = [3]
+    """
     getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
             interruption_statistics=[60.0, 40.0], show_interruptions=True, \
             interrupt_ripples=False, analysis_time=20)
-    # getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed])
+    """
+    if (int(sys.argv[1][0]) == 0):
+        while (True):
+                getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
+                            interruption_statistics=[60.0, 30.0], show_interruptions=False, \
+                            interrupt_ripples=True, analysis_time=20)
+    elif (int(sys.argv[1][0]) == 1):
+                getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
+                            interruption_statistics=[60.0, 30.0], show_interruptions=False, \
+                            interrupt_ripples=False, analysis_time=20)
+    else:
+        getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
+            analysis_time=10.0)
+
+if (__name__ == "__main__"):
+    main()
