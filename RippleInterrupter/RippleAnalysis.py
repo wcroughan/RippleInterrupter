@@ -81,8 +81,7 @@ def visualizeLFP(timestamps, raw_lfp_buffer, ripple_power, ripple_filtered_lfp, 
         if (wait_for_user_input == 'Q'):
             return
         animateLFP(timestamps, norm_lfp, norm_raw_ripple, norm_ripple_power, 400)
-
-
+    return (power_mean, power_std)
 
 def animateLFP(timestamps, lfp, raw_ripple, ripple_power, frame_size, statistic=None):
     """
@@ -322,13 +321,15 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
             if (iter_idx >= N_DATA_SAMPLES):
                 break
 
+    client.closeConnections()
     print("Collected raw LFP Data. Visualizing.")
-    visualizeLFP(timestamps, raw_lfp_buffer, ripple_power, ripple_filtered_lfp, \
-            ripple_events, do_animation=False)
+    power_mean, power_std = visualizeLFP(timestamps, raw_lfp_buffer, ripple_power, \
+            ripple_filtered_lfp, ripple_events, do_animation=False)
     writeLogFile(trodes_timestamps, ripple_events, wall_ripple_times, interrupt_events)
 
     # Program exits with a segmentation fault! Can't help this.
     wait_for_user_input = input('Press ENTER to quit')
+    return (power_mean, power_std)
 
 def main():
     # tetrodes_to_be_analyzed = [1,2,3,14,15,16,17,18,19,20,21,22,23,24,25,26,32,37,39,40]
@@ -339,18 +340,17 @@ def main():
             interruption_statistics=[60.0, 40.0], show_interruptions=True, \
             interrupt_ripples=False, analysis_time=20)
     """
-    if (int(sys.argv[1][0]) == 0):
-        while (True):
-                getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
-                            interruption_statistics=[60.0, 30.0], show_interruptions=False, \
-                            interrupt_ripples=True, analysis_time=20)
-    elif (int(sys.argv[1][0]) == 1):
-                getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
-                            interruption_statistics=[60.0, 30.0], show_interruptions=True, \
-                            interrupt_ripples=False, analysis_time=20)
-    else:
+    if len(sys.argv) == 1:
+        (power_mean, power_std) = getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
+                analysis_time=10.0)
+    elif (int(sys.argv[1][0]) == 0):
         getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
-            analysis_time=10.0)
+                interruption_statistics=[60.0, 30.0], show_interruptions=True, \
+                interrupt_ripples=True, analysis_time=20)
+    elif (int(sys.argv[1][0]) == 1):
+        getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
+                interruption_statistics=[60.0, 30.0], show_interruptions=True, \
+                interrupt_ripples=False, analysis_time=20)
 
 if (__name__ == "__main__"):
     main()
