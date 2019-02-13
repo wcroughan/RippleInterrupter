@@ -213,6 +213,7 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
     timestamps  = np.linspace(0, analysis_time, N_DATA_SAMPLES)
     iter_idx    = 0
     prev_ripple = -1.0
+    prev_interrupt = -1.0
 
     if report_ripples:
         ripple_events = []
@@ -284,7 +285,8 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
                                 prev_ripple = current_time
                                 current_wall_time = time.time() - start_wall_time
                                 print("Ripple @ %.2f, Real Time %.2f, strength: %.1f"%(current_time, current_wall_time, ripple_to_baseline_ratio))
-                                if interrupt_ripples:
+                                if interrupt_ripples and ((current_time - prev_interrupt) > RiD.INTERRUPT_REFRACTORY_PERIOD):
+                                    prev_interrupt = current_time;
                                     sendBiphasicPulse(ser)
                                     # TODO: Add ripple interruption code
                                     interruption_time = time.time() - start_wall_time
@@ -322,7 +324,7 @@ def main():
                             interrupt_ripples=True, analysis_time=20)
     elif (int(sys.argv[1][0]) == 1):
                 getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
-                            interruption_statistics=[60.0, 30.0], show_interruptions=False, \
+                            interruption_statistics=[60.0, 30.0], show_interruptions=True, \
                             interrupt_ripples=False, analysis_time=20)
     else:
         getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
