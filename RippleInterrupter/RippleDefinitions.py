@@ -3,6 +3,9 @@ Constant definitions that can be accessed across files without having to
 respecify them at multiple locations
 """
 
+# Spike sampling rate
+SPIKE_SAMPLING_FREQ = 30000
+
 # LFP sampling rate, and filter parameters
 LFP_FREQUENCY     = 1500
 LFP_FILTER_LENGTH = 0.002     # 1ms long window for filtering ripples

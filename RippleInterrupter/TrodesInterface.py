@@ -1,3 +1,6 @@
+"""
+Connection interface to Trodes
+"""
 from spikegadgets import trodesnetwork as tn
 
 # Constant declaration
@@ -29,7 +32,7 @@ class SGClient(tn.AbstractModuleClient):
         self.recvquit = True
 
     def recv_event(self, origin, event, msg):
-        if origin == "CameraModule" and event == "newZone":
+        if origin == "CameraModule.2" and event == "2Dpos":
             self.recvquit = True
 
         print(origin)

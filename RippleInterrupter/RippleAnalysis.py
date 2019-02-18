@@ -1,14 +1,15 @@
+"""
+Module for analysis of ripples in streaming or offline LFP data.
+"""
 # System imports
-from scipy import signal, stats
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-from matplotlib.ticker import PercentFormatter
-from mpl_toolkits.mplot3d import Axes3D
-import numpy as np
 import os
 import sys
 import time
-import serial
+import threading
+from scipy import signal
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+import numpy as np
 
 # Local file imports
 import TrodesInterface
@@ -32,13 +33,18 @@ class RippleDetector(threading.Thread):
 
         threading.Thread.__init__(self)
         self._target_tetrodes = target_tetrodes
-        self._lfp_stream = sg_client.subscribeLFPData(TrodesInterface.LFP_SUBSCRIPTION_ATTRIBUTE, tetrodes)
+        self._n_tetrodes = len(self._target_tetrodes)
+        self._lfp_stream = sg_client.subscribeLFPData(TrodesInterface.LFP_SUBSCRIPTION_ATTRIBUTE, \
+                self._target_tetrodes)
         self._lfp_stream.initialize()
+        # TODO: Check that initialization worked!
         self._ripple_filter = signal.butter(RiD.LFP_FILTER_ORDER, \
                 (RiD.RIPPLE_LO_FREQ, RiD.RIPPLE_HI_FREQ), btype='bandpass', \
                 analog=False, output='sos', fs=RiD.LFP_FREQUENCY)
 
-    def run(self, t_max=np.Inf):
+        self._lfp_buffer = self._lfp_buffer.create_numpy_array()
+
+    def run(self):
         """
         Start thread execution
 
@@ -46,10 +52,38 @@ class RippleDetector(threading.Thread):
             that ripple analysis should work for.
         :returns: Nothing
         """
-        
-        while (True):
+        # Filter the contents of the signal frame by frame
+        ripple_frame_filter = signal.sosfilt_zi(self._ripple_filter)
+
+        # Tile it to take in all the tetrodes at once
+        ripple_frame_filter = np.tile(np.reshape(ripple_frame_filter, \
+                (RiD.LFP_FILTER_ORDER, 1, 2)), (1, n_tetrodes, 1))
+        # Buffers for storing/manipulating raw LFP, ripple filtered LFP and
+        # ripple power.
+        raw_lfp_window = np.zeros(self._n_tetrodes, RiD.LFP_FILTER_ORDER)
+        ripple_power = np.zeros(self._n_tetrodes, RiD.RIPPLE_SMOOTHING_WINDOW)
+        lfp_window_ptr = 0
+        pow_window_ptr = 0
+        while True:
             # Acquire buffered LFP frames and fill them in a filter buffer
-            n_lfp_frames = lfp_stream.available(0)
+            n_lfp_frames = self._lfp_stream.available(0)
+            for frame_idx in range(n_lfp_frames):
+                trodes_timestamp = self._lfp_stream.getData()
+                raw_lfp_window[:, lfp_window_ptr] = self._lfp_buffer[:]
+                lfp_window_ptr += 1
+
+                # If the filter window is full, filter the data and record it
+                # in rippple power
+                if (lfp_window_ptr == RiD.LFP_FILTER_ORDER):
+                    lfp_window_ptr = 0
+                    filtered_window, ripple_frame_filter = signal.sosfilt(self._ripple_filter, \
+                           lfp_window, axis=1, zi=ripple_frame_filter)
+                    ripple_power[:, pow_window_ptr] = np.sqrt(np.mean(np.power( \
+                            filtered_window, 2), axis=1))
+                    pow_window_ptr += 1
+
+                    # TODO: Add a condition to check if ripple power is at a
+                    # level where we would like to check for a replay
         raise NotImplementedError()
         
 def normalizeData(in_data):
@@ -57,7 +91,7 @@ def normalizeData(in_data):
     data_mean = np.mean(in_data, axis=0)
     data_std  = np.std(in_data, axis=0)
     norm_data = np.divide((in_data - data_mean), data_std)
-    return norm_data, data_mean, data_std
+    return (norm_data, data_mean, data_std)
 
 def writeLogFile(trodes_timestamps, ripple_events, wall_ripple_times, interrupt_events):
     outf = open(os.getcwd() + "/ripple_interruption_out__" +str(time.time()) + ".txt", "w")
@@ -76,76 +110,6 @@ def writeLogFile(trodes_timestamps, ripple_events, wall_ripple_times, interrupt_
         outf.write(str(i_event) + "\n")
 
     outf.close()
-
-def animateLFP(timestamps, lfp, raw_ripple, ripple_power, frame_size, statistic=None):
-    """
-    Animate a given LFP by plotting a fixed size sliding frame.
-
-    :timestamps: time-points for the LFP data
-    :lfp: LFP (Raw/Filtered) for a single tetrode
-    :raw_ripple: LFP Passed through a ripple filter
-    :ripple_power: Ripple power calculated over a moving winow centered at all
-        the data points.
-    :frame_size: Size of the frame that should be seen at once
-    :statistic: Function handle that should be applied to the data to generate
-        a scalar quantity that can also be plotted!
-    """
-
-    # Turn interactive plotting off. It messes up animation
-    plt.ioff()
-
-    # Change this to '3d' if the need every arises for a multi-dimensional plot
-    lfp_fig   = plt.figure()
-    plot_axes = plt.axes(projection=None)
-
-    # Start with an empty plot, it can be then updated by animation functions
-    # NOTE: The way frame is accessed in animation internals forces us to
-    # make this an array if nothing else is being passed in. Having text
-    # removes this requirement.
-    lfp_frame,   = plot_axes.plot([], [], animated=True)
-    r_raw_frame, = plot_axes.plot([], [], animated=True)
-    r_pow_frame, = plot_axes.plot([], [], animated=True)
-    txt_template = 't = %.2fs'
-    lfp_measure  = plot_axes.text(0.5, 0.09, '', transform=plot_axes.transAxes)
-
-    # Local functions for setting up animation frames and cycling through them
-    def _nextAnimFrame(step=0):
-        """
-        # Making sure that the step index and data are coming in properly
-        print(step)
-        print(lfp[step])
-        """
-        lfp_frame.set_data(timestamps[step:step+frame_size], lfp[step:step+frame_size])
-        r_raw_frame.set_data(timestamps[step:step+frame_size], raw_ripple[step:step+frame_size])
-        r_pow_frame.set_data(timestamps[step:step+frame_size], ripple_power[step:step+frame_size])
-        lfp_measure.set_text(txt_template % timestamps[step])
-        # Updating the limits is needed still so that the correct range of data
-        # is displayed! It doesn't update the axis labels though - That's a
-        # different ballgame!
-        plot_axes.set_xlim(timestamps[step], timestamps[step+frame_size])
-        return lfp_frame, r_raw_frame, r_pow_frame, lfp_measure
-
-    def _initAnimFrame():
-        # NOTE: Init function called twice! I have seen this before but still
-        # don't understand why it works this way!
-        # print("Initializing animation frame...")
-        plot_axes.set_xlabel('Time (s)')
-        plot_axes.set_ylabel('EEG (uV)')
-        plot_axes.set_ylim(min(lfp), max(lfp))
-        plot_axes.set_xlim(timestamps[0], timestamps[frame_size])
-        plot_axes.grid(True)
-        return _nextAnimFrame()
-
-    n_frames = len(timestamps) - frame_size
-    lfp_anim = animation.FuncAnimation(lfp_fig, _nextAnimFrame, np.arange(0, n_frames), \
-            init_func=_initAnimFrame, interval=RiD.LFP_ANIMATION_INTERVAL, \
-            blit=True, repeat=False)
-    plt.figure(lfp_fig.number)
-
-    # Make the filtered ripple thinner
-    r_raw_frame.set_linewidth(0.5)
-    plt.show(plot_axes)
-
 
 def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
         ripple_statistics=None):
