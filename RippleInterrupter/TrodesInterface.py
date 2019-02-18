@@ -2,6 +2,7 @@ from spikegadgets import trodesnetwork as tn
 
 # Constant declaration
 LFP_SUBSCRIPTION_ATTRIBUTE = 1024
+SPIKE_SUBSCRIPTION_ATTRIBUTE = 1024
 
 class SGClient(tn.AbstractModuleClient):
     """
