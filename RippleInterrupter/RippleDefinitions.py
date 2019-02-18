@@ -4,7 +4,7 @@ respecify them at multiple locations
 """
 
 # Spike sampling rate
-SPIKE_SAMPLING_FREQ = 30000
+SPIKE_SAMPLING_FREQ = 30000.0
 
 # LFP sampling rate, and filter parameters
 LFP_FREQUENCY     = 1500

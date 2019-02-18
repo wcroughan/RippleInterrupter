@@ -16,24 +16,60 @@ import TrodesInterface
 import RippleDefinitions as RiD
 import Visualization
 
+class RippleSynchronizer(threading.Thread):
+    """
+    Waits for a ripple to be detected and processes downstream changes for
+    analyzing spike contents.
+    """
+
+    # Wait for 10ms while checking if the event flag is set.
+    _EVENT_TIMEOUT = 0.01
+
+    def __init__(self, sync_event):
+        """TODO: to be defined1. """
+        threading.Thread.__init__(self)
+        self._sync_event = sync_event
+        print(time.strftime("Started Ripple Synchronization thread at %H:%M:%S"))
+
+    def run(self):
+        while True:
+            # TODO: EVENT TIMEOUT will act as a timeout between successive
+            # ripple detections (maybe too hacky)
+            print("Waiting for ripple trigger...")
+            self._sync_event.acquire()
+            self._sync_event.wait(self._EVENT_TIMEOUT)
+            if self._sync_event.isSet():
+                self._sync_event.clear()
+                print(time.strftime("Ripple tiggered at %H:%M:%S"))
+            self._sync_event.release()
+
 class RippleDetector(threading.Thread):
     """
     Thread for ripple detection on a set of channels [ONLINE]
     """
 
-    def __init__(self, sg_client, target_tetrodes):
+    def __init__(self, sg_client, target_tetrodes, baseline_stats=None, trigger_condition=None):
         """
         Subsribe to LFP stream on a given client and start listening
         to/filtering data for a set of target tetrode channels.
 
         :sg_client: SpikeGadgets client for subscribing LFP steam
         :target_tetrodes: Set of tetrodes to listen to for ripples
-
+        :baseline_stats: Ripple power mean and std to detect/trigger interruption
+        :trigger_condition: Instance of threading.Event() (or
+            threading.Condition()) to communicate synchronization with other threads.
         """
 
         threading.Thread.__init__(self)
+        # TODO: Error handling if baseline stats are not provided - Get them by
+        # looking at the data for some time.
         self._target_tetrodes = target_tetrodes
         self._n_tetrodes = len(self._target_tetrodes)
+        self._mean_ripple_power = baseline_stats[0]
+        self._std_ripple_power  = baseline_stats[1]
+        self._trigger_condition = trigger_condition
+
+        # Data streams
         self._lfp_stream = sg_client.subscribeLFPData(TrodesInterface.LFP_SUBSCRIPTION_ATTRIBUTE, \
                 self._target_tetrodes)
         self._lfp_stream.initialize()
@@ -42,7 +78,8 @@ class RippleDetector(threading.Thread):
                 (RiD.RIPPLE_LO_FREQ, RiD.RIPPLE_HI_FREQ), btype='bandpass', \
                 analog=False, output='sos', fs=RiD.LFP_FREQUENCY)
 
-        self._lfp_buffer = self._lfp_buffer.create_numpy_array()
+        self._lfp_buffer = self._lfp_stream.create_numpy_array()
+        print(time.strftime("Started Ripple detection thread at %H:%M:%S"))
 
     def run(self):
         """
@@ -80,11 +117,16 @@ class RippleDetector(threading.Thread):
                            lfp_window, axis=1, zi=ripple_frame_filter)
                     ripple_power[:, pow_window_ptr] = np.sqrt(np.mean(np.power( \
                             filtered_window, 2), axis=1))
-                    pow_window_ptr += 1
 
-                    # TODO: Add a condition to check if ripple power is at a
-                    # level where we would like to check for a replay
-        raise NotImplementedError()
+                    # TODO: Uncomment this to work with a moving average of ripple power
+                    # pow_window_ptr += 1
+
+                    # TODO: This just looks at one tetrode for ripple detection right now
+                    power_to_baseline_ratio = (ripple_power[0,0] - self._mean_ripple_power)/self._std_ripple_power
+                    if (power_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD):
+                        self.trigger_condition.acquire()
+                        self.trigger_condition.set()
+                        self.trigger_condition.release()
         
 def normalizeData(in_data):
     # TODO: Might need tiling of data if there are multiple dimensions

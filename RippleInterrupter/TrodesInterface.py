@@ -26,6 +26,8 @@ class SGClient(tn.AbstractModuleClient):
 
         # Call the parent class constructor
         tn.AbstractModuleClient.__init__(self, name, connection, port)
+        if (self.initialize() != 0):
+            raise Exception("Could not connect to Trodes. Aborting!")
         print("Initialized connection to Trodes.")
 
     def recv_quit(self):
