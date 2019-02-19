@@ -21,7 +21,7 @@ class PositionEstimator(threading.Thread):
     __P_BIN_SIZE_X = (__P_MAX_X - __P_MIN_X)
     __P_BIN_SIZE_Y = (__P_MAX_Y - __P_MIN_Y)
 
-    def __init__(self, sg_client, camera_number=None, n_bins=(5,5)):
+    def __init__(self, sg_client, n_bins=(0,0), camera_number=None):
         threading.Thread.__init__(self)
         self._data_field = np.ndarray([], dtype=[('timestamp', 'u4'), ('line_segment', 'i4'), \
                 ('position_on_segment', 'f8'), ('position_x', i2), ('position_y', 'i2')])

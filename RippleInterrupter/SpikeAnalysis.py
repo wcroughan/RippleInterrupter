@@ -2,9 +2,33 @@
 import threading
 from scipy import signal, stats
 import matplotlib.pyplot as plt
+import xml.etree.ElementTree as ET
 
 # Local imports
 import TrodesInterface
+
+def readClusterFile(filename):
+    """
+    Reads a cluster file and generates a list of tetrodes that have cells and
+    all the clusters on that tetrode.
+
+    :filename: XML file containing clustering information.
+    :returns: A dictionary giving valid cluster indices for each tetrode.
+    """
+
+    try:
+        cluster_tree = ET.parse(filename)
+    except Exception as err:
+        print(err)
+        return
+
+    # The file is organized as:
+    # [ROOT] SpikeSortInfo 
+    #       -> PolygonClusters
+    #           -> ntrode (nTrodeID)
+    #               -> 
+    tree_roo
+    return
 
 class PlaceField(threading.Thread):
 
