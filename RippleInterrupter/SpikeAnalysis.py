@@ -1,4 +1,5 @@
 #System imports
+import time
 import threading
 from scipy import signal, stats
 import matplotlib.pyplot as plt
@@ -81,14 +82,17 @@ class SpikeDetector(threading.Thread):
     will allocate them to place bins.
     """
 
-    def __init__(self, sg_client, tetrodes, spike_buffer):
+    def __init__(self, sg_client, tetrodes, spike_buffer, position_buffer):
         """TODO: to be defined1. """
         threading.Thread.__init__(self)
+        tetrode_argument = [ tet_str + ",0" for tet_str in  tetrodes]
         self._spike_stream = sg_client.subscribeSpikesData(TrodesInterface.SPIKE_SUBSCRIPTION_ATTRIBUTE, \
-                tetrodes)
+                tetrode_argument)
         self._spike_stream.initialize()
         self._spike_record = self._spike_stream.create_numpy_array()
         self._spike_buffer = spike_buffer
+        self._position_buffer = position_buffer
+        print(time.strftime("Spike Detection thread started at %H:%M:%S"))
         return
 
     def run(self):
@@ -107,5 +111,12 @@ class SpikeDetector(threading.Thread):
                 tetrode_id = self._spike_record[0]['ntrodeid']
                 cluster_id = self._spike_record[0]['cluster']
 
+                # Get the position corresponding to this spike using the position buffer
+                oldest_position = self._position_buffer.get()
+                print("Spike Timestamp %d, position bin %d at timestamp %d matched"%(\
+                        spike_timestamp, oldest_position[1], oldest_position[0]))
+
                 # Put this spike in the spike buffer queue
-                self._spike_record.put()
+                # TODO: Use unique cluster indices (or unit indices here)
+                # instead of whatever has been hacked in at the moment.
+                self._spike_buffer.put((tetrode_id*8 + cluster_id, spike_timestamp))
