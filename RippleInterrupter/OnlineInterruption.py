@@ -3,6 +3,7 @@ import threading
 import Queue
 import time
 import numpy as np
+import multiprocessing as mp
 
 # Local imports
 import Logger
@@ -28,7 +29,8 @@ if (__name__ == "__main__"):
 
     # TODO: Making this a giant array might not be the best idea.. Potential
     # bugs accessing it too.
-    place_fields = np.zeros((n_clusters, N_POSITION_BINS(0), N_POSITION_BINS(1)))
+    place_fields = np.zeros((n_clusters, N_POSITION_BINS(0), N_POSITION_BINS(1)), \
+            dtype=[('n_spikes', 'u4'), ('occupancy', 'f8')]
 
     # Trodes needs strings!
     tetrode_argument = [str(tet) for tet in tetrodes_of_interest]
@@ -50,7 +52,9 @@ if (__name__ == "__main__"):
     spike_buffer = Queue.Queue()
     spike_listener = SpikeAnalysis.SpikeDetector(sg_client, tetrode_argument, \
             spike_buffer)
-    bayesian_estimator = 
+    bayesian_estimator = PositionEstimator.BayesianEstimator(spike_buffer, \
+            place_fields)
+    place_field_handler = 
 
     # Spawn threads for handling all the place fields. We can convert this into
     # separate threads for separate fields too but that seems overkill at this

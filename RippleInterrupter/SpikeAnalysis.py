@@ -26,17 +26,17 @@ def readClusterFile(filename):
     # [ROOT] SpikeSortInfo 
     #       -> PolygonClusters
     #           -> ntrode (nTrodeID)
-    #               -> 
-    tree_roo
+    #               -> cluster (clusterIndex)
+    tree_root = cluster_
     return
 
-class PlaceField(threading.Thread):
+class PlaceFieldHandler(threading.Thread):
 
     """
     Class for creating and updating place fields online
     """
 
-    def __init__(self, clusters=None):
+    def __init__(self, clusters, field_container):
         """
         Class constructor: Initialize a thread for pooling information on this
         place field.

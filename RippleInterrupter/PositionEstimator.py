@@ -14,7 +14,7 @@ class BayesianEstimator(threading.Thread):
         threading.Thread.__init__(self)
         # Hoping that everything in python is pass by reference. Place fields
         # is a giant array! Both spike buffer and place fields are shared
-        # resources
+        # resources.
         self._spike_buffer = spike_buffer
         self._place_fields = place_fields
 
