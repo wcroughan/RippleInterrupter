@@ -6,24 +6,27 @@ import SpikeAnalysis
 
 class BayesianEstimator(threading.Thread):
     """
-    Continuously keeps track of the current position of the animal.
     When a ripple trigger arrives, switches to replay decoding immediately.
     """
 
-    def __init__(self, spike_buffer, place_fields):
+    def __init__(self, spike_sender, place_field_provider):
         """TODO: to be defined1. """
         threading.Thread.__init__(self)
         # Hoping that everything in python is pass by reference. Place fields
         # is a giant array! Both spike buffer and place fields are shared
         # resources.
-        self._spike_buffer = spike_buffer
-        self._place_fields = place_fields
+        self._spike_buffer = spike_sender.get_spike_buffer_connection()
+        self._place_fields = place_field_provider.get_place_fields()
 
     def run(self):
+        while True:
+            #
+            pass
+
         raise NotImplementedError()
 
 
-    #TODO add request functions like in place field handler so in case of ripple we can stop behavior decoding immediately
+    #TODO keep track of decoding at replay time scale, also save behavioral decoding for output every once in a while
 
 
 class ReplayClassifier(threading.Thread):
