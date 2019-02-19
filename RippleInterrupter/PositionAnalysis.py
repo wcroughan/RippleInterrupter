@@ -57,6 +57,16 @@ class PositionEstimator(threading.Thread):
                 round((py - self.__P_MIN_Y)/self.__P_BIN_SIZE_Y)
         return bin_id
 
+    def getXYBin(self):
+        """
+        Get the x and y BIN for the current position.
+        """
+        px = self._data_field['position_x']
+        py = self._data_field['position_y']
+        x_bin = round((px - self.__P_MIN_X)/self.__P_BIN_SIZE_X)
+        y_bin = round((py - self.__P_MIN_Y)/self.__P_BIN_SIZE_Y)
+        return (x_bin, y_bin)
+
     def run(self):
         """
         Collect position data continuously and update the amount of time spent
@@ -97,7 +107,10 @@ class PositionEstimator(threading.Thread):
                     print("Position jumped %d -> %d"%(curr_bin_id, prev_bin_id))
 
                     #self._past_position_buffer.put((prev_step_timestamp, prev_bin_id))
-                    self._past_position_buffer.put((current_timestamp, curr_bin_id))
+                    
+                    (x_bin, y_bin) = getXYBin()
+                    self._past_position_buffer.put((current_timestamp, x_bin, y_bin))
+
                     # Update the total time spent in the bin we were previously in
                     self._bin_occupancy[prev_bin_id] += float(time_spent_in_prev_bin)/RiD.SPIKE_SAMPLING_FREQ
 
