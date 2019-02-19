@@ -5,6 +5,7 @@ import threading
 import time
 import logging
 import numpy as np
+from multiprocessing import Pipe
 
 # Local imports
 import RippleDefinitions as RiD
@@ -22,7 +23,8 @@ class PositionEstimator(threading.Thread):
     __P_BIN_SIZE_X = (__P_MAX_X - __P_MIN_X)
     __P_BIN_SIZE_Y = (__P_MAX_Y - __P_MIN_Y)
 
-    def __init__(self, sg_client, n_bins, past_position_buffer, camera_number=1):
+    #def __init__(self, sg_client, n_bins, past_position_buffer, camera_number=1):
+    def __init__(self, sg_client, n_bins, camera_number=1):
         threading.Thread.__init__(self)
         self._data_field = np.ndarray([], dtype=[('timestamp', 'u4'), ('line_segment', 'i4'), \
                 ('position_on_segment', 'f8'), ('position_x', 'i2'), ('position_y', 'i2')])
@@ -33,7 +35,7 @@ class PositionEstimator(threading.Thread):
         self._n_bins_x = int(n_bins[0])
         self._n_bins_y = int(n_bins[1])
         self._bin_occupancy = np.zeros((self._n_bins_x * self._n_bins_y), dtype='float')
-        self._past_position_buffer = past_position_buffer
+        #self._past_position_buffer = past_position_buffer
 
         # TODO: This is assuming that the jump in timestamps will not
         # completely fill up the memory. If the bin size is small, we might end
@@ -46,6 +48,8 @@ class PositionEstimator(threading.Thread):
             raise Exception("Could not connect to camera, aborting.")
         self._position_consumer.initialize()
         print(time.strftime("Starting Position tracking thread at %H:%M:%S"))
+
+        self._position_buffer_connections = []
 
     def getPositionBin(self):
         """
@@ -66,6 +70,14 @@ class PositionEstimator(threading.Thread):
         x_bin = round((px - self.__P_MIN_X)/self.__P_BIN_SIZE_X)
         y_bin = round((py - self.__P_MIN_Y)/self.__P_BIN_SIZE_Y)
         return (x_bin, y_bin)
+
+    def get_bin_occupancy(self):
+        return self._bin_occupancy
+
+    def get_position_buffer_connection(self):
+        my_end, your_end = Pipe()
+        self._position_buffer_connections.append(my_end)
+        return your_end
 
     def run(self):
         """
@@ -96,7 +108,10 @@ class PositionEstimator(threading.Thread):
 
                 if (prev_bin_id < 0):
                     # First recorded bin!
-                    self._past_position_buffer.put((self._data_field['timestamp'], curr_bin_id))
+                    #self._past_position_buffer.put((self._data_field['timestamp'], curr_bin_id))
+                    (x_bin, y_bin) = getXYBin()
+                    for outp in self._position_buffer_connections:
+                        outp.send((self._data_field['timestamp'], x_bin, y_bin))
                     prev_bin_id = curr_bin_id
                 elif (curr_bin_id != prev_bin_id):
                     current_timestamp = self._data_field['timestamp']
@@ -109,7 +124,9 @@ class PositionEstimator(threading.Thread):
                     #self._past_position_buffer.put((prev_step_timestamp, prev_bin_id))
                     
                     (x_bin, y_bin) = getXYBin()
-                    self._past_position_buffer.put((current_timestamp, x_bin, y_bin))
+                    for outp in self._position_buffer_connections:
+                        outp.send((current_timestamp, x_bin, y_bin))
+                    #self._past_position_buffer.put((current_timestamp, x_bin, y_bin))
 
                     # Update the total time spent in the bin we were previously in
                     self._bin_occupancy[prev_bin_id] += float(time_spent_in_prev_bin)/RiD.SPIKE_SAMPLING_FREQ

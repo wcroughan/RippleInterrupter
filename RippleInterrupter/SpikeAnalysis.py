@@ -70,12 +70,13 @@ class PlaceFieldHandler(threading.Thread):
     #    threading.Thread.__init__(self, past_position_buffer)
     #    self._past_position_buffer = past_position_buffer
 
-    def __init__(self, position_buffer, spike_buffer, place_fields):
+    def __init__(self, position_processor, spike_processor, place_fields):
         threading.Thread.__init__(self)
-        self._position_buffer = position_buffer
-        self._spike_buffer = spike_buffer
+        self._position_buffer = position_processor.get_position_buffer_connection()
+        self._spike_buffer = spike_processor.get_spike_buffer_connection()
         self._place_fields = place_fields
         self._nspks_in_bin = np.zeros(np.shape(place_fields))
+        self._bin_occupancy = position_processor.get_bin_occupancy()
 
     def run(self):
         """
@@ -89,7 +90,6 @@ class PlaceFieldHandler(threading.Thread):
         next_posbin_x = 0
         next_postime = 0
         spk_time = 0
-        pos_buf_empty = False
 
         update_pf_every_n_spks = 100 #this controls how many spikes are collected before place fields are recalculated
         pf_update_spk_iter = 0
@@ -98,6 +98,8 @@ class PlaceFieldHandler(threading.Thread):
             if self._has_pf_request:
                 time.sleep(0.005) #5ms
                 continue
+
+            pos_buf_empty = False
 
             while not self._spike_buffer.empty() and not self._has_pf_request:
                 #note this assumes technically that spikes are in strict chronological order. Although realistically
@@ -124,10 +126,10 @@ class PlaceFieldHandler(threading.Thread):
                 self._nspks_in_bin[spk_cl, current_posbin_x, current_posbin_y] += 1
                 pf_update_spk_iter += 1
 
-            if pf_update_spk_iter >= update_pf_every_n_spks:
+            if pf_update_spk_iter >= update_pf_every_n_spks and not self._has_pf_request:
                 pf_update_spk_iter = 0
-
-                #TODO update place field
+            
+                self._place_fields = np.divide(self._nspks_in_bin, self._bin_occupancy)
 
 
 
@@ -163,7 +165,8 @@ class SpikeDetector(threading.Thread):
     will allocate them to place bins.
     """
 
-    def __init__(self, sg_client, tetrodes, spike_buffer, position_buffer):
+    #def __init__(self, sg_client, tetrodes, spike_buffer, position_buffer):
+    def __init__(self, sg_client, tetrodes):
         """TODO: to be defined1. """
         threading.Thread.__init__(self)
         tetrode_argument = [ tet_str + ",0" for tet_str in  tetrodes]
@@ -171,10 +174,16 @@ class SpikeDetector(threading.Thread):
                 tetrode_argument)
         self._spike_stream.initialize()
         self._spike_record = self._spike_stream.create_numpy_array()
-        self._spike_buffer = spike_buffer
-        self._position_buffer = position_buffer
+        #self._spike_buffer = spike_buffer
+        #self._position_buffer = position_buffer
         print(time.strftime("Spike Detection thread started at %H:%M:%S"))
+        self._spike_buffer_connections = []
         return
+
+    def get_spike_buffer_connection(self):
+        my_end, your_end = Pipe()
+        self._spike_buffer_connections.append(my_end)
+        return your_end
 
     def run(self):
         """
@@ -193,11 +202,13 @@ class SpikeDetector(threading.Thread):
                 cluster_id = self._spike_record[0]['cluster']
 
                 # Get the position corresponding to this spike using the position buffer
-                oldest_position = self._position_buffer.get()
-                print("Spike Timestamp %d, position bin %d at timestamp %d matched"%(\
-                        spike_timestamp, oldest_position[1], oldest_position[0]))
+                #oldest_position = self._position_buffer.get()
+                #print("Spike Timestamp %d, position bin %d at timestamp %d matched"%(\
+                        #spike_timestamp, oldest_position[1], oldest_position[0]))
 
                 # Put this spike in the spike buffer queue
                 # TODO: Use unique cluster indices (or unit indices here)
                 # instead of whatever has been hacked in at the moment.
-                self._spike_buffer.put((tetrode_id*8 + cluster_id, spike_timestamp))
+                #self._spike_buffer.put((tetrode_id*8 + cluster_id, spike_timestamp))
+                for outp in self._spike_buffer_connections:
+                    outp.send((tetrode_id*8 + cluster_id, spike_timestamp))

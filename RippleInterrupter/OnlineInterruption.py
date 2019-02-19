@@ -59,12 +59,14 @@ if (__name__ == "__main__"):
     # TODO: Put everything in a try/catch loop to better handle user interrupts
     # Create a buffer for spikes to be accessed until they are taken out of the
     # queue by the Bayesian Estimator.
-    spike_buffer = Queue()
-    position_buffer = Queue()
+    #spike_buffer = Queue()
+    #position_buffer = Queue()
 
     # Initialize threads for looking at the actual/decoded position
-    spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, tetrode_argument, spike_buffer, position_buffer)
-    position_estimator  = PositionAnalysis.PositionEstimator(sg_client, N_POSITION_BINS, position_buffer)
+    #spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, tetrode_argument, spike_buffer, position_buffer)
+    #position_estimator  = PositionAnalysis.PositionEstimator(sg_client, N_POSITION_BINS, position_buffer)
+    spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, tetrode_argument)
+    position_estimator  = PositionAnalysis.PositionEstimator(sg_client, N_POSITION_BINS)
     """
     place_field_handler = SpikeAnalysis.PlaceFieldHandler()
     bayesian_estimator  = PositionEstimator.BayesianEstimator(spike_buffer, place_fields)
