@@ -4,6 +4,8 @@ import threading
 from scipy import signal, stats
 import matplotlib.pyplot as plt
 import xml.etree.ElementTree as ET
+from multiprocessing import Queue
+import numpy as np
 
 # Local imports
 import TrodesInterface
@@ -74,7 +76,48 @@ class PlaceFieldHandler(threading.Thread):
         :returns: Nothing
         """
 
-        raise NotImplementedError()
+        current_posbin = 0
+        next_posbin = 0
+        next_postime = 0
+
+        while True:
+            if self._has_pf_request:
+                time.sleep(0.005) #5ms
+                continue
+
+            while not self._spike_buffer.empty() and not self._has_pf_request:
+                (spk_cl, spk_time) = self._spike_buffer.pop()
+                while spk_time >= next_postime:
+                    current_posbin = next_posbin
+                    if self._past_position_buffer.empty():
+                        next_postime = np.Inf
+                    else:
+                        #get next time stamp and position
+                        pass
+
+
+    def submit_pf_request(self):
+        """
+        Indicate that another thread wants to access the place field. This will
+        cause the PlaceFieldHandler to immediately pause calculation and leave
+        the current result, which is faster than waiting for it to finish. This
+        function blocks until this pause action is complete.
+        BE SURE TO CALL end_pf_request() immediately upon finishing access to
+        the place field
+        """
+        self._has_pf_request = True
+        with self._place_field_lock:
+            return
+
+    def end_pf_request(self):
+        """
+        Call this after calling submit_pf_request immediately after place field
+        access is finished
+        """
+        self._has_pf_request = False
+
+
+            
 
 class SpikeDetector(threading.Thread):
     """
