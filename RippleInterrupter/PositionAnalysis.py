@@ -96,7 +96,8 @@ class PositionEstimator(threading.Thread):
                     # DEBUG: Report the jump in position bins
                     print("Position jumped %d -> %d"%(curr_bin_id, prev_bin_id))
 
-                    self._past_position_buffer.put((prev_step_timestamp, prev_bin_id))
+                    #self._past_position_buffer.put((prev_step_timestamp, prev_bin_id))
+                    self._past_position_buffer.put((current_timestamp, curr_bin_id))
                     # Update the total time spent in the bin we were previously in
                     self._bin_occupancy[prev_bin_id] += float(time_spent_in_prev_bin)/RiD.SPIKE_SAMPLING_FREQ
 
