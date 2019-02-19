@@ -14,7 +14,8 @@ import TrodesInterface
 if (__name__ == "__main__"):
     # TODO: Add a config file for reading a list of tetrodes that we want to
     # work with.
-    tetrodes_of_interest = [2, 3, 14, 17, 18, 21, 22, 23]
+    tetrodes_of_interest = [3, 14]
+    n_clusters = [4, 8]   
     # Trodes needs strings!
     tetrode_argument = [str(tet) for tet in tetrodes_of_interest]
 
@@ -31,7 +32,11 @@ if (__name__ == "__main__"):
 
     # TODO: Put everything in a try/catch loop to better handle user interrupts
     # TODO: Uncomment to start looking at spikes
-    # spike_listener  = SpikeAnalysis.SpikeDetector(sg_client, tetrode_argument)
+    spike_listener  = SpikeAnalysis.SpikeDetector(sg_client, tetrode_argument)
+
+    # Spawn threads for handling all the place fields. We can convert this into
+    # separate threads for separate fields too but that seems overkill at this
+    # point.
 
     ripple_detector.start()
     ripple_trigger.start()

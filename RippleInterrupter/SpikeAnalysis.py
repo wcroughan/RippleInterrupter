@@ -12,18 +12,18 @@ class PlaceField(threading.Thread):
     Class for creating and updating place fields online
     """
 
-    def __init__(self, threadID, cluster=None):
+    def __init__(self, clusters=None):
         """
         Class constructor: Initialize a thread for pooling information on this
         place field.
 
         :threadID: Thread ID to be attached to this Place Field
-        :cluster: Spike cluster used to feed data into the place field
+        :clusters: Spike cluster used to feed data into the place field. Fed in
+            as tuples of tetrode ID and cluster ID.
 
         """
         threading.Thread.__init__(self)
-        self._threadID = threadID
-        self._cluster = cluster
+        self._clusters = cluster
 
     def run(self):
         """
@@ -58,17 +58,13 @@ class SpikeDetector(threading.Thread):
         place fields!
         """
         while True:
-            if self._spike_stream.available(0):
+            n_available_spikes = self._spike_stream.available(0)
+            for spk_idx in range(n_available_spikes):
                 # Populate the spike record
-                self._spike_stream.getData()
+                timestamp = self._spike_stream.getData()
 
-class RippleSynchronizer(threading.Thread):
-    """
-    Waits for a ripple to be detected and processes downstream changes for
-    analyzing spike contents.
-    """
-
-    def __init__(self, sync_event):
-        """TODO: to be defined1. """
-        threading.Thread.__init__(self, args=(sync_event,))
+                # One entry is populated automatically in self._spike_record
+                spike_timestamp = self._spike_record[0]['timestamp']
+                tetrode_id = self._spike_record[0]['ntrodeid']
+                cluster_id = self._spike_record[0]['cluster']
 
