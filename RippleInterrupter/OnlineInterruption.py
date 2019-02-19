@@ -67,8 +67,8 @@ if (__name__ == "__main__"):
     #position_estimator  = PositionAnalysis.PositionEstimator(sg_client, N_POSITION_BINS, position_buffer)
     spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, tetrode_argument)
     position_estimator  = PositionAnalysis.PositionEstimator(sg_client, N_POSITION_BINS)
+    place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, place_fields)
     """
-    place_field_handler = SpikeAnalysis.PlaceFieldHandler()
     bayesian_estimator  = PositionEstimator.BayesianEstimator(spike_buffer, place_fields)
     """
 
