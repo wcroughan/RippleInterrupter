@@ -1,15 +1,16 @@
 # System imports
 import threading
-import Queue
 import time
 import numpy as np
-import multiprocessing as mp
+import logging
+from multiprocessing import Queue
 
 # Local imports
 import Logger
-import Visualizatiojjjn
+import Visualization
 import SpikeAnalysis
 import RippleAnalysis
+import PositionAnalysis
 import TrodesInterface
 
 # Constant declarations
@@ -17,6 +18,15 @@ import TrodesInterface
 N_POSITION_BINS = (6, 6)
 # Main function that launches threads for detecting ripples, creating place
 # fields and analyzing replays online.
+
+def nTrodeAndClusterToIDMap(ntrode_id, cluster_id):
+    """
+    Takes in tetrode ID and cluster ID and maps it to a scalar index that can
+    then be used to access the place field for the cluster.
+    """
+
+    raise NotImplementedError()
+
 if (__name__ == "__main__"):
     # TODO: Add a config file for reading a list of tetrodes that we want to
     # work with.
@@ -29,8 +39,8 @@ if (__name__ == "__main__"):
 
     # TODO: Making this a giant array might not be the best idea.. Potential
     # bugs accessing it too.
-    place_fields = np.zeros((n_clusters, N_POSITION_BINS(0), N_POSITION_BINS(1)), \
-            dtype=[('n_spikes', 'u4'), ('occupancy', 'f8')]
+    place_fields = np.zeros((n_units, N_POSITION_BINS[0], N_POSITION_BINS[1]), \
+            dtype=[('nspikes', 'u4'), ('occupancy', 'f8')])
 
     # Trodes needs strings!
     tetrode_argument = [str(tet) for tet in tetrodes_of_interest]
@@ -49,23 +59,29 @@ if (__name__ == "__main__"):
     # TODO: Put everything in a try/catch loop to better handle user interrupts
     # Create a buffer for spikes to be accessed until they are taken out of the
     # queue by the Bayesian Estimator.
-    spike_buffer = Queue.Queue()
-    spike_listener = SpikeAnalysis.SpikeDetector(sg_client, tetrode_argument, \
-            spike_buffer)
-    bayesian_estimator = PositionEstimator.BayesianEstimator(spike_buffer, \
-            place_fields)
-    place_field_handler = 
+    spike_buffer = Queue()
+    position_buffer = Queue()
+
+    # Initialize threads for looking at the actual/decoded position
+    """
+    spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, tetrode_argument, spike_buffer)
+    place_field_handler = SpikeAnalysis.PlaceFieldHandler()
+    bayesian_estimator  = PositionEstimator.BayesianEstimator(spike_buffer, place_fields)
+    """
+    position_estimator  = PositionAnalysis.PositionEstimator(sg_client, N_POSITION_BINS, position_buffer)
 
     # Spawn threads for handling all the place fields. We can convert this into
     # separate threads for separate fields too but that seems overkill at this
     # point.
 
+    position_estimator.start()
     ripple_detector.start()
-    ripple_trigger.start()
+    # ripple_trigger.start()
 
     # Join all the threads to wait for their execution to  finish
+    position_estimator.join()
     ripple_detector.join()
-    ripple_trigger.join()
+    # ripple_trigger.join()
 
     # For each unit detected (God knows how this will work out!), launch a
     # thread for constructing place fields.
