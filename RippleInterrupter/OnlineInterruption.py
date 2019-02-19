@@ -28,8 +28,17 @@ if (__name__ == "__main__"):
     # Start threads for collecting spikes and LFP
     ripple_detector = RippleAnalysis.RippleDetector(sg_client, tetrode_argument, \
             baseline_stats=[60.0, 30.0], trigger_condition=trig_condition)
+
+    # TODO: Put everything in a try/catch loop to better handle user interrupts
     # TODO: Uncomment to start looking at spikes
     # spike_listener  = SpikeAnalysis.SpikeDetector(sg_client, tetrode_argument)
+
+    ripple_detector.start()
+    ripple_trigger.start()
+
+    # Join all the threads to wait for their execution to  finish
+    ripple_detector.join()
+    ripple_trigger.join()
 
     # For each unit detected (God knows how this will work out!), launch a
     # thread for constructing place fields.

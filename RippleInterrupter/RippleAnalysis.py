@@ -36,12 +36,9 @@ class RippleSynchronizer(threading.Thread):
             # TODO: EVENT TIMEOUT will act as a timeout between successive
             # ripple detections (maybe too hacky)
             print("Waiting for ripple trigger...")
-            self._sync_event.acquire()
-            self._sync_event.wait(self._EVENT_TIMEOUT)
-            if self._sync_event.isSet():
-                self._sync_event.clear()
-                print(time.strftime("Ripple tiggered at %H:%M:%S"))
-            self._sync_event.release()
+            with self._sync_event:
+                self._sync_event.wait()
+            print(time.strftime("Ripple tiggered at %H:%M:%S\n"))
 
 class RippleDetector(threading.Thread):
     """
@@ -94,18 +91,24 @@ class RippleDetector(threading.Thread):
 
         # Tile it to take in all the tetrodes at once
         ripple_frame_filter = np.tile(np.reshape(ripple_frame_filter, \
-                (RiD.LFP_FILTER_ORDER, 1, 2)), (1, n_tetrodes, 1))
+                (RiD.LFP_FILTER_ORDER, 1, 2)), (1, self._n_tetrodes, 1))
         # Buffers for storing/manipulating raw LFP, ripple filtered LFP and
         # ripple power.
-        raw_lfp_window = np.zeros(self._n_tetrodes, RiD.LFP_FILTER_ORDER)
-        ripple_power = np.zeros(self._n_tetrodes, RiD.RIPPLE_SMOOTHING_WINDOW)
+        raw_lfp_window = np.zeros((self._n_tetrodes, RiD.LFP_FILTER_ORDER), dtype='float')
+        ripple_power = np.zeros((self._n_tetrodes, RiD.RIPPLE_SMOOTHING_WINDOW), dtype='float')
         lfp_window_ptr = 0
         pow_window_ptr = 0
+
+        # Delay measures for ripple detection (and trigger)
+        prev_ripple = -np.Inf
+        curr_time   = 0
+        start_wall_time = time.time()
+        curr_wall_time = start_wall_time
         while True:
             # Acquire buffered LFP frames and fill them in a filter buffer
             n_lfp_frames = self._lfp_stream.available(0)
             for frame_idx in range(n_lfp_frames):
-                trodes_timestamp = self._lfp_stream.getData()
+                timestamp = self._lfp_stream.getData()
                 raw_lfp_window[:, lfp_window_ptr] = self._lfp_buffer[:]
                 lfp_window_ptr += 1
 
@@ -114,7 +117,7 @@ class RippleDetector(threading.Thread):
                 if (lfp_window_ptr == RiD.LFP_FILTER_ORDER):
                     lfp_window_ptr = 0
                     filtered_window, ripple_frame_filter = signal.sosfilt(self._ripple_filter, \
-                           lfp_window, axis=1, zi=ripple_frame_filter)
+                           raw_lfp_window, axis=1, zi=ripple_frame_filter)
                     ripple_power[:, pow_window_ptr] = np.sqrt(np.mean(np.power( \
                             filtered_window, 2), axis=1))
 
@@ -123,10 +126,18 @@ class RippleDetector(threading.Thread):
 
                     # TODO: This just looks at one tetrode for ripple detection right now
                     power_to_baseline_ratio = (ripple_power[0,0] - self._mean_ripple_power)/self._std_ripple_power
-                    if (power_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD):
-                        self.trigger_condition.acquire()
-                        self.trigger_condition.set()
-                        self.trigger_condition.release()
+                    # print("Frame filtered... Ripple strength %.2f"%power_to_baseline_ratio)
+
+                    # Timestamp has both trodes and system timestamps!
+                    curr_time = float(timestamp.trodes_timestamp)/RiD.LFP_FREQUENCY
+                    if ((curr_time - prev_ripple) > RiD.RIPPLE_REFRACTORY_PERIOD):
+                        if (power_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD):
+                            prev_ripple = curr_time
+                            with self._trigger_condition:
+                                self._trigger_condition.notifyAll()
+                            curr_wall_time = time.time()
+                            print("Detected ripple at %.2f. Strength: %.2f"% \
+                                    (curr_wall_time-start_wall_time, power_to_baseline_ratio))
         
 def normalizeData(in_data):
     # TODO: Might need tiling of data if there are multiple dimensions

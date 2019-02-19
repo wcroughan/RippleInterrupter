@@ -7,7 +7,7 @@ respecify them at multiple locations
 SPIKE_SAMPLING_FREQ = 30000.0
 
 # LFP sampling rate, and filter parameters
-LFP_FREQUENCY     = 1500
+LFP_FREQUENCY     = 1500.0
 LFP_FILTER_LENGTH = 0.002     # 1ms long window for filtering ripples
 LFP_FILTER_ORDER  = int(LFP_FILTER_LENGTH * LFP_FREQUENCY)
 
