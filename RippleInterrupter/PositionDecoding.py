@@ -4,6 +4,7 @@ import numpy as np
 
 # Local imports
 import SpikeAnalysis
+import PositionAnalysis
 
 class BayesianEstimator(threading.Thread):
     """
@@ -25,12 +26,12 @@ class BayesianEstimator(threading.Thread):
         #self._log_place_fields = place_field_provider.get_log_place_fields()
         self._place_field_provider = place_field_provider
         self._bin_times = np.zeros((1,self.prob_buffer_size))
-        self._done_exp_output_flag = [true for i in range(self.prob_buffer_size)]
-        self._need_exp_output_flag = [false for i in range(self.prob_buffer_size)]
+        self._done_exp_output_flag = [True for i in range(self.prob_buffer_size)]
+        self._need_exp_output_flag = [False for i in range(self.prob_buffer_size)]
         self.time_bin = 0
         
-        self._log_probs_out = np.zeros((self.prob_buffer_size, N_POSITION_BINS[0], N_POSITION_BINS[1]))
-        self._probs_out = np.add(np.zeros_like(self._log_probs_out), 1.0 / (N_POSITION_BINS[0] + N_POSITION_BINS[1]))
+        self._log_probs_out = np.zeros((self.prob_buffer_size, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
+        self._probs_out = np.add(np.zeros_like(self._log_probs_out), 1.0 / (PositionAnalysis.N_POSITION_BINS[0] + PositionAnalysis.N_POSITION_BINS[1]))
 
         self._output_lock = threading.Condition()
 

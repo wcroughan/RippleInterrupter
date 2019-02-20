@@ -16,7 +16,6 @@ import PositionDecoding
 
 # Constant declarations
 # TODO: Could all be moved to a separate file
-N_POSITION_BINS = (6, 6)
 # Main function that launches threads for detecting ripples, creating place
 # fields and analyzing replays online.
 
@@ -39,8 +38,8 @@ if (__name__ == "__main__"):
     # TODO: Making this a giant array might not be the best idea.. Potential
     # bugs accessing it too. This has both spikes and occupance stored as a
     # tuple.
-    place_fields = np.zeros((n_units, N_POSITION_BINS[0], N_POSITION_BINS[1]), \
-            dtype='float')
+    place_fields = np.zeros((n_units, PositionAnalysis.N_POSITION_BINS[0], \
+            PositionAnalysis.N_POSITION_BINS[1]), dtype='float')
 
     # Trodes needs strings!
     tetrode_argument = [str(tet) for tet in tetrodes_of_interest]
@@ -64,7 +63,7 @@ if (__name__ == "__main__"):
 
     # Initialize threads for looking at the actual/decoded position
     spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, cluster_identity_map)
-    position_estimator  = PositionAnalysis.PositionEstimator(sg_client, N_POSITION_BINS)
+    position_estimator  = PositionAnalysis.PositionEstimator(sg_client)
     place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, place_fields)
     bayesian_estimator  = PositionDecoding.BayesianEstimator(spike_listener, place_fields)
 

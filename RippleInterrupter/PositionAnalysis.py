@@ -10,6 +10,7 @@ from multiprocessing import Pipe
 # Local imports
 import RippleDefinitions as RiD
 
+N_POSITION_BINS = (6, 6)
 class PositionEstimator(threading.Thread):
     """
     Run a thread that collects position data from trodes.
@@ -24,7 +25,7 @@ class PositionEstimator(threading.Thread):
     __P_BIN_SIZE_Y = (__P_MAX_Y - __P_MIN_Y)
 
     #def __init__(self, sg_client, n_bins, past_position_buffer, camera_number=1):
-    def __init__(self, sg_client, n_bins, camera_number=1):
+    def __init__(self, sg_client, n_bins=N_POSITION_BINS, camera_number=1):
         threading.Thread.__init__(self)
         self._data_field = np.ndarray([], dtype=[('timestamp', 'u4'), ('line_segment', 'i4'), \
                 ('position_on_segment', 'f8'), ('position_x', 'i2'), ('position_y', 'i2')])
