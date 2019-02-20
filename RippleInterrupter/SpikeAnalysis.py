@@ -63,16 +63,17 @@ class PlaceFieldHandler(threading.Thread):
     Class for creating and updating place fields online
     """
 
-    def __init__(self, position_processor, spike_processor, place_fields, place_field_lock):
+    def __init__(self, position_processor, spike_processor, place_fields):
     # def __init__(self, position_processor, spike_processor, place_fields):
         threading.Thread.__init__(self)
         self._position_buffer = position_processor.get_position_buffer_connection()
         self._spike_buffer = spike_processor.get_spike_buffer_connection()
         self._place_fields = place_fields
+        self._log_place_fields = np.zeros_like(self._place_fields)
         self._nspks_in_bin = np.zeros(np.shape(place_fields))
         self._bin_occupancy = position_processor.get_bin_occupancy()
         self._has_pf_request = False
-        self._place_field_lock = place_field_lock
+        self._place_field_lock = threading.Condition()
         print(time.strftime("Started thread for building place fields at %H:%M:%S"))
 
     def run(self):
@@ -128,10 +129,13 @@ class PlaceFieldHandler(threading.Thread):
                 pf_update_spk_iter += 1
 
             if pf_update_spk_iter >= update_pf_every_n_spks and not self._has_pf_request:
-                pf_update_spk_iter = 0
-                # Deal with divide by zero when the occupancy is zero for some of the place bins
-                self._place_fields = np.divide(self._nspks_in_bin, self._bin_occupancy, \
-                        out=np.zeros_like(self._nspks_in_bin), where=self._bin_occupancy!=0)
+                with self._place_field_lock:
+                    pf_update_spk_iter = 0
+                    # Deal with divide by zero when the occupancy is zero for some of the place bins
+                    self._place_fields = np.divide(self._nspks_in_bin, self._bin_occupancy, \
+                            out=np.zeros_like(self._nspks_in_bin), where=self._bin_occupancy!=0)
+                    self._log_place_fields = np.log(self._place_fields, out=np.zeros_like(self._place_fields), \
+                       where=self._place_fields!=0)
 
 
 
@@ -157,6 +161,10 @@ class PlaceFieldHandler(threading.Thread):
         access is finished
         """
         self._has_pf_request = False
+
+    def get_place_fields(self):
+        with self._place_field_lock:
+            return (np.copy(self._log_place_fields), np.sum(self._place_fields, axis=0))
 
 
 class SpikeDetector(threading.Thread):

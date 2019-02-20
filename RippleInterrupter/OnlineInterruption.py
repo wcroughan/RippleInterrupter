@@ -12,6 +12,7 @@ import SpikeAnalysis
 import RippleAnalysis
 import PositionAnalysis
 import TrodesInterface
+import PositionDecoding
 
 # Constant declarations
 # TODO: Could all be moved to a separate file
@@ -61,15 +62,11 @@ if (__name__ == "__main__"):
     #spike_buffer = Queue()
     #position_buffer = Queue()
 
-    place_field_lock = threading.Condition()
     # Initialize threads for looking at the actual/decoded position
     spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, cluster_identity_map)
     position_estimator  = PositionAnalysis.PositionEstimator(sg_client, N_POSITION_BINS)
-    place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, place_fields, \
-            place_field_lock)
-    """
-    bayesian_estimator  = PositionEstimator.BayesianEstimator(spike_buffer, place_fields)
-    """
+    place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, place_fields)
+    bayesian_estimator  = PositionDecoding.BayesianEstimator(spike_listener, place_fields)
 
     # Spawn threads for handling all the place fields. We can convert this into
     # separate threads for separate fields too but that seems overkill at this
