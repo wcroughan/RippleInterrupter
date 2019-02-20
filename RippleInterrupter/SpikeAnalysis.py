@@ -57,19 +57,7 @@ class PlaceFieldHandler(threading.Thread):
     Class for creating and updating place fields online
     """
 
-    #def __init__(self, clusters, field_container):
-    #    """
-    #    Class constructor: Initialize a thread for pooling information on this
-    #    place field.
-
-    #    :threadID: Thread ID to be attached to this Place Field
-    #    :clusters: Spike cluster used to feed data into the place field. Fed in
-    #        as tuples of tetrode ID and cluster ID.
-    #    :field_container: 
-    #    """
-    #    threading.Thread.__init__(self, past_position_buffer)
-    #    self._past_position_buffer = past_position_buffer
-
+    # def __init__(self, position_processor, spike_processor, place_fields, place_field_lock):
     def __init__(self, position_processor, spike_processor, place_fields):
         threading.Thread.__init__(self)
         self._position_buffer = position_processor.get_position_buffer_connection()
@@ -77,6 +65,9 @@ class PlaceFieldHandler(threading.Thread):
         self._place_fields = place_fields
         self._nspks_in_bin = np.zeros(np.shape(place_fields))
         self._bin_occupancy = position_processor.get_bin_occupancy()
+        self._has_pf_request = False
+        # self._place_field_lock = place_field_lock
+        print(time.strftime("Started thread for building place fields at %H:%M:%S"))
 
     def run(self):
         """
@@ -95,26 +86,28 @@ class PlaceFieldHandler(threading.Thread):
         pf_update_spk_iter = 0
 
         while True:
+            # If thread has been requested to stop an updates to place field
+            # data because of an outside access to the data
             if self._has_pf_request:
                 time.sleep(0.005) #5ms
                 continue
 
             pos_buf_empty = False
 
-            while not self._spike_buffer.empty() and not self._has_pf_request:
+            while self._spike_buffer.poll() and not self._has_pf_request:
                 #note this assumes technically that spikes are in strict chronological order. Although realistically
                 #we can break that assumption since that would only cause the few spikes that come late to be assigned
                 #to the next place bin the animal is in
 
                 #get the next spike
-                (spk_cl, spk_time) = self._spike_buffer.pop()
+                (spk_cl, spk_time) = self._spike_buffer.recv()
 
                 #if it's after our most recent position update, try and read the next position
                 #keep reading positions until our position data is ahead of our spike data
                 while not pos_buf_empty and spk_time >= next_postime:
                     current_posbin_x = next_posbin_x
                     current_posbin_y = next_posbin_y
-                    if self._position_buffer.empty():
+                    if not self._position_buffer.poll():
                         #If we don't have any position data ahead of spike data,
                         #don't bother checking this every time the outer loop iterates
                         pos_buf_empty = True
@@ -157,8 +150,6 @@ class PlaceFieldHandler(threading.Thread):
         self._has_pf_request = False
 
 
-            
-
 class SpikeDetector(threading.Thread):
     """
     Pulls spikes from Trodes and assigns them to different worker threads that
@@ -174,10 +165,8 @@ class SpikeDetector(threading.Thread):
                 tetrode_argument)
         self._spike_stream.initialize()
         self._spike_record = self._spike_stream.create_numpy_array()
-        #self._spike_buffer = spike_buffer
-        #self._position_buffer = position_buffer
-        print(time.strftime("Spike Detection thread started at %H:%M:%S"))
         self._spike_buffer_connections = []
+        print(time.strftime("Spike Detection thread started at %H:%M:%S"))
         return
 
     def get_spike_buffer_connection(self):
@@ -202,9 +191,8 @@ class SpikeDetector(threading.Thread):
                 cluster_id = self._spike_record[0]['cluster']
 
                 # Get the position corresponding to this spike using the position buffer
-                #oldest_position = self._position_buffer.get()
-                #print("Spike Timestamp %d, position bin %d at timestamp %d matched"%(\
-                        #spike_timestamp, oldest_position[1], oldest_position[0]))
+                # print("Spike Timestamp %d, from Tetrode %d, Cluster %d."%(\
+                #         spike_timestamp, tetrode_id, cluster_id))
 
                 # Put this spike in the spike buffer queue
                 # TODO: Use unique cluster indices (or unit indices here)

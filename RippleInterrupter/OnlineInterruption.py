@@ -62,9 +62,12 @@ if (__name__ == "__main__"):
     #spike_buffer = Queue()
     #position_buffer = Queue()
 
+    place_field_lock = threading.Condition()
     # Initialize threads for looking at the actual/decoded position
     spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, tetrode_argument)
     position_estimator  = PositionAnalysis.PositionEstimator(sg_client, N_POSITION_BINS)
+    # place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, place_fields, \
+    #         place_field_lock)
     place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, place_fields)
     """
     bayesian_estimator  = PositionEstimator.BayesianEstimator(spike_buffer, place_fields)
@@ -76,12 +79,14 @@ if (__name__ == "__main__"):
 
     spike_listener.start()
     position_estimator.start()
+    place_field_handler.start()
     ripple_detector.start()
     ripple_trigger.start()
 
     # Join all the threads to wait for their execution to  finish
     spike_listener.join()
     position_estimator.join()
+    place_field_handler.join()
     ripple_detector.join()
     ripple_trigger.join()
 
