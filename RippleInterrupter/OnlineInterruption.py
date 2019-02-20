@@ -63,8 +63,6 @@ if (__name__ == "__main__"):
     #position_buffer = Queue()
 
     # Initialize threads for looking at the actual/decoded position
-    #spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, tetrode_argument, spike_buffer, position_buffer)
-    #position_estimator  = PositionAnalysis.PositionEstimator(sg_client, N_POSITION_BINS, position_buffer)
     spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, tetrode_argument)
     position_estimator  = PositionAnalysis.PositionEstimator(sg_client, N_POSITION_BINS)
     place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, place_fields)

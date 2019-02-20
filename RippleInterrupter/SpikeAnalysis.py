@@ -4,7 +4,7 @@ import threading
 from scipy import signal, stats
 import matplotlib.pyplot as plt
 import xml.etree.ElementTree as ET
-from multiprocessing import Queue
+from multiprocessing import Queue, Pipe
 import numpy as np
 
 # Local imports

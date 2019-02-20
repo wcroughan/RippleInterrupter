@@ -55,11 +55,8 @@ class PositionEstimator(threading.Thread):
         """
         Get the BIN for the current position.
         """
-        px = self._data_field['position_x']
-        py = self._data_field['position_y']
-        bin_id = self._n_bins_y * round((px - self.__P_MIN_X)/self.__P_BIN_SIZE_X) + \
-                round((py - self.__P_MIN_Y)/self.__P_BIN_SIZE_Y)
-        return bin_id
+        x_bin, y_bin = self.getXYBin()
+        return x_bin * self._n_bins_y + y_bin
 
     def getXYBin(self):
         """
@@ -109,7 +106,7 @@ class PositionEstimator(threading.Thread):
                 if (prev_bin_id < 0):
                     # First recorded bin!
                     #self._past_position_buffer.put((self._data_field['timestamp'], curr_bin_id))
-                    (x_bin, y_bin) = getXYBin()
+                    (x_bin, y_bin) = self.getXYBin()
                     for outp in self._position_buffer_connections:
                         outp.send((self._data_field['timestamp'], x_bin, y_bin))
                     prev_bin_id = curr_bin_id
@@ -123,7 +120,7 @@ class PositionEstimator(threading.Thread):
 
                     #self._past_position_buffer.put((prev_step_timestamp, prev_bin_id))
                     
-                    (x_bin, y_bin) = getXYBin()
+                    (x_bin, y_bin) = self.getXYBin()
                     for outp in self._position_buffer_connections:
                         outp.send((current_timestamp, x_bin, y_bin))
                     #self._past_position_buffer.put((current_timestamp, x_bin, y_bin))
