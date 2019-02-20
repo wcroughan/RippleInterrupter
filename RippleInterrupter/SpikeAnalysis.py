@@ -70,7 +70,6 @@ class PlaceFieldHandler(threading.Thread):
         self._spike_buffer = spike_processor.get_spike_buffer_connection()
         self._place_fields = place_fields
         self._nspks_in_bin = np.zeros(np.shape(place_fields))
-        print(np.shape(place_fields))
         self._bin_occupancy = position_processor.get_bin_occupancy()
         self._has_pf_request = False
         self._place_field_lock = place_field_lock
@@ -130,7 +129,9 @@ class PlaceFieldHandler(threading.Thread):
 
             if pf_update_spk_iter >= update_pf_every_n_spks and not self._has_pf_request:
                 pf_update_spk_iter = 0
-                self._place_fields = np.divide(self._nspks_in_bin, self._bin_occupancy)
+                # Deal with divide by zero when the occupancy is zero for some of the place bins
+                self._place_fields = np.divide(self._nspks_in_bin, self._bin_occupancy, \
+                        out=np.zeros_like(self._nspks_in_bin), where=self._bin_occupancy!=0)
 
 
 
