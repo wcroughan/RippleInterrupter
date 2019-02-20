@@ -30,12 +30,10 @@ def nTrodeAndClusterToIDMap(ntrode_id, cluster_id):
 if (__name__ == "__main__"):
     # TODO: Add a config file for reading a list of tetrodes that we want to
     # work with.
+    cluster_filename = "./test_clusters.trodesClusters"
     tetrodes_of_interest = [3, 14]
-    n_clusters = [4, 8]   
-
-    # TODO: Get these from the cluster file instead of writing it here.
-    # Total number of clusters (single units) we have
-    n_units = sum(n_clusters)
+    n_units, cluster_identity_map = SpikeAnalysis.readClusterFile(cluster_filename, tetrodes_of_interest)
+    print(cluster_identity_map)
 
     # TODO: Making this a giant array might not be the best idea.. Potential
     # bugs accessing it too.
@@ -64,7 +62,7 @@ if (__name__ == "__main__"):
 
     place_field_lock = threading.Condition()
     # Initialize threads for looking at the actual/decoded position
-    spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, tetrode_argument)
+    spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, tetrode_argument, cluster_identity_map)
     position_estimator  = PositionAnalysis.PositionEstimator(sg_client, N_POSITION_BINS)
     # place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, place_fields, \
     #         place_field_lock)

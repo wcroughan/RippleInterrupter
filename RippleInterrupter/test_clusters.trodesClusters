@@ -105,7 +105,6 @@
   <nTrode nTrodeID="12" nTrodeIndex="11" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
   <nTrode nTrodeID="13" nTrodeIndex="12" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
   <nTrode nTrodeID="14" nTrodeIndex="13" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4">
-   <Cluster clusterIndex="0"/>
    <Cluster clusterIndex="1">
     <Polygon xAxis="1" yAxis="2">
      <Vertex x="782" y="190"/>

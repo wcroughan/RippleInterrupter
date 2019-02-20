@@ -10,7 +10,7 @@ import numpy as np
 # Local imports
 import TrodesInterface
 
-def readClusterFile(filename):
+def readClusterFile(filename, tetrodes):
     """
     Reads a cluster file and generates a list of tetrodes that have cells and
     all the clusters on that tetrode.
@@ -18,7 +18,6 @@ def readClusterFile(filename):
     :filename: XML file containing clustering information.
     :returns: A dictionary giving valid cluster indices for each tetrode.
     """
-
     try:
         cluster_tree = ET.parse(filename)
     except Exception as err:
@@ -32,24 +31,31 @@ def readClusterFile(filename):
     #               -> cluster (clusterIndex)
 
     n_trode_to_cluster_idx_map = {}
+    raw_cluster_idx = 0
     # Some unnecessary accesses to get to tetrodes and clusters
     tree_root = cluster_tree.getroot()
     polygon_clusters = tree_root.getchildren()[0]
-    for ntrode in polygon_clusters:
+    ntrode_list = list(polygon_clusters)
+
+    for ti in tetrodes:
+        # Offset by 1 because Trodes tetrodes start with 1!
+        ntrode = ntrode_list[ti-1]
+        print(ntrode)
         tetrode_idx = ntrode.get('nTrodeIndex')
-        if len(list(ntrode) == 0):
+        if len(list(ntrode)) == 0:
             # Has no clusters on it
             continue
 
         # TODO: These indices go from 1.. N. Might have to switch to 0.. N if
         # that is what spike data returns.
         cluster_idx_to_id_map = {}
-        n_tet_clusters = 0
-        for raw_idx, cluster in enumerate(ntrode):
-            cluster_idx_to_id_map[int(cluster.get('clusterIndex'))] = raw_idx
-            n_tet_clusters += 1
-        n_trode_to_cluster_idx_map[tetrode_idx] = cluster_idx_to_id_map
-    return
+        for cluster in ntrode:
+            cluster_idx_to_id_map[int(cluster.get('clusterIndex'))] = raw_cluster_idx
+            raw_cluster_idx += 1
+        n_trode_to_cluster_idx_map[ti] = cluster_idx_to_id_map
+
+    # Final value of raw_cluster_idx is a proxy for the total number of units we have
+    return raw_cluster_idx, n_trode_to_cluster_idx_map
 
 class PlaceFieldHandler(threading.Thread):
 
@@ -157,7 +163,7 @@ class SpikeDetector(threading.Thread):
     """
 
     #def __init__(self, sg_client, tetrodes, spike_buffer, position_buffer):
-    def __init__(self, sg_client, tetrodes):
+    def __init__(self, sg_client, tetrodes, cluster_identity_map):
         """TODO: to be defined1. """
         threading.Thread.__init__(self)
         tetrode_argument = [ tet_str + ",0" for tet_str in  tetrodes]
@@ -166,6 +172,7 @@ class SpikeDetector(threading.Thread):
         self._spike_stream.initialize()
         self._spike_record = self._spike_stream.create_numpy_array()
         self._spike_buffer_connections = []
+        self._cluster_identity_map = cluster_identity_map
         print(time.strftime("Spike Detection thread started at %H:%M:%S"))
         return
 
@@ -197,6 +204,11 @@ class SpikeDetector(threading.Thread):
                 # Put this spike in the spike buffer queue
                 # TODO: Use unique cluster indices (or unit indices here)
                 # instead of whatever has been hacked in at the moment.
-                #self._spike_buffer.put((tetrode_id*8 + cluster_id, spike_timestamp))
+                if cluster_id not in self._cluster_identity_map[tetrode_id]:
+                    # Spike from an unclustered region... Ignore
+                    # print("Spike Ignored!")
+                    continue
+                unique_cluster_identity = self._cluster_identity_map[tetrode_id][cluster_id]
+                print("Spike Timestamp %d, from uClusterID %d"%(spike_timestamp,unique_cluster_identity))
                 for outp in self._spike_buffer_connections:
-                    outp.send((tetrode_id*8 + cluster_id, spike_timestamp))
+                    outp.send((unique_cluster_identity, spike_timestamp))
