@@ -36,9 +36,10 @@ if (__name__ == "__main__"):
     print(cluster_identity_map)
 
     # TODO: Making this a giant array might not be the best idea.. Potential
-    # bugs accessing it too.
+    # bugs accessing it too. This has both spikes and occupance stored as a
+    # tuple.
     place_fields = np.zeros((n_units, N_POSITION_BINS[0], N_POSITION_BINS[1]), \
-            dtype=[('nspikes', 'u4'), ('occupancy', 'f8')])
+            dtype='float')
 
     # Trodes needs strings!
     tetrode_argument = [str(tet) for tet in tetrodes_of_interest]
@@ -64,9 +65,8 @@ if (__name__ == "__main__"):
     # Initialize threads for looking at the actual/decoded position
     spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, cluster_identity_map)
     position_estimator  = PositionAnalysis.PositionEstimator(sg_client, N_POSITION_BINS)
-    # place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, place_fields, \
-    #         place_field_lock)
-    place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, place_fields)
+    place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, place_fields, \
+            place_field_lock)
     """
     bayesian_estimator  = PositionEstimator.BayesianEstimator(spike_buffer, place_fields)
     """
@@ -76,18 +76,18 @@ if (__name__ == "__main__"):
     # point.
 
     spike_listener.start()
-    """
     position_estimator.start()
     place_field_handler.start()
+    """
     ripple_detector.start()
     ripple_trigger.start()
     """
 
     # Join all the threads to wait for their execution to  finish
     spike_listener.join()
-    """
     position_estimator.join()
     place_field_handler.join()
+    """
     ripple_detector.join()
     ripple_trigger.join()
     """

@@ -34,7 +34,7 @@ class PositionEstimator(threading.Thread):
         self._position_consumer = sg_client.subscribeHighFreqData("PositionData", "CameraModule")
         self._n_bins_x = int(n_bins[0])
         self._n_bins_y = int(n_bins[1])
-        self._bin_occupancy = np.zeros((self._n_bins_x * self._n_bins_y), dtype='float')
+        self._bin_occupancy = np.zeros((self._n_bins_x, self._n_bins_y), dtype='float')
         #self._past_position_buffer = past_position_buffer
 
         # TODO: This is assuming that the jump in timestamps will not
@@ -64,8 +64,8 @@ class PositionEstimator(threading.Thread):
         """
         px = self._data_field['position_x']
         py = self._data_field['position_y']
-        x_bin = round((px - self.__P_MIN_X)/self.__P_BIN_SIZE_X)
-        y_bin = round((py - self.__P_MIN_Y)/self.__P_BIN_SIZE_Y)
+        x_bin = int(round((px - self.__P_MIN_X)/self.__P_BIN_SIZE_X))
+        y_bin = int(round((py - self.__P_MIN_Y)/self.__P_BIN_SIZE_Y))
         return (x_bin, y_bin)
 
     def get_bin_occupancy(self):
@@ -82,8 +82,10 @@ class PositionEstimator(threading.Thread):
         in each position bin
         """
         # Keep track of current and previous BIN ID, and also the time at which last jump happened
-        curr_bin_id = -1
-        prev_bin_id = -1
+        curr_x_bin = -1
+        curr_y_bin = -1
+        prev_x_bin = -1
+        prev_y_bin = -1
         thread_start_time = time.time()
 
         # TODO: Because it will not be possible to get the correct first time
@@ -94,7 +96,7 @@ class PositionEstimator(threading.Thread):
             n_available_frames = self._position_consumer.available(0)
             for frame_idx in range(n_available_frames):
                 self._position_consumer.readData(self._data_field)
-                curr_bin_id = self.getPositionBin()
+                (curr_x_bin, curr_y_bin) = self.getXYBin()
                 # DEBUG - Desparate
                 """
                 print("Received Position data at %.2f \
@@ -103,14 +105,14 @@ class PositionEstimator(threading.Thread):
                             self._data_field['position_y']))
                 """
 
-                if (prev_bin_id < 0):
+                if (prev_x_bin < 0):
                     # First recorded bin!
                     #self._past_position_buffer.put((self._data_field['timestamp'], curr_bin_id))
-                    (x_bin, y_bin) = self.getXYBin()
                     for outp in self._position_buffer_connections:
-                        outp.send((self._data_field['timestamp'], x_bin, y_bin))
-                    prev_bin_id = curr_bin_id
-                elif (curr_bin_id != prev_bin_id):
+                        outp.send((self._data_field['timestamp'], curr_x_bin, curr_y_bin))
+                    prev_x_bin = curr_x_bin
+                    prev_y_bin = curr_y_bin
+                elif ((curr_x_bin != prev_x_bin) or (curr_y_bin != prev_y_bin)):
                     current_timestamp = self._data_field['timestamp']
                     time_spent_in_prev_bin = current_timestamp - prev_step_timestamp
                     prev_step_timestamp = current_timestamp
@@ -120,13 +122,13 @@ class PositionEstimator(threading.Thread):
 
                     #self._past_position_buffer.put((prev_step_timestamp, prev_bin_id))
                     
-                    (x_bin, y_bin) = self.getXYBin()
                     for outp in self._position_buffer_connections:
-                        outp.send((current_timestamp, x_bin, y_bin))
+                        outp.send((current_timestamp, curr_x_bin, curr_y_bin))
                     #self._past_position_buffer.put((current_timestamp, x_bin, y_bin))
 
                     # Update the total time spent in the bin we were previously in
-                    self._bin_occupancy[prev_bin_id] += float(time_spent_in_prev_bin)/RiD.SPIKE_SAMPLING_FREQ
+                    self._bin_occupancy[prev_x_bin, prev_y_bin] += float(time_spent_in_prev_bin)/RiD.SPIKE_SAMPLING_FREQ
 
                     # Update the current bin
-                    prev_bin_id = curr_bin_id
+                    prev_x_bin = curr_x_bin
+                    prev_y_bin = curr_y_bin

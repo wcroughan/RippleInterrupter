@@ -63,16 +63,17 @@ class PlaceFieldHandler(threading.Thread):
     Class for creating and updating place fields online
     """
 
-    # def __init__(self, position_processor, spike_processor, place_fields, place_field_lock):
-    def __init__(self, position_processor, spike_processor, place_fields):
+    def __init__(self, position_processor, spike_processor, place_fields, place_field_lock):
+    # def __init__(self, position_processor, spike_processor, place_fields):
         threading.Thread.__init__(self)
         self._position_buffer = position_processor.get_position_buffer_connection()
         self._spike_buffer = spike_processor.get_spike_buffer_connection()
         self._place_fields = place_fields
         self._nspks_in_bin = np.zeros(np.shape(place_fields))
+        print(np.shape(place_fields))
         self._bin_occupancy = position_processor.get_bin_occupancy()
         self._has_pf_request = False
-        # self._place_field_lock = place_field_lock
+        self._place_field_lock = place_field_lock
         print(time.strftime("Started thread for building place fields at %H:%M:%S"))
 
     def run(self):
@@ -119,15 +120,16 @@ class PlaceFieldHandler(threading.Thread):
                         pos_buf_empty = True
                         break
                     else:
-                        (next_postime, next_posbin_x, next_posbin_y) = self._position_buffer.pop()
+                        (next_postime, next_posbin_x, next_posbin_y) = self._position_buffer.recv()
 
                 #add this spike to spike counts for place bin
+                # print("Spike from cluster %d, in bin (%d, %d)"%(spk_cl, current_posbin_x, current_posbin_y))
+                # print(current_posbin_y)
                 self._nspks_in_bin[spk_cl, current_posbin_x, current_posbin_y] += 1
                 pf_update_spk_iter += 1
 
             if pf_update_spk_iter >= update_pf_every_n_spks and not self._has_pf_request:
                 pf_update_spk_iter = 0
-            
                 self._place_fields = np.divide(self._nspks_in_bin, self._bin_occupancy)
 
 
@@ -213,6 +215,6 @@ class SpikeDetector(threading.Thread):
                     print("Warning: Spike Ignored!")
                     continue
                 unique_cluster_identity = self._cluster_identity_map[tetrode_id][cluster_id]
-                print("Spike Timestamp %d, from uClusterID %d"%(spike_timestamp,unique_cluster_identity))
+                # print("Spike Timestamp %d, from uClusterID %d"%(spike_timestamp,unique_cluster_identity))
                 for outp in self._spike_buffer_connections:
                     outp.send((unique_cluster_identity, spike_timestamp))
