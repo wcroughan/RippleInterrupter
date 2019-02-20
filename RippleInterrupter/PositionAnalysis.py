@@ -19,8 +19,8 @@ class PositionEstimator(threading.Thread):
     # Min/Max position values in x and y to be used for binning
     __P_MIN_X = 0
     __P_MIN_Y = 0
-    __P_MAX_X = 1200
-    __P_MAX_Y = 1200
+    __P_MAX_X = 1400
+    __P_MAX_Y = 1400
     __P_BIN_SIZE_X = (__P_MAX_X - __P_MIN_X)
     __P_BIN_SIZE_Y = (__P_MAX_Y - __P_MIN_Y)
 
@@ -65,8 +65,8 @@ class PositionEstimator(threading.Thread):
         """
         px = self._data_field['position_x']
         py = self._data_field['position_y']
-        x_bin = int(round((px - self.__P_MIN_X)/self.__P_BIN_SIZE_X))
-        y_bin = int(round((py - self.__P_MIN_Y)/self.__P_BIN_SIZE_Y))
+        x_bin = np.floor_divide(self._n_bins_x * (px - self.__P_MIN_X),self.__P_BIN_SIZE_X)
+        y_bin = np.floor_divide(self._n_bins_y * (py - self.__P_MIN_Y),self.__P_BIN_SIZE_Y)
         return (x_bin, y_bin)
 
     def get_bin_occupancy(self):

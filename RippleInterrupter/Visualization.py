@@ -152,9 +152,9 @@ class GraphicsManager(Process):
         self._ripple_trigger_condition = ripple_trigger_condition
         
         # Automatically keep only a fixed number of entries in this buffer... Useful for plotting
-        self._pos_timestamps = deque(self.__N_POSITION_ELEMENTS_TO_PLOT*[0], self.__N_POSITION_ELEMENTS_TO_PLOT)
-        self._pos_x = deque(self.__N_POSITION_ELEMENTS_TO_PLOT*[0], self.__N_POSITION_ELEMENTS_TO_PLOT)
-        self._pos_y = deque(self.__N_POSITION_ELEMENTS_TO_PLOT*[0], self.__N_POSITION_ELEMENTS_TO_PLOT)
+        self._pos_timestamps = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
+        self._pos_x = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
+        self._pos_y = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
 
         # Figure elements
         self._pos_ax = None
