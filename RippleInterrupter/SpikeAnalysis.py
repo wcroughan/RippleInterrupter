@@ -191,9 +191,12 @@ class SpikeDetector(threading.Thread):
         """TODO: to be defined1. """
         threading.Thread.__init__(self)
         tetrode_argument = []
+        self._n_clusters = 0
         for ntrode in cluster_identity_map:
             for cluster in cluster_identity_map[ntrode]:
                 tetrode_argument.append(str(ntrode) + "," + str(cluster))
+                self._n_clusters += 1
+
         # Take a look at all the cluster we will be listening to
         # print(tetrode_argument)
         self._spike_stream = sg_client.subscribeSpikesData(TrodesInterface.SPIKE_SUBSCRIPTION_ATTRIBUTE, \
@@ -204,6 +207,9 @@ class SpikeDetector(threading.Thread):
         self._cluster_identity_map = cluster_identity_map
         print(time.strftime("Spike Detection thread started at %H:%M:%S"))
         return
+
+    def get_n_clusters(self):
+        return self._n_clusters
 
     def get_spike_buffer_connection(self):
         my_end, your_end = Pipe()

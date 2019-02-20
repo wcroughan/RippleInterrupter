@@ -4,6 +4,7 @@ Visualization of various measures
 
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+import matplotlib.cm as colormap
 from matplotlib.ticker import PercentFormatter
 from mpl_toolkits.mplot3d import Axes3D
 from collections import deque
@@ -134,15 +135,18 @@ class GraphicsManager(Process):
     """
 
     __N_POSITION_ELEMENTS_TO_PLOT = 100
+    __N_SPIKES_TO_PLOT = 200
     __N_ANIMATION_FRAMES = 5000
     def __init__(self, ripple_analyzer, spike_listener, position_estimator, \
-            place_field_handler, ripple_trigger_condition):
+            place_field_handler, ripple_trigger_condition, clusters=None):
         """TODO: to be defined1.
 
+        :ripple_analyzer: TODO
         :spike_listener: TODO
         :position_estimator: TODO
         :place_field_handler: TODO
-
+        :ripple_trigger_condition: TODO
+        :clusters: User specified cluster indices that we should be looking at.
         """
         Process.__init__(self)
         self._ripple_analyzer = ripple_analyzer
@@ -150,33 +154,49 @@ class GraphicsManager(Process):
         self._position_estimator = position_estimator
         self._place_field_handler = place_field_handler
         self._ripple_trigger_condition = ripple_trigger_condition
+        if clusters is None:
+            self._n_clusters = self._spike_listener.get_n_clusters()
+            self._clusters = range(self._n_clusters)
+        else:
+            # TODO: Fetch indices for these clusters
+            self._n_clusters = 0
+            self._clusters = None
+            pass
+
         
         # Automatically keep only a fixed number of entries in this buffer... Useful for plotting
         self._pos_timestamps = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._pos_x = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._pos_y = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
+        self._spk_timestamps = deque([], self.__N_SPIKES_TO_PLOT)
+        self._spk_clusters = deque([], self.__N_SPIKES_TO_PLOT)
 
         # Figure elements
-        self._pos_ax = None
-        self._pos_frame = None
-        self._spk_ax = None
-        self._spk_frame = None
+        self._spk_pos_ax = None
+        self._spk_pos_frame = []
 
         # Communication buffers
         self._position_buffer = self._position_estimator.get_position_buffer_connection()
         self._spike_buffer = self._spike_listener.get_spike_buffer_connection()
 
-    def update_position_frame(self, step=0):
+    def update_position_and_spike_frame(self, step=0):
         """
         Function used for animating the current position of the animal.
         """
-        if  self.pos_ax is not None:
+        if  self._spk_pos_ax is not None:
             # print(self._pos_x)
             # print(self._pos_y)
-            self._pos_frame.set_data((self._pos_x, self._pos_y))
+            self._spk_pos_frame[-1].set_data((self._pos_x, self._pos_y))
             if step == self.__N_ANIMATION_FRAMES:
                 print(time.strftime("Animation Finished at %H:%M:%S."))
-            return self._pos_frame,
+            return self._spk_pos_frame
+
+    def fetch_spikes_and_update_frames(self):
+        while True:
+            if self._spike_buffer.poll():
+                spike_data = self._spike_buffer.recv()
+                self._spk_clusters.append(spike_data[0])
+                self._spk_timestamps.append(spike_data[1])
 
     def fetch_position_and_update_frames(self):
         while True:
@@ -198,19 +218,30 @@ class GraphicsManager(Process):
         """
 
         # Launch a thread for fetching position data constantly
-        position_fetcher = threading.Thread(name="PositionFetcher", target=self.fetch_position_and_update_frames, \
-                args=())
+        position_fetcher = threading.Thread(name="PositionFetcher", target=self.fetch_position_and_update_frames)
+        spike_fetcher = threading.Thread(name="SpikeFetcher", target=self.fetch_spikes_and_update_frames)
+
         position_fetcher.start()
+        spike_fetcher.start()
 
         pos_fig = plt.figure()
-        self.pos_ax  = plt.axes()
-        self.pos_ax.set_xlabel("x (bin)")
-        self.pos_ax.set_ylabel("y (bin)")
-        self.pos_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
-        self.pos_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
-        self.pos_ax.grid(True)
-        self._pos_frame, = plt.plot([], [], animated=True)
-        anim_obj = animation.FuncAnimation(pos_fig, self.update_position_frame, frames=self.__N_ANIMATION_FRAMES, interval=25, blit=True)
+        self._spk_pos_ax  = plt.axes()
+        self._spk_pos_ax.set_xlabel("x (bin)")
+        self._spk_pos_ax.set_ylabel("y (bin)")
+        self._spk_pos_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
+        self._spk_pos_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
+        self._spk_pos_ax.grid(True)
+
+        # Create graphics entries for the actual position and also each of the spike clusters
+        colors = colormap.magma(np.linspace(0, 1, self._n_clusters))
+        for cl_idx in range(self._n_clusters):
+            new_line_plot,    = plt.plot([], [], animated=True, c=colors[cl_idx])
+            self._spk_pos_frame.append(new_line_plot)
+        pos_frame, = plt.plot([], [], animated=True)
+        self._spk_pos_frame.append(pos_frame)
+
+        anim_obj = animation.FuncAnimation(pos_fig, self.update_position_and_spike_frame, frames=self.__N_ANIMATION_FRAMES, interval=25, blit=True)
         plt.show()
 
         position_fetcher.join()
+        spike_fetcher.join()
