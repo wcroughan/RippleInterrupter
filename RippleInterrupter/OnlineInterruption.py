@@ -62,7 +62,7 @@ if (__name__ == "__main__"):
 
     place_field_lock = threading.Condition()
     # Initialize threads for looking at the actual/decoded position
-    spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, tetrode_argument, cluster_identity_map)
+    spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, cluster_identity_map)
     position_estimator  = PositionAnalysis.PositionEstimator(sg_client, N_POSITION_BINS)
     # place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, place_fields, \
     #         place_field_lock)
@@ -76,24 +76,21 @@ if (__name__ == "__main__"):
     # point.
 
     spike_listener.start()
+    """
     position_estimator.start()
     place_field_handler.start()
     ripple_detector.start()
     ripple_trigger.start()
+    """
 
     # Join all the threads to wait for their execution to  finish
     spike_listener.join()
+    """
     position_estimator.join()
     place_field_handler.join()
     ripple_detector.join()
     ripple_trigger.join()
+    """
 
-    # For each unit detected (God knows how this will work out!), launch a
-    # thread for constructing place fields.
-    # TODO: This can definitely not be hardcoded like this
-    n_units = 100
-    place_fields = []
-    for unit_id in range(n_units):
-        place_fields.append(SpikeAnalysis.PlaceField(unit_id))
-
+    # TODO: Delete all the threads
     print("Program finished. Exiting.")

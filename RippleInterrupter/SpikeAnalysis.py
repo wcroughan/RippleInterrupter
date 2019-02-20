@@ -40,7 +40,6 @@ def readClusterFile(filename, tetrodes):
     for ti in tetrodes:
         # Offset by 1 because Trodes tetrodes start with 1!
         ntrode = ntrode_list[ti-1]
-        print(ntrode)
         tetrode_idx = ntrode.get('nTrodeIndex')
         if len(list(ntrode)) == 0:
             # Has no clusters on it
@@ -50,7 +49,8 @@ def readClusterFile(filename, tetrodes):
         # that is what spike data returns.
         cluster_idx_to_id_map = {}
         for cluster in ntrode:
-            cluster_idx_to_id_map[int(cluster.get('clusterIndex'))] = raw_cluster_idx
+            local_cluster_idx = cluster.get('clusterIndex')
+            cluster_idx_to_id_map[int(local_cluster_idx)] = raw_cluster_idx
             raw_cluster_idx += 1
         n_trode_to_cluster_idx_map[ti] = cluster_idx_to_id_map
 
@@ -163,10 +163,15 @@ class SpikeDetector(threading.Thread):
     """
 
     #def __init__(self, sg_client, tetrodes, spike_buffer, position_buffer):
-    def __init__(self, sg_client, tetrodes, cluster_identity_map):
+    def __init__(self, sg_client, cluster_identity_map):
         """TODO: to be defined1. """
         threading.Thread.__init__(self)
-        tetrode_argument = [ tet_str + ",0" for tet_str in  tetrodes]
+        tetrode_argument = []
+        for ntrode in cluster_identity_map:
+            for cluster in cluster_identity_map[ntrode]:
+                tetrode_argument.append(str(ntrode) + "," + str(cluster))
+        # Take a look at all the cluster we will be listening to
+        # print(tetrode_argument)
         self._spike_stream = sg_client.subscribeSpikesData(TrodesInterface.SPIKE_SUBSCRIPTION_ATTRIBUTE, \
                 tetrode_argument)
         self._spike_stream.initialize()
@@ -202,11 +207,10 @@ class SpikeDetector(threading.Thread):
                 #         spike_timestamp, tetrode_id, cluster_id))
 
                 # Put this spike in the spike buffer queue
-                # TODO: Use unique cluster indices (or unit indices here)
-                # instead of whatever has been hacked in at the moment.
+                # TODO: Can remove this if it is never a problem
                 if cluster_id not in self._cluster_identity_map[tetrode_id]:
                     # Spike from an unclustered region... Ignore
-                    # print("Spike Ignored!")
+                    print("Warning: Spike Ignored!")
                     continue
                 unique_cluster_identity = self._cluster_identity_map[tetrode_id][cluster_id]
                 print("Spike Timestamp %d, from uClusterID %d"%(spike_timestamp,unique_cluster_identity))
