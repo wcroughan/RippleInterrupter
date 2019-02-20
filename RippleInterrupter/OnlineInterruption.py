@@ -14,26 +14,18 @@ import PositionAnalysis
 import TrodesInterface
 import PositionDecoding
 
-# Constant declarations
-# TODO: Could all be moved to a separate file
-# Main function that launches threads for detecting ripples, creating place
-# fields and analyzing replays online.
-
-def nTrodeAndClusterToIDMap(ntrode_id, cluster_id):
-    """
-    Takes in tetrode ID and cluster ID and maps it to a scalar index that can
-    then be used to access the place field for the cluster.
-    """
-
-    raise NotImplementedError()
-
 if (__name__ == "__main__"):
-    # TODO: Add a config file for reading a list of tetrodes that we want to
-    # work with.
-    cluster_filename = "./test_clusters.trodesClusters"
+    # TODO: None of the thread classes have any clean up at the end... TBD
+
+    # Not necessary to add a filename here. Can be read using a dialog box now
     tetrodes_of_interest = [3, 14]
-    # n_units, cluster_identity_map = SpikeAnalysis.readClusterFile(cluster_filename, tetrodes_of_interest)
-    n_units, cluster_identity_map = SpikeAnalysis.readClusterFile(tetrodes=tetrodes_of_interest)
+
+    # Uncomment to use a hardcoded file
+    cluster_filename = "./test_clusters.trodesClusters"
+    n_units, cluster_identity_map = SpikeAnalysis.readClusterFile(cluster_filename, tetrodes_of_interest)
+
+    # Uncomment to let the user select a file
+    # n_units, cluster_identity_map = SpikeAnalysis.readClusterFile(tetrodes=tetrodes_of_interest)
     # print(cluster_identity_map)
 
     # TODO: Making this a giant array might not be the best idea.. Potential
@@ -68,10 +60,17 @@ if (__name__ == "__main__"):
     place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, place_fields)
     bayesian_estimator  = PositionDecoding.BayesianEstimator(spike_listener, place_fields)
 
+    # Optionally, launch a graphics thread for continuously monitoring
+    # different threads for spikes, position data and ripples and show them to
+    # the user in real time.
+    graphical_interface = Visualization.GraphicsManager(ripple_detector, spike_listener, position_estimator, \
+            place_field_handler, trig_condition)
+
     # Spawn threads for handling all the place fields. We can convert this into
     # separate threads for separate fields too but that seems overkill at this
     # point.
 
+    graphical_interface.start()
     spike_listener.start()
     position_estimator.start()
     place_field_handler.start()
@@ -81,6 +80,7 @@ if (__name__ == "__main__"):
     """
 
     # Join all the threads to wait for their execution to  finish
+    graphical_interface.join()
     spike_listener.join()
     position_estimator.join()
     place_field_handler.join()

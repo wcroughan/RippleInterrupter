@@ -6,6 +6,7 @@ import os
 import sys
 import time
 import threading
+from multiprocessing import Pipe
 from scipy import signal
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -66,6 +67,9 @@ class RippleDetector(threading.Thread):
         self._std_ripple_power  = baseline_stats[1]
         self._trigger_condition = trigger_condition
 
+        # Output connections
+        self._ripple_buffer_connections = []
+
         # Data streams
         self._lfp_stream = sg_client.subscribeLFPData(TrodesInterface.LFP_SUBSCRIPTION_ATTRIBUTE, \
                 self._target_tetrodes)
@@ -77,6 +81,15 @@ class RippleDetector(threading.Thread):
 
         self._lfp_buffer = self._lfp_stream.create_numpy_array()
         print(time.strftime("Started Ripple detection thread at %H:%M:%S"))
+
+    def get_ripple_buffer_connections(self):
+        """
+        Returns a connection to the stored ripple power and raw lfp buffer
+        :returns: Receiving end of the pipe for ripple buffer
+        """
+        my_end, your_end = Pipe()
+        self._ripple_buffer_connections.append(my_end)
+        return your_end
 
     def run(self):
         """

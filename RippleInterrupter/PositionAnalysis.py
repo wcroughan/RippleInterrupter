@@ -113,13 +113,11 @@ class PositionEstimator(threading.Thread):
                         outp.send((self._data_field['timestamp'], curr_x_bin, curr_y_bin))
                     prev_x_bin = curr_x_bin
                     prev_y_bin = curr_y_bin
+                    print("Position Started (%d, %d)"%(curr_x_bin, curr_y_bin))
                 elif ((curr_x_bin != prev_x_bin) or (curr_y_bin != prev_y_bin)):
                     current_timestamp = self._data_field['timestamp']
                     time_spent_in_prev_bin = current_timestamp - prev_step_timestamp
                     prev_step_timestamp = current_timestamp
-
-                    # DEBUG: Report the jump in position bins
-                    print("Position jumped %d -> %d"%(curr_bin_id, prev_bin_id))
 
                     #self._past_position_buffer.put((prev_step_timestamp, prev_bin_id))
                     
@@ -129,6 +127,11 @@ class PositionEstimator(threading.Thread):
 
                     # Update the total time spent in the bin we were previously in
                     self._bin_occupancy[prev_x_bin, prev_y_bin] += float(time_spent_in_prev_bin)/RiD.SPIKE_SAMPLING_FREQ
+
+                    # DEBUG: Report the jump in position bins
+                    print("Position jumped (%d, %d) -> (%d,%d)"%(curr_x_bin, curr_y_bin, prev_x_bin, prev_y_bin))
+                    print("Position binned (%d, %d) = (%d,%d)"%(curr_x_bin, curr_y_bin, \
+                            self._data_field['position_x'], self._data_field['position_y']))
 
                     # Update the current bin
                     prev_x_bin = curr_x_bin

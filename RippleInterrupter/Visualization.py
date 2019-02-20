@@ -6,6 +6,14 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.ticker import PercentFormatter
 from mpl_toolkits.mplot3d import Axes3D
+from collections import deque
+from multiprocessing import Process
+import time
+import threading
+import numpy as np
+
+# Local Imports
+import PositionAnalysis
 
 def animateLFP(timestamps, lfp, raw_ripple, ripple_power, frame_size, statistic=None):
     """
@@ -119,3 +127,90 @@ def visualizeLFP(timestamps, raw_lfp_buffer, ripple_power, ripple_filtered_lfp, 
             return
         animateLFP(timestamps, norm_lfp, norm_raw_ripple, norm_ripple_power, 400)
     return (power_mean, power_std)
+
+class GraphicsManager(Process):
+    """
+    Process for managing visualization and graphics
+    """
+
+    __N_POSITION_ELEMENTS_TO_PLOT = 100
+    __N_ANIMATION_FRAMES = 5000
+    def __init__(self, ripple_analyzer, spike_listener, position_estimator, \
+            place_field_handler, ripple_trigger_condition):
+        """TODO: to be defined1.
+
+        :spike_listener: TODO
+        :position_estimator: TODO
+        :place_field_handler: TODO
+
+        """
+        Process.__init__(self)
+        self._ripple_analyzer = ripple_analyzer
+        self._spike_listener = spike_listener
+        self._position_estimator = position_estimator
+        self._place_field_handler = place_field_handler
+        self._ripple_trigger_condition = ripple_trigger_condition
+        
+        # Automatically keep only a fixed number of entries in this buffer... Useful for plotting
+        self._pos_timestamps = deque(self.__N_POSITION_ELEMENTS_TO_PLOT*[0], self.__N_POSITION_ELEMENTS_TO_PLOT)
+        self._pos_x = deque(self.__N_POSITION_ELEMENTS_TO_PLOT*[0], self.__N_POSITION_ELEMENTS_TO_PLOT)
+        self._pos_y = deque(self.__N_POSITION_ELEMENTS_TO_PLOT*[0], self.__N_POSITION_ELEMENTS_TO_PLOT)
+
+        # Figure elements
+        self._pos_ax = None
+        self._pos_frame = None
+        self._spk_ax = None
+        self._spk_frame = None
+
+        # Communication buffers
+        self._position_buffer = self._position_estimator.get_position_buffer_connection()
+        self._spike_buffer = self._spike_listener.get_spike_buffer_connection()
+
+    def update_position_frame(self, step=0):
+        """
+        Function used for animating the current position of the animal.
+        """
+        if  self.pos_ax is not None:
+            # print(self._pos_x)
+            # print(self._pos_y)
+            self._pos_frame.set_data((self._pos_x, self._pos_y))
+            if step == self.__N_ANIMATION_FRAMES:
+                print(time.strftime("Animation Finished at %H:%M:%S."))
+            return self._pos_frame,
+
+    def fetch_position_and_update_frames(self):
+        while True:
+            if self._position_buffer.poll():
+                position_data = self._position_buffer.recv()
+                self._pos_timestamps.append(position_data[0])
+                self._pos_x.append(position_data[1])
+                self._pos_y.append(position_data[2])
+                print("Fetched Position data... (%d, %d)"%(position_data[1],position_data[2]))
+            else:
+                # Wait for a while for data to appear
+                time.sleep(0.05)
+        pass
+
+    def run(self):
+        """
+        Start a GUI, launch all the graphics windows that have been requested
+        in separate threads.
+        """
+
+        # Launch a thread for fetching position data constantly
+        position_fetcher = threading.Thread(name="PositionFetcher", target=self.fetch_position_and_update_frames, \
+                args=())
+        position_fetcher.start()
+
+        pos_fig = plt.figure()
+        self.pos_ax  = plt.axes()
+        self.pos_ax.set_xlabel("x (bin)")
+        self.pos_ax.set_ylabel("y (bin)")
+        self.pos_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
+        self.pos_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
+        self.pos_ax.grid(True)
+        self._pos_frame, = plt.plot([], [], animated=True)
+        anim_obj = animation.FuncAnimation(pos_fig, self.update_position_frame, frames=self.__N_ANIMATION_FRAMES, interval=25, blit=True)
+        plt.show()
+
+        position_fetcher.join()
