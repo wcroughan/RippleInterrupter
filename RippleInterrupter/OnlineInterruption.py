@@ -32,8 +32,9 @@ if (__name__ == "__main__"):
     # work with.
     cluster_filename = "./test_clusters.trodesClusters"
     tetrodes_of_interest = [3, 14]
-    n_units, cluster_identity_map = SpikeAnalysis.readClusterFile(cluster_filename, tetrodes_of_interest)
-    print(cluster_identity_map)
+    # n_units, cluster_identity_map = SpikeAnalysis.readClusterFile(cluster_filename, tetrodes_of_interest)
+    n_units, cluster_identity_map = SpikeAnalysis.readClusterFile(tetrodes=tetrodes_of_interest)
+    # print(cluster_identity_map)
 
     # TODO: Making this a giant array might not be the best idea.. Potential
     # bugs accessing it too. This has both spikes and occupance stored as a

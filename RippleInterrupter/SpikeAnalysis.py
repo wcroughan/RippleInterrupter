@@ -1,23 +1,32 @@
 #System imports
+import os
 import time
 import threading
 from scipy import signal, stats
 import matplotlib.pyplot as plt
 import xml.etree.ElementTree as ET
 from multiprocessing import Queue, Pipe
+from tkinter import Tk, filedialog
 import numpy as np
+import logging
 
 # Local imports
 import TrodesInterface
 
-def readClusterFile(filename, tetrodes):
+def readClusterFile(filename=None, tetrodes=None):
     """
     Reads a cluster file and generates a list of tetrodes that have cells and
     all the clusters on that tetrode.
 
     :filename: XML file containing clustering information.
+    :tetrodes: Which tetrodes to look at in the cluster file.
     :returns: A dictionary giving valid cluster indices for each tetrode.
     """
+    if filename is None:
+        gui_root = Tk()
+        gui_root.wm_withdraw()
+        filename = filedialog.askopenfilename(initialdir = os.getcwd(), title = "Select Cluster file",filetypes = (("cluster files","*.trodesClusters"),("all files","*.*")))
+
     try:
         cluster_tree = ET.parse(filename)
     except Exception as err:
@@ -37,6 +46,9 @@ def readClusterFile(filename, tetrodes):
     polygon_clusters = tree_root.getchildren()[0]
     ntrode_list = list(polygon_clusters)
 
+    if tetrodes is None:
+        tetrodes = range(1,1+len(ntrode_list))
+
     for ti in tetrodes:
         # Offset by 1 because Trodes tetrodes start with 1!
         ntrode = ntrode_list[ti-1]
@@ -55,6 +67,7 @@ def readClusterFile(filename, tetrodes):
         n_trode_to_cluster_idx_map[ti] = cluster_idx_to_id_map
 
     # Final value of raw_cluster_idx is a proxy for the total number of units we have
+    logging.debug(n_trode_to_cluster_idx_map)
     return raw_cluster_idx, n_trode_to_cluster_idx_map
 
 class PlaceFieldHandler(threading.Thread):
