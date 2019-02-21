@@ -233,7 +233,7 @@ class SpikeDetector(ThreadExtension.StoppableThread):
         Start collecting all spikes from trodes and allocate them to differnet
         place fields!
         """
-        while self.req_stop():
+        while not self.req_stop():
             n_available_spikes = self._spike_stream.available(0)
             for spk_idx in range(n_available_spikes):
                 # Populate the spike record
@@ -255,6 +255,6 @@ class SpikeDetector(ThreadExtension.StoppableThread):
                     print("Warning: Spike Ignored!")
                     continue
                 unique_cluster_identity = self._cluster_identity_map[tetrode_id][cluster_id]
-                # print("Spike Timestamp %d, from uClusterID %d"%(spike_timestamp,unique_cluster_identity))
+                print("Spike Timestamp %d, from uClusterID %d"%(spike_timestamp,unique_cluster_identity))
                 for outp in self._spike_buffer_connections:
                     outp.send((unique_cluster_identity, spike_timestamp))
