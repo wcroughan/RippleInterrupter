@@ -3,6 +3,7 @@ Collect position data from trodes
 """
 import threading
 import time
+from datetime import datetime
 import logging
 import numpy as np
 from multiprocessing import Pipe
@@ -11,6 +12,7 @@ from multiprocessing import Pipe
 import RippleDefinitions as RiD
 import ThreadExtension
 
+MODULE_IDENTIFIER = "[PositionAnalysis] "
 N_POSITION_BINS = (6, 6)
 class PositionEstimator(ThreadExtension.StoppableThread):
     """
@@ -49,7 +51,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
             logging.debug("Failed to open Camera Module")
             raise Exception("Could not connect to camera, aborting.")
         self._position_consumer.initialize()
-        print(time.strftime("Starting Position tracking thread at %H:%M:%S"))
+        logging.debug(MODULE_IDENTIFIER + datetime.now().strftime("Starting Position tracking thread at %H:%M:%S.%f"))
 
         self._position_buffer_connections = []
 
@@ -101,7 +103,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                 (curr_x_bin, curr_y_bin) = self.getXYBin()
                 # DEBUG - Desparate
                 """
-                print("Received Position data at %.2f \
+                logging.debug(MODULE_IDENTIFIER + "Received Position data at %.2f \
                         (%d,%d)"%(time.time()-thread_start_time, \
                             self._data_field['position_x'], \
                             self._data_field['position_y']))
@@ -114,7 +116,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                         outp.send((self._data_field['timestamp'], curr_x_bin, curr_y_bin))
                     prev_x_bin = curr_x_bin
                     prev_y_bin = curr_y_bin
-                    print("Position Started (%d, %d)"%(curr_x_bin, curr_y_bin))
+                    logging.debug(MODULE_IDENTIFIER + "Position Started (%d, %d)"%(curr_x_bin, curr_y_bin))
                 elif ((curr_x_bin != prev_x_bin) or (curr_y_bin != prev_y_bin)):
                     current_timestamp = self._data_field['timestamp']
                     time_spent_in_prev_bin = current_timestamp - prev_step_timestamp
@@ -130,8 +132,8 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                     self._bin_occupancy[prev_x_bin, prev_y_bin] += float(time_spent_in_prev_bin)/RiD.SPIKE_SAMPLING_FREQ
 
                     # DEBUG: Report the jump in position bins
-                    print("Position jumped (%d, %d) -> (%d,%d)"%(curr_x_bin, curr_y_bin, prev_x_bin, prev_y_bin))
-                    print("Position binned (%d, %d) = (%d,%d)"%(curr_x_bin, curr_y_bin, \
+                    logging.debug(MODULE_IDENTIFIER + "Position jumped (%d, %d) -> (%d,%d)"%(curr_x_bin, curr_y_bin, prev_x_bin, prev_y_bin))
+                    logging.debug(MODULE_IDENTIFIER + "Position binned (%d, %d) = (%d,%d)"%(curr_x_bin, curr_y_bin, \
                             self._data_field['position_x'], self._data_field['position_y']))
 
                     # Update the current bin

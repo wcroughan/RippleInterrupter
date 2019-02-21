@@ -15,8 +15,18 @@ import PositionAnalysis
 import TrodesInterface
 import PositionDecoding
 
+MODULE_IDENTIFIER = "[OnlineInterruption] "
+
 def main():
     # TODO: None of the thread classes have any clean up at the end... TBD
+    # Start logging before anything else
+    log_file_prefix = "replay_disruption_log"
+    print("starting data logger with prefix " + log_file_prefix)
+    # self._filename = os.getcwd() + "/" + time.strftime(file_prefix + "_%Y%m%d_%H%M%S.log")
+    log_filename = time.strftime(log_file_prefix + "_%Y%m%d_%H%M%S.log")
+    logging.basicConfig(filename=log_filename, level=logging.DEBUG)
+    print("Log file initialized")
+    logging.debug(MODULE_IDENTIFIER + "Starting Log file at " + time.ctime())
 
     # Not necessary to add a filename here. Can be read using a dialog box now
     tetrodes_of_interest = [3, 14]
@@ -29,9 +39,6 @@ def main():
     # n_units, cluster_identity_map = SpikeAnalysis.readClusterFile(tetrodes=tetrodes_of_interest)
     # print(cluster_identity_map)
 
-    # TODO: Making this a giant array might not be the best idea.. Potential
-    # bugs accessing it too. This has both spikes and occupance stored as a
-    # tuple.
     place_fields = np.zeros((n_units, PositionAnalysis.N_POSITION_BINS[0], \
             PositionAnalysis.N_POSITION_BINS[1]), dtype='float')
 
@@ -84,22 +91,22 @@ def main():
         # Run cleanup here
         # graphical_interface.terminate()
         graphical_interface.join()
-        print("GUI terminated")
+        logging.debug(MODULE_IDENTIFIER + "GUI terminated")
         spike_listener.join()
-        print("Spike Listener Stopped")
+        logging.debug(MODULE_IDENTIFIER  + "Spike Listener Stopped")
         position_estimator.join()
-        print("Position data collection Stopped")
+        logging.debug(MODULE_IDENTIFIER + "Position data collection Stopped")
         place_field_handler.join()
-        print("Place field builder Stopped")
+        logging.debug(MODULE_IDENTIFIER + "Place field builder Stopped")
         """
         ripple_detector.join()
         ripple_trigger.join()
         """
     except (KeyboardInterrupt, SystemExit):
-        print("something else happened")
+        logging.debug(MODULE_IDENTIFIER + "Caught Keyboard Interrupt from user...")
     finally:
         # TODO: Delete all the threads
-        print("Program finished. Exiting.")
+        logging.debug(MODULE_IDENTIFIER + "Program finished. Exiting.")
 
 
 if (__name__ == "__main__"):

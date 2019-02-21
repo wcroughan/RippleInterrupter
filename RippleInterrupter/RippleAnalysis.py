@@ -5,6 +5,8 @@ Module for analysis of ripples in streaming or offline LFP data.
 import os
 import sys
 import time
+import logging
+from datetime import datetime
 import threading
 from multiprocessing import Pipe
 from scipy import signal
@@ -17,6 +19,8 @@ import TrodesInterface
 import ThreadExtension
 import RippleDefinitions as RiD
 import Visualization
+
+MODULE_IDENTIFIER = "[RippleAnalysis] "
 
 class RippleSynchronizer(ThreadExtension.StoppableThread):
     """
@@ -31,16 +35,16 @@ class RippleSynchronizer(ThreadExtension.StoppableThread):
         """TODO: to be defined1. """
         ThreadExtension.StoppableThread.__init__(self)
         self._sync_event = sync_event
-        print(time.strftime("Started Ripple Synchronization thread at %H:%M:%S"))
+        logging.debug(MODULE_IDENTIFIER + datetime.now().strftime("Started Ripple Synchronization thread at %H:%M:%S.3%f"))
 
     def run(self):
         while not self.req_stop():
             # TODO: EVENT TIMEOUT will act as a timeout between successive
             # ripple detections (maybe too hacky)
-            print("Waiting for ripple trigger...")
+            logging.debug(MODULE_IDENTIFIER + "Waiting for ripple trigger...")
             with self._sync_event:
                 self._sync_event.wait()
-            print(time.strftime("Ripple tiggered at %H:%M:%S\n"))
+            logging.debug(MODULE_IDENTIFIER + datetime.now().strftime("Ripple tiggered at %H:%M:%S.%f\n"))
 
 class RippleDetector(ThreadExtension.StoppableThread):
     """
@@ -81,7 +85,7 @@ class RippleDetector(ThreadExtension.StoppableThread):
                 analog=False, output='sos', fs=RiD.LFP_FREQUENCY)
 
         self._lfp_buffer = self._lfp_stream.create_numpy_array()
-        print(time.strftime("Started Ripple detection thread at %H:%M:%S"))
+        logging.debug(MODULE_IDENTIFIER + datetime.now().strftime("Started Ripple detection thread at %H:%M:%S.%f"))
 
     def get_ripple_buffer_connections(self):
         """
@@ -150,7 +154,7 @@ class RippleDetector(ThreadExtension.StoppableThread):
                             with self._trigger_condition:
                                 self._trigger_condition.notifyAll()
                             curr_wall_time = time.time()
-                            print("Detected ripple at %.2f. Strength: %.2f"% \
+                            logging.debug(MODULE_IDENTIFIER + "Detected ripple at %.2f. Strength: %.2f"% \
                                     (curr_wall_time-start_wall_time, power_to_baseline_ratio))
         
 def normalizeData(in_data):

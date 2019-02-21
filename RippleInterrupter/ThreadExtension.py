@@ -27,6 +27,7 @@ class StoppableThread(threading.Thread):
         return self._stop_event.is_set()
 
     def join(self, timeout=None):
-        print("join called on stoppable thread")
+        # For all implementations of this class, need to extend the join method
+        # to log the time at which thread ended.
         self.stop()
         threading.Thread.join(self, timeout)

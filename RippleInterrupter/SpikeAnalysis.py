@@ -2,6 +2,7 @@
 import os
 import time
 import threading
+from datetime import datetime
 from scipy import signal, stats
 import matplotlib.pyplot as plt
 import xml.etree.ElementTree as ET
@@ -13,6 +14,8 @@ import logging
 # Local imports
 import TrodesInterface
 import ThreadExtension
+
+MODULE_IDENTIFIER = "[SpikeAnalysis] "
 
 def readClusterFile(filename=None, tetrodes=None):
     """
@@ -68,7 +71,7 @@ def readClusterFile(filename=None, tetrodes=None):
         n_trode_to_cluster_idx_map[ti] = cluster_idx_to_id_map
 
     # Final value of raw_cluster_idx is a proxy for the total number of units we have
-    logging.debug(n_trode_to_cluster_idx_map)
+    logging.debug(MODULE_IDENTIFIER + "Cluster map... \n", n_trode_to_cluster_idx_map)
     return raw_cluster_idx, n_trode_to_cluster_idx_map
 
 class PlaceFieldHandler(ThreadExtension.StoppableThread):
@@ -89,7 +92,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
         self._has_pf_request = False
         self._place_field_lock = threading.Condition()
         self._spike_place_buffer_connections = []
-        print(time.strftime("Started thread for building place fields at %H:%M:%S"))
+        logging.debug(time.strftime("Started thread for building place fields at %H:%M:%S"))
 
     def get_spike_place_buffer_connection(self):
         my_end, your_end = Pipe()
@@ -128,7 +131,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
 
                 #get the next spike
                 (spk_cl, spk_time) = self._spike_buffer.recv()
-                print("Received spike from %d at %d"%(spk_cl, spk_time))
+                logging.debug(MODULE_IDENTIFIER + "Received spike from %d at %d"%(spk_cl, spk_time))
 
                 #if it's after our most recent position update, try and read the next position
                 #keep reading positions until our position data is ahead of our spike data
@@ -147,7 +150,6 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
                 # print("Spike from cluster %d, in bin (%d, %d)"%(spk_cl, current_posbin_x, current_posbin_y))
                 # print(current_posbin_y)
                 self._nspks_in_bin[spk_cl, current_posbin_x, current_posbin_y] += 1
-                print("Added spike to place field collection")
                 # Send this to the visualization pipeline to see how spike are being reported
                 for pipe_in in self._spike_place_buffer_connections:
                     pipe_in.send((spk_cl, current_posbin_x, current_posbin_y))
@@ -217,7 +219,7 @@ class SpikeDetector(ThreadExtension.StoppableThread):
         self._spike_record = self._spike_stream.create_numpy_array()
         self._spike_buffer_connections = []
         self._cluster_identity_map = cluster_identity_map
-        print(time.strftime("Spike Detection thread started at %H:%M:%S"))
+        logging.debug(datetime.now().strftime("Spike Detection thread started at %H:%M:%S.%f"))
         return
 
     def get_n_clusters(self):
@@ -252,9 +254,9 @@ class SpikeDetector(ThreadExtension.StoppableThread):
                 # TODO: Can remove this if it is never a problem
                 if cluster_id not in self._cluster_identity_map[tetrode_id]:
                     # Spike from an unclustered region... Ignore
-                    print("Warning: Spike Ignored!")
+                    logging.debug(MODULE_IDENTIFIER + "Warning: Spike Ignored!")
                     continue
                 unique_cluster_identity = self._cluster_identity_map[tetrode_id][cluster_id]
-                print("Spike Timestamp %d, from uClusterID %d"%(spike_timestamp,unique_cluster_identity))
+                logging.debug(MODULE_IDENTIFIER + "Spike Timestamp %d, from uClusterID %d"%(spike_timestamp,unique_cluster_identity))
                 for outp in self._spike_buffer_connections:
                     outp.send((unique_cluster_identity, spike_timestamp))

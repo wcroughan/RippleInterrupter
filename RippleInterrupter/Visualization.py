@@ -11,11 +11,15 @@ from collections import deque
 from multiprocessing import Process
 import tkinter
 import time
+from datetime import datetime
 import threading
+import logging
 import numpy as np
 
 # Local Imports
 import PositionAnalysis
+
+MODULE_IDENTIFIER = "[GraphicsHandler] "
 
 def animateLFP(timestamps, lfp, raw_ripple, ripple_power, frame_size, statistic=None):
     """
@@ -157,7 +161,7 @@ class GraphicsManager(Process):
         self._key_entry = tkinter.Entry(self._command_window)
         self._key_entry.bind("<Return>", self.process_command)
         self._key_entry.pack()
-        exit_button = tkinter.Button(self._command_window, text='Quit', command=self._command_window.quit)
+        exit_button = tkinter.Button(self._command_window, text='Quit', command=self._command_window.destroy)
         exit_button.pack()
 
         self._keep_running = True
@@ -201,17 +205,19 @@ class GraphicsManager(Process):
             # print(self._pos_y)
             self._spk_pos_frame[-1].set_data((self._pos_x, self._pos_y))
             if step == self.__N_ANIMATION_FRAMES:
-                print(time.strftime("Animation Finished at %H:%M:%S."))
+                logging.debug(MODULE_IDENTIFIER + datetime.now().strftime("Animation Finished at %H:%M:%S.%f"))
             return self._spk_pos_frame
 
     def fetch_spikes_and_update_frames(self):
         while self._keep_running:
             if self._spike_buffer.poll():
                 spike_data = self._spike_buffer.recv()
-                self._spk_clusters.append(spike_data[0])
+                # TODO: Might not have to save all the spike timestamps since
+                # we are already getting position data here.
+                self._spk_timestamps.append(spike_data[0])
                 self._spk_pos_x.append(spike_data[1])
                 self._spk_pos_y.append(spike_data[2])
-                print("Received spike from cluster: %d, in bin (%d, %d)"%spike_data)
+                logging.debug(MODULE_IDENTIFIER + "Received spike from cluster: %d, in bin (%d, %d)"%spike_data)
 
     def fetch_position_and_update_frames(self):
         while self._keep_running:
@@ -220,7 +226,7 @@ class GraphicsManager(Process):
                 self._pos_timestamps.append(position_data[0])
                 self._pos_x.append(position_data[1])
                 self._pos_y.append(position_data[2])
-                print("Fetched Position data... (%d, %d)"%(position_data[1],position_data[2]))
+                logging.debug("Fetched Position data... (%d, %d)"%(position_data[1],position_data[2]))
             else:
                 # Wait for a while for data to appear
                 time.sleep(0.05)
@@ -273,7 +279,7 @@ class GraphicsManager(Process):
         # This is a blocking command... After you exit this, everything will end.
         self._command_window.mainloop()
 
-        print("Closing GUI and display pipes")
+        logging.debug(MODULE_IDENTIFIER + datetime.now().strftime("Closing GUI and display pipes at %H:%M:%S.%f"))
         plt.close()
         self._keep_running = False
         position_fetcher.join()
