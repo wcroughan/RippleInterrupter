@@ -181,7 +181,8 @@ class GraphicsManager(Process):
         self._pos_x = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._pos_y = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._spk_timestamps = deque([], self.__N_SPIKES_TO_PLOT)
-        self._spk_clusters = deque([], self.__N_SPIKES_TO_PLOT)
+        self._spk_pos_x = deque([], self.__N_SPIKES_TO_PLOT)
+        self._spk_pos_y = deque([], self.__N_SPIKES_TO_PLOT)
 
         # Figure elements
         self._spk_pos_ax = None
@@ -189,7 +190,7 @@ class GraphicsManager(Process):
 
         # Communication buffers
         self._position_buffer = self._position_estimator.get_position_buffer_connection()
-        self._spike_buffer = self._spike_listener.get_spike_buffer_connection()
+        self._spike_buffer = self._place_field_handler.get_spike_place_buffer_connection()
 
     def update_position_and_spike_frame(self, step=0):
         """
@@ -208,7 +209,9 @@ class GraphicsManager(Process):
             if self._spike_buffer.poll():
                 spike_data = self._spike_buffer.recv()
                 self._spk_clusters.append(spike_data[0])
-                self._spk_timestamps.append(spike_data[1])
+                self._spk_pos_x.append(spike_data[1])
+                self._spk_pos_y.append(spike_data[2])
+                print("Received spike from cluster: %d, in bin (%d, %d)"%spike_data)
 
     def fetch_position_and_update_frames(self):
         while self._keep_running:

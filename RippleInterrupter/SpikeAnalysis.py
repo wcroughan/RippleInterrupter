@@ -88,7 +88,13 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
         self._bin_occupancy = position_processor.get_bin_occupancy()
         self._has_pf_request = False
         self._place_field_lock = threading.Condition()
+        self._spike_place_buffer_connections = []
         print(time.strftime("Started thread for building place fields at %H:%M:%S"))
+
+    def get_spike_place_buffer_connection(self):
+        my_end, your_end = Pipe()
+        self._spike_place_buffer_connections.append(my_end)
+        return your_end
 
     def run(self):
         """
@@ -122,6 +128,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
 
                 #get the next spike
                 (spk_cl, spk_time) = self._spike_buffer.recv()
+                print("Received spike from %d at %d"%(spk_cl, spk_time))
 
                 #if it's after our most recent position update, try and read the next position
                 #keep reading positions until our position data is ahead of our spike data
@@ -140,6 +147,10 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
                 # print("Spike from cluster %d, in bin (%d, %d)"%(spk_cl, current_posbin_x, current_posbin_y))
                 # print(current_posbin_y)
                 self._nspks_in_bin[spk_cl, current_posbin_x, current_posbin_y] += 1
+                print("Added spike to place field collection")
+                # Send this to the visualization pipeline to see how spike are being reported
+                for pipe_in in self._spike_place_buffer_connections:
+                    pipe_in.send((spk_cl, current_posbin_x, current_posbin_y))
                 pf_update_spk_iter += 1
 
             if pf_update_spk_iter >= update_pf_every_n_spks and not self._has_pf_request:
