@@ -1,4 +1,5 @@
 # System imports
+import sys
 import threading
 import time
 import numpy as np
@@ -14,7 +15,7 @@ import PositionAnalysis
 import TrodesInterface
 import PositionDecoding
 
-if (__name__ == "__main__"):
+def main():
     # TODO: None of the thread classes have any clean up at the end... TBD
 
     # Not necessary to add a filename here. Can be read using a dialog box now
@@ -48,7 +49,6 @@ if (__name__ == "__main__"):
     ripple_detector = RippleAnalysis.RippleDetector(sg_client, tetrode_argument, \
             baseline_stats=[60.0, 30.0], trigger_condition=trig_condition)
 
-    # TODO: Put everything in a try/catch loop to better handle user interrupts
     # Create a buffer for spikes to be accessed until they are taken out of the
     # queue by the Bayesian Estimator.
     #spike_buffer = Queue()
@@ -79,15 +79,28 @@ if (__name__ == "__main__"):
     ripple_trigger.start()
     """
 
-    # Join all the threads to wait for their execution to  finish
-    graphical_interface.join()
-    spike_listener.join()
-    position_estimator.join()
-    place_field_handler.join()
-    """
-    ripple_detector.join()
-    ripple_trigger.join()
-    """
+    try:
+        # Join all the threads to wait for their execution to  finish
+        # Run cleanup here
+        # graphical_interface.terminate()
+        graphical_interface.join()
+        print("GUI terminated")
+        spike_listener.join()
+        print("Spike Listener Stopped")
+        position_estimator.join()
+        print("Position data collection Stopped")
+        place_field_handler.join()
+        print("Place field builder Stopped")
+        """
+        ripple_detector.join()
+        ripple_trigger.join()
+        """
+    except (KeyboardInterrupt, SystemExit):
+        print("something else happened")
+    finally:
+        # TODO: Delete all the threads
+        print("Program finished. Exiting.")
 
-    # TODO: Delete all the threads
-    print("Program finished. Exiting.")
+
+if (__name__ == "__main__"):
+    main()

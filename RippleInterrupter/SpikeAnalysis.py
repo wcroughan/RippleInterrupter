@@ -12,6 +12,7 @@ import logging
 
 # Local imports
 import TrodesInterface
+import ThreadExtension
 
 def readClusterFile(filename=None, tetrodes=None):
     """
@@ -70,7 +71,7 @@ def readClusterFile(filename=None, tetrodes=None):
     logging.debug(n_trode_to_cluster_idx_map)
     return raw_cluster_idx, n_trode_to_cluster_idx_map
 
-class PlaceFieldHandler(threading.Thread):
+class PlaceFieldHandler(ThreadExtension.StoppableThread):
 
     """
     Class for creating and updating place fields online
@@ -78,7 +79,7 @@ class PlaceFieldHandler(threading.Thread):
 
     def __init__(self, position_processor, spike_processor, place_fields):
     # def __init__(self, position_processor, spike_processor, place_fields):
-        threading.Thread.__init__(self)
+        ThreadExtension.StoppableThread.__init__(self)
         self._position_buffer = position_processor.get_position_buffer_connection()
         self._spike_buffer = spike_processor.get_spike_buffer_connection()
         self._place_fields = place_fields
@@ -105,7 +106,7 @@ class PlaceFieldHandler(threading.Thread):
         update_pf_every_n_spks = 100 #this controls how many spikes are collected before place fields are recalculated
         pf_update_spk_iter = 0
 
-        while True:
+        while not self.req_stop():
             # If thread has been requested to stop an updates to place field
             # data because of an outside access to the data
             if self._has_pf_request:
@@ -180,7 +181,7 @@ class PlaceFieldHandler(threading.Thread):
             return (np.copy(self._log_place_fields), np.sum(self._place_fields, axis=0))
 
 
-class SpikeDetector(threading.Thread):
+class SpikeDetector(ThreadExtension.StoppableThread):
     """
     Pulls spikes from Trodes and assigns them to different worker threads that
     will allocate them to place bins.
@@ -189,7 +190,7 @@ class SpikeDetector(threading.Thread):
     #def __init__(self, sg_client, tetrodes, spike_buffer, position_buffer):
     def __init__(self, sg_client, cluster_identity_map):
         """TODO: to be defined1. """
-        threading.Thread.__init__(self)
+        ThreadExtension.StoppableThread.__init__(self)
         tetrode_argument = []
         self._n_clusters = 0
         for ntrode in cluster_identity_map:
@@ -221,7 +222,7 @@ class SpikeDetector(threading.Thread):
         Start collecting all spikes from trodes and allocate them to differnet
         place fields!
         """
-        while True:
+        while self.req_stop():
             n_available_spikes = self._spike_stream.available(0)
             for spk_idx in range(n_available_spikes):
                 # Populate the spike record

@@ -14,10 +14,11 @@ import numpy as np
 
 # Local file imports
 import TrodesInterface
+import ThreadExtension
 import RippleDefinitions as RiD
 import Visualization
 
-class RippleSynchronizer(threading.Thread):
+class RippleSynchronizer(ThreadExtension.StoppableThread):
     """
     Waits for a ripple to be detected and processes downstream changes for
     analyzing spike contents.
@@ -28,12 +29,12 @@ class RippleSynchronizer(threading.Thread):
 
     def __init__(self, sync_event):
         """TODO: to be defined1. """
-        threading.Thread.__init__(self)
+        ThreadExtension.StoppableThread.__init__(self)
         self._sync_event = sync_event
         print(time.strftime("Started Ripple Synchronization thread at %H:%M:%S"))
 
     def run(self):
-        while True:
+        while not self.req_stop():
             # TODO: EVENT TIMEOUT will act as a timeout between successive
             # ripple detections (maybe too hacky)
             print("Waiting for ripple trigger...")
@@ -41,7 +42,7 @@ class RippleSynchronizer(threading.Thread):
                 self._sync_event.wait()
             print(time.strftime("Ripple tiggered at %H:%M:%S\n"))
 
-class RippleDetector(threading.Thread):
+class RippleDetector(ThreadExtension.StoppableThread):
     """
     Thread for ripple detection on a set of channels [ONLINE]
     """
@@ -58,7 +59,7 @@ class RippleDetector(threading.Thread):
             threading.Condition()) to communicate synchronization with other threads.
         """
 
-        threading.Thread.__init__(self)
+        ThreadExtension.StoppableThread.__init__(self)
         # TODO: Error handling if baseline stats are not provided - Get them by
         # looking at the data for some time.
         self._target_tetrodes = target_tetrodes
@@ -117,7 +118,7 @@ class RippleDetector(threading.Thread):
         curr_time   = 0
         start_wall_time = time.time()
         curr_wall_time = start_wall_time
-        while True:
+        while not self.req_stop():
             # Acquire buffered LFP frames and fill them in a filter buffer
             n_lfp_frames = self._lfp_stream.available(0)
             for frame_idx in range(n_lfp_frames):

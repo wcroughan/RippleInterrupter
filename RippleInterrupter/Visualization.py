@@ -9,6 +9,7 @@ from matplotlib.ticker import PercentFormatter
 from mpl_toolkits.mplot3d import Axes3D
 from collections import deque
 from multiprocessing import Process
+import tkinter
 import time
 import threading
 import numpy as np
@@ -149,6 +150,17 @@ class GraphicsManager(Process):
         :clusters: User specified cluster indices that we should be looking at.
         """
         Process.__init__(self)
+
+        # Graphics windows
+        self._command_window = tkinter.Tk()
+        tkinter.Label(self._command_window, text="Enter command to execute...").pack()
+        self._key_entry = tkinter.Entry(self._command_window)
+        self._key_entry.bind("<Return>", self.process_command)
+        self._key_entry.pack()
+        exit_button = tkinter.Button(self._command_window, text='Quit', command=self._command_window.quit)
+        exit_button.pack()
+
+        self._keep_running = True
         self._ripple_analyzer = ripple_analyzer
         self._spike_listener = spike_listener
         self._position_estimator = position_estimator
@@ -192,14 +204,14 @@ class GraphicsManager(Process):
             return self._spk_pos_frame
 
     def fetch_spikes_and_update_frames(self):
-        while True:
+        while self._keep_running:
             if self._spike_buffer.poll():
                 spike_data = self._spike_buffer.recv()
                 self._spk_clusters.append(spike_data[0])
                 self._spk_timestamps.append(spike_data[1])
 
     def fetch_position_and_update_frames(self):
-        while True:
+        while self._keep_running:
             if self._position_buffer.poll():
                 position_data = self._position_buffer.recv()
                 self._pos_timestamps.append(position_data[0])
@@ -211,15 +223,27 @@ class GraphicsManager(Process):
                 time.sleep(0.05)
         pass
 
+    def process_command(self, key_in):
+        print(self._key_entry.get())
+        self._key_entry.delete(0, tkinter.END)
+        pass
+
     def run(self):
         """
         Start a GUI, launch all the graphics windows that have been requested
         in separate threads.
         """
 
+        # Create a command window to take user inputs
+        # gui_handler = threading.Thread(name="CommandWindow", daemon=True, \
+        #         target=self._command_window.mainloop)
+
         # Launch a thread for fetching position data constantly
-        position_fetcher = threading.Thread(name="PositionFetcher", target=self.fetch_position_and_update_frames)
-        spike_fetcher = threading.Thread(name="SpikeFetcher", target=self.fetch_spikes_and_update_frames)
+        # TODO: Making these threads stoppable is too much of a pain!
+        position_fetcher = threading.Thread(name="PositionFetcher", daemon=True, \
+                target=self.fetch_position_and_update_frames)
+        spike_fetcher = threading.Thread(name="SpikeFetcher", daemon=True, \
+                target=self.fetch_spikes_and_update_frames)
 
         position_fetcher.start()
         spike_fetcher.start()
@@ -243,5 +267,11 @@ class GraphicsManager(Process):
         anim_obj = animation.FuncAnimation(pos_fig, self.update_position_and_spike_frame, frames=self.__N_ANIMATION_FRAMES, interval=25, blit=True)
         plt.show()
 
+        # This is a blocking command... After you exit this, everything will end.
+        self._command_window.mainloop()
+
+        print("Closing GUI and display pipes")
+        plt.close()
+        self._keep_running = False
         position_fetcher.join()
         spike_fetcher.join()

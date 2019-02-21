@@ -9,9 +9,10 @@ from multiprocessing import Pipe
 
 # Local imports
 import RippleDefinitions as RiD
+import ThreadExtension
 
 N_POSITION_BINS = (6, 6)
-class PositionEstimator(threading.Thread):
+class PositionEstimator(ThreadExtension.StoppableThread):
     """
     Run a thread that collects position data from trodes.
     """
@@ -26,7 +27,7 @@ class PositionEstimator(threading.Thread):
 
     #def __init__(self, sg_client, n_bins, past_position_buffer, camera_number=1):
     def __init__(self, sg_client, n_bins=N_POSITION_BINS, camera_number=1):
-        threading.Thread.__init__(self)
+        ThreadExtension.StoppableThread.__init__(self)
         self._data_field = np.ndarray([], dtype=[('timestamp', 'u4'), ('line_segment', 'i4'), \
                 ('position_on_segment', 'f8'), ('position_x', 'i2'), ('position_y', 'i2')])
         # TODO: Take the camera number into account here. This could just be
@@ -93,7 +94,7 @@ class PositionEstimator(threading.Thread):
         # stamp, we will have to ignore the first data entry obtained here.
         # Otherwise it will skew the occupancy!
         prev_step_timestamp = 0
-        while True:
+        while not self.req_stop():
             n_available_frames = self._position_consumer.available(0)
             for frame_idx in range(n_available_frames):
                 self._position_consumer.readData(self._data_field)
