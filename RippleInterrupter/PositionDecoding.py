@@ -5,6 +5,7 @@ import numpy as np
 # Local imports
 import SpikeAnalysis
 import PositionAnalysis
+import StimHardware
 
 class BayesianEstimator(threading.Thread):
     """
@@ -41,7 +42,7 @@ class BayesianEstimator(threading.Thread):
 
         while True:
             if spk_iter >= self.nspks_until_get_new_pf:
-                (self._log_place_fields, self.correction_factor) = self._place_field_provider.get_place_fields()
+                (self._log_place_fields, self._correction_factor) = self._place_field_provider.get_place_fields()
                 spk_iter = 0
             
             how_far_back = -1
@@ -111,7 +112,9 @@ class BayesianEstimator(threading.Thread):
             ret = np.concatenate((self._probs_out[(self.prob_buffer_size-self.num_return_time_bins+self.time_bin):self.prob_buffer_size,:,:], self._probs_out[0:time_bin,:,:]), axis=0)
             self._request_made = False
             return ret
-    
+ 
+    def get_num_returned_time_bins(self):
+        return self.num_return_time_bins
 
 
 class ReplayClassifier(threading.Thread):
@@ -133,8 +136,19 @@ class ReplayClassifier(threading.Thread):
         threading.Thread.__init__(self)
         self._ripple_trigger = ripple_trigger
         self._replay_decoder = bayesianDecoder
-        #TODO assign
-        self._serial_port = []
+        self._serial_port = StimHardware.SerialPort()
+
+        self._zero_probs = np.zeros( (self._replay_decoder.get_num_returned_time_bins(), PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
+        self._condition_top = [[[False for i in range(PositionAnalysis.N_POSITION_BINS[1])] for j in range(PositionAnalysis.N_POSITION_BINS[0])] for k in range(self._replay_decoder.get_num_returned_time_bins())]
+        self._condition_bottom = [[[False for i in range(PositionAnalysis.N_POSITION_BINS[1])] for j in range(PositionAnalysis.N_POSITION_BINS[0])] for k in range(self._replay_decoder.get_num_returned_time_bins())]
+
+        if PositionAnalysis.N_POSITION_BINS[0] != 6 or PositionAnalysis.N_POSITION_BINS[1] != 6:
+            raise AssertionError()
+
+        self._condition_bottom[:,5,2:6] = True
+        self._condition_top[:,0,0:4] = True
+
+        self.min_probs_for_stim = np.sum(np.where(self._condition_top, np.ones_like(self._zero_probs), self._zero_probs)) / np.sum(np.ones_like(self._zero_probs))
         
     def run(self):
         # TODO: Need to have some condition here to make sure that threads can
@@ -151,7 +165,9 @@ class ReplayClassifier(threading.Thread):
                 probs = self._replay_decoder.get_recent_probs()
 
                 #TODO what are our criteria for stimulation?
-                should_stim = True
+                top_sum = np.sum(np.where(self._condition_top, probs, self._zero_probs))
+                bot_sum = np.sum(np.where(self._condition_bottom, probs, self._zero_probs))
+                should_stim = top_sum > self.min_probs_for_stim and top_sum > bot_sum
 
                 if should_stim:
                     self._serial_port.sendBiphasicPulse()
