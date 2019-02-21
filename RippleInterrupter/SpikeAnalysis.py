@@ -79,6 +79,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
     """
     Class for creating and updating place fields online
     """
+    CLASS_IDENTIFIER = "[PlaceFieldHandler] "
 
     def __init__(self, position_processor, spike_processor, place_fields):
     # def __init__(self, position_processor, spike_processor, place_fields):
@@ -92,7 +93,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
         self._has_pf_request = False
         self._place_field_lock = threading.Condition()
         self._spike_place_buffer_connections = []
-        logging.debug(time.strftime("Started thread for building place fields at %H:%M:%S"))
+        logging.debug(self.CLASS_IDENTIFIER + time.strftime("Started thread for building place fields at %H:%M:%S"))
 
     def get_spike_place_buffer_connection(self):
         my_end, your_end = Pipe()
@@ -110,6 +111,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
         next_posbin_y = 0
         next_posbin_x = 0
         next_postime = 0
+        last_postime = 0
         spk_time = 0
 
         update_pf_every_n_spks = 100 #this controls how many spikes are collected before place fields are recalculated
@@ -124,6 +126,10 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
 
             pos_buf_empty = False
 
+            # BUG: If position thread is lagging, it will send the position at
+            # a later time but we will keep filling the spikes at the oldest
+            # position bin we ever saw. We need to wait for the position thread
+            # to catch up.
             while self._spike_buffer.poll() and not self._has_pf_request:
                 #note this assumes technically that spikes are in strict chronological order. Although realistically
                 #we can break that assumption since that would only cause the few spikes that come late to be assigned
@@ -131,20 +137,22 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
 
                 #get the next spike
                 (spk_cl, spk_time) = self._spike_buffer.recv()
-                logging.debug(MODULE_IDENTIFIER + "Received spike from %d at %d"%(spk_cl, spk_time))
+                logging.debug(self.CLASS_IDENTIFIER + "Received spike from %d at %d"%(spk_cl, spk_time))
 
                 #if it's after our most recent position update, try and read the next position
                 #keep reading positions until our position data is ahead of our spike data
-                while not pos_buf_empty and spk_time >= next_postime:
+                while (not pos_buf_empty) and (spk_time >= next_postime):
                     current_posbin_x = next_posbin_x
                     current_posbin_y = next_posbin_y
                     if not self._position_buffer.poll():
                         #If we don't have any position data ahead of spike data,
                         #don't bother checking this every time the outer loop iterates
+                        logging.debug(self.CLASS_IDENTIFIER + "Position buffer empty for spike from %d at %d"%(spk_cl, spk_time))
                         pos_buf_empty = True
                         break
                     else:
                         (next_postime, next_posbin_x, next_posbin_y) = self._position_buffer.recv()
+                        logging.debug(self.CLASS_IDENTIFIER + "Received new position (%d, %d) at %d"%(next_posbin_x, next_posbin_y, next_postime))
 
                 #add this spike to spike counts for place bin
                 # print("Spike from cluster %d, in bin (%d, %d)"%(spk_cl, current_posbin_x, current_posbin_y))
@@ -191,6 +199,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
         self._has_pf_request = False
 
     def get_place_fields(self):
+        logging.debug([MODULE_IDENTIFIER] + "Place fields requested.")
         with self._place_field_lock:
             return (np.copy(self._log_place_fields), np.sum(self._place_fields, axis=0))
 
@@ -220,7 +229,7 @@ class SpikeDetector(ThreadExtension.StoppableThread):
         self._spike_record = self._spike_stream.create_numpy_array()
         self._spike_buffer_connections = []
         self._cluster_identity_map = cluster_identity_map
-        logging.debug(datetime.now().strftime("Spike Detection thread started at %H:%M:%S.%f"))
+        logging.debug(MODULE_IDENTIFIER + datetime.now().strftime("Spike Detection thread started at %H:%M:%S.%f"))
         return
 
     def get_n_clusters(self):

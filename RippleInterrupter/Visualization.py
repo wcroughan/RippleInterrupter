@@ -223,7 +223,7 @@ class GraphicsManager(Process):
             if self._spike_buffer.poll():
                 spike_data = self._spike_buffer.recv()
                 # TODO: collect all spikes for a cluster
-                if spike_data[0] == 7:
+                if spike_data[0] == 9:
                     self._spk_pos_x.append(spike_data[1])
                     self._spk_pos_y.append(spike_data[2])
                     self._spk_timestamps.append(spike_data[3])
