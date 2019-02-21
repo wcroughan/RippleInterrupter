@@ -152,7 +152,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
                 self._nspks_in_bin[spk_cl, current_posbin_x, current_posbin_y] += 1
                 # Send this to the visualization pipeline to see how spike are being reported
                 for pipe_in in self._spike_place_buffer_connections:
-                    pipe_in.send((spk_cl, current_posbin_x, current_posbin_y))
+                    pipe_in.send((spk_cl, current_posbin_x, current_posbin_y, spk_time))
                 pf_update_spk_iter += 1
 
             if pf_update_spk_iter >= update_pf_every_n_spks and not self._has_pf_request:

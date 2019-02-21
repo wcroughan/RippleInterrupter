@@ -23,12 +23,6 @@ class InterruptionLogger(object):
         """
 
         time_now = time.gmtime()
-        print("starting data logger with prefix " + file_prefix)
-        # self._filename = os.getcwd() + "/" + time.strftime(file_prefix + "_%Y%m%d_%H%M%S.log")
-        self._filename = time.strftime(file_prefix + "_%Y%m%d_%H%M%S.log")
-        logging.basicConfig(filename=self._filename, level=logging.DEBUG)
-        print("Log file initialized")
-        logging.debug(MODULE_IDENTIFIER + "Starting Log file at " + time.ctime())
 
     def log(self, message):
         logging.debug(getCurrentTime() + message)

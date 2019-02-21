@@ -21,11 +21,9 @@ def main():
     # TODO: None of the thread classes have any clean up at the end... TBD
     # Start logging before anything else
     log_file_prefix = "replay_disruption_log"
-    print("starting data logger with prefix " + log_file_prefix)
     # self._filename = os.getcwd() + "/" + time.strftime(file_prefix + "_%Y%m%d_%H%M%S.log")
     log_filename = time.strftime(log_file_prefix + "_%Y%m%d_%H%M%S.log")
-    logging.basicConfig(filename=log_filename, level=logging.DEBUG)
-    print("Log file initialized")
+    logging.basicConfig(filename=log_filename, format="%(levelname)s%(message)s", level=logging.DEBUG)
     logging.debug(MODULE_IDENTIFIER + "Starting Log file at " + time.ctime())
 
     # Not necessary to add a filename here. Can be read using a dialog box now

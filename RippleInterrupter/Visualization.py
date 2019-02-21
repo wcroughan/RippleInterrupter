@@ -161,7 +161,7 @@ class GraphicsManager(Process):
         self._key_entry = tkinter.Entry(self._command_window)
         self._key_entry.bind("<Return>", self.process_command)
         self._key_entry.pack()
-        exit_button = tkinter.Button(self._command_window, text='Quit', command=self._command_window.destroy)
+        exit_button = tkinter.Button(self._command_window, text='Quit', command=self.kill_gui)
         exit_button.pack()
 
         self._keep_running = True
@@ -178,23 +178,30 @@ class GraphicsManager(Process):
             self._n_clusters = 0
             self._clusters = None
             pass
-
+        self._cluster_colormap = colormap.magma(np.linspace(0, 1, self._n_clusters))
         
         # Automatically keep only a fixed number of entries in this buffer... Useful for plotting
         self._pos_timestamps = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._pos_x = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._pos_y = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
+        self._spk_clusters = deque([], self.__N_SPIKES_TO_PLOT)
         self._spk_timestamps = deque([], self.__N_SPIKES_TO_PLOT)
         self._spk_pos_x = deque([], self.__N_SPIKES_TO_PLOT)
         self._spk_pos_y = deque([], self.__N_SPIKES_TO_PLOT)
 
         # Figure elements
+        self._pos_fig = None
         self._spk_pos_ax = None
         self._spk_pos_frame = []
 
         # Communication buffers
         self._position_buffer = self._position_estimator.get_position_buffer_connection()
         self._spike_buffer = self._place_field_handler.get_spike_place_buffer_connection()
+    
+    def kill_gui(self):
+        self._command_window.quit()
+        plt.close(self._pos_fig)
+        self._command_window.destroy()
 
     def update_position_and_spike_frame(self, step=0):
         """
@@ -203,7 +210,9 @@ class GraphicsManager(Process):
         if  self._spk_pos_ax is not None:
             # print(self._pos_x)
             # print(self._pos_y)
-            self._spk_pos_frame[-1].set_data((self._pos_x, self._pos_y))
+            # TODO: Add colors based on which cluster the spikes are coming from
+            self._spk_pos_frame[0].set_data((self._spk_pos_x, self._spk_pos_y))
+            self._spk_pos_frame[1].set_data((self._pos_x, self._pos_y))
             if step == self.__N_ANIMATION_FRAMES:
                 logging.debug(MODULE_IDENTIFIER + datetime.now().strftime("Animation Finished at %H:%M:%S.%f"))
             return self._spk_pos_frame
@@ -214,10 +223,13 @@ class GraphicsManager(Process):
                 spike_data = self._spike_buffer.recv()
                 # TODO: Might not have to save all the spike timestamps since
                 # we are already getting position data here.
-                self._spk_timestamps.append(spike_data[0])
+                self._spk_clusters.append(spike_data[0])
                 self._spk_pos_x.append(spike_data[1])
                 self._spk_pos_y.append(spike_data[2])
-                logging.debug(MODULE_IDENTIFIER + "Received spike from cluster: %d, in bin (%d, %d)"%spike_data)
+                self._spk_timestamps.append(spike_data[3])
+                logging.debug(MODULE_IDENTIFIER + "Fetched spike from cluster: %d, in bin (%d, %d). TS: %d"%spike_data)
+            else:
+                time.sleep(0.05)
 
     def fetch_position_and_update_frames(self):
         while self._keep_running:
@@ -226,11 +238,10 @@ class GraphicsManager(Process):
                 self._pos_timestamps.append(position_data[0])
                 self._pos_x.append(position_data[1])
                 self._pos_y.append(position_data[2])
-                logging.debug("Fetched Position data... (%d, %d)"%(position_data[1],position_data[2]))
+                logging.debug(MODULE_IDENTIFIER + "Fetched Position data... (%d, %d)"%(position_data[1],position_data[2]))
             else:
                 # Wait for a while for data to appear
                 time.sleep(0.05)
-        pass
 
     def process_command(self, key_in):
         print(self._key_entry.get())
@@ -257,7 +268,7 @@ class GraphicsManager(Process):
         position_fetcher.start()
         spike_fetcher.start()
 
-        pos_fig = plt.figure()
+        self._pos_fig = plt.figure()
         self._spk_pos_ax  = plt.axes()
         self._spk_pos_ax.set_xlabel("x (bin)")
         self._spk_pos_ax.set_ylabel("y (bin)")
@@ -266,21 +277,17 @@ class GraphicsManager(Process):
         self._spk_pos_ax.grid(True)
 
         # Create graphics entries for the actual position and also each of the spike clusters
-        colors = colormap.magma(np.linspace(0, 1, self._n_clusters))
-        for cl_idx in range(self._n_clusters):
-            new_line_plot,    = plt.plot([], [], animated=True, c=colors[cl_idx])
-            self._spk_pos_frame.append(new_line_plot)
         pos_frame, = plt.plot([], [], animated=True)
+        spk_frame, = plt.plot([], [], linestyle='None', marker='o', animated=True)
+        self._spk_pos_frame.append(spk_frame)
         self._spk_pos_frame.append(pos_frame)
 
-        anim_obj = animation.FuncAnimation(pos_fig, self.update_position_and_spike_frame, frames=self.__N_ANIMATION_FRAMES, interval=25, blit=True)
+        anim_obj = animation.FuncAnimation(self._pos_fig, self.update_position_and_spike_frame, frames=self.__N_ANIMATION_FRAMES, interval=25, blit=True)
         plt.show()
 
         # This is a blocking command... After you exit this, everything will end.
         self._command_window.mainloop()
-
         logging.debug(MODULE_IDENTIFIER + datetime.now().strftime("Closing GUI and display pipes at %H:%M:%S.%f"))
-        plt.close()
         self._keep_running = False
         position_fetcher.join()
         spike_fetcher.join()
