@@ -212,6 +212,7 @@ class GraphicsManager(Process):
             # print(self._pos_y)
             # TODO: Add colors based on which cluster the spikes are coming from
             self._spk_pos_frame[0].set_data((self._spk_pos_x, self._spk_pos_y))
+            # self._spk_pos_frame[0].set_color(self._spk_clusters)
             self._spk_pos_frame[1].set_data((self._pos_x, self._pos_y))
             if step == self.__N_ANIMATION_FRAMES:
                 logging.debug(MODULE_IDENTIFIER + datetime.now().strftime("Animation Finished at %H:%M:%S.%f"))
@@ -221,13 +222,12 @@ class GraphicsManager(Process):
         while self._keep_running:
             if self._spike_buffer.poll():
                 spike_data = self._spike_buffer.recv()
-                # TODO: Might not have to save all the spike timestamps since
-                # we are already getting position data here.
-                self._spk_clusters.append(spike_data[0])
-                self._spk_pos_x.append(spike_data[1])
-                self._spk_pos_y.append(spike_data[2])
-                self._spk_timestamps.append(spike_data[3])
-                logging.debug(MODULE_IDENTIFIER + "Fetched spike from cluster: %d, in bin (%d, %d). TS: %d"%spike_data)
+                # TODO: collect all spikes for a cluster
+                if spike_data[0] == 7:
+                    self._spk_pos_x.append(spike_data[1])
+                    self._spk_pos_y.append(spike_data[2])
+                    self._spk_timestamps.append(spike_data[3])
+                    logging.debug(MODULE_IDENTIFIER + "Fetched spike from cluster: %d, in bin (%d, %d). TS: %d"%spike_data)
             else:
                 time.sleep(0.05)
 
@@ -282,7 +282,7 @@ class GraphicsManager(Process):
         self._spk_pos_frame.append(spk_frame)
         self._spk_pos_frame.append(pos_frame)
 
-        anim_obj = animation.FuncAnimation(self._pos_fig, self.update_position_and_spike_frame, frames=self.__N_ANIMATION_FRAMES, interval=25, blit=True)
+        anim_obj = animation.FuncAnimation(self._pos_fig, self.update_position_and_spike_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
         plt.show()
 
         # This is a blocking command... After you exit this, everything will end.

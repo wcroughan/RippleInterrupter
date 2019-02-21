@@ -23,7 +23,7 @@ def main():
     log_file_prefix = "replay_disruption_log"
     # self._filename = os.getcwd() + "/" + time.strftime(file_prefix + "_%Y%m%d_%H%M%S.log")
     log_filename = time.strftime(log_file_prefix + "_%Y%m%d_%H%M%S.log")
-    logging.basicConfig(filename=log_filename, format="%(levelname)s%(message)s", level=logging.DEBUG)
+    logging.basicConfig(filename=log_filename, format="%(levelname)s:%(message)s", level=logging.DEBUG)
     logging.debug(MODULE_IDENTIFIER + "Starting Log file at " + time.ctime())
 
     # Not necessary to add a filename here. Can be read using a dialog box now

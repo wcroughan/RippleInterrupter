@@ -156,6 +156,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
                 pf_update_spk_iter += 1
 
             if pf_update_spk_iter >= update_pf_every_n_spks and not self._has_pf_request:
+                logging.debug(MODULE_IDENTIFIER + "Updating place fields. Last spike at %d"%spk_time)
                 with self._place_field_lock:
                     pf_update_spk_iter = 0
                     # Deal with divide by zero when the occupancy is zero for some of the place bins
