@@ -132,9 +132,9 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                     self._bin_occupancy[prev_x_bin, prev_y_bin] += float(time_spent_in_prev_bin)/RiD.SPIKE_SAMPLING_FREQ
 
                     # DEBUG: Report the jump in position bins
-                    logging.debug(MODULE_IDENTIFIER + "Position jumped (%d, %d) -> (%d,%d), TS:%d"%(prev_x_bin, prev_y_bin, curr_x_bin, curr_y_bin,current_timestamp))
-                    logging.debug(MODULE_IDENTIFIER + "Position binned (%d, %d) = (%d,%d)"%(curr_x_bin, curr_y_bin, \
-                            self._data_field['position_x'], self._data_field['position_y']))
+                    logging.debug(MODULE_IDENTIFIER + "Position jumped (%d, %d) -> (%d,%d), TS:%d"%(prev_x_bin, prev_y_bin, curr_x_bin, curr_y_bin, current_timestamp))
+                    # logging.debug(MODULE_IDENTIFIER + "Position binned (%d, %d) = (%d,%d)"%(curr_x_bin, curr_y_bin, \
+                    #       self._data_field['position_x'], self._data_field['position_y']))
 
                     # Update the current bin
                     prev_x_bin = curr_x_bin

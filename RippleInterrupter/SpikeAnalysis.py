@@ -143,11 +143,11 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
 
                 #if it's after our most recent position update, try and read the next position
                 #keep reading positions until our position data is ahead of our spike data
-                while pos_buf_available and (spk_time >= next_postime):
+                while pos_buf_available and (spk_time >= curr_postime):
+                    """
                     curr_postime  = next_postime
                     curr_posbin_x = next_posbin_x
                     curr_posbin_y = next_posbin_y
-                    """
                     if not pos_buf_available:
                         #If we don't have any position data ahead of spike data,
                         #don't bother checking this every time the outer loop iterates
@@ -157,8 +157,8 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
                         (next_postime, next_posbin_x, next_posbin_y) = self._position_buffer.recv()
                         logging.debug(self.CLASS_IDENTIFIER + "Received new position (%d, %d) at %d"%(next_posbin_x, next_posbin_y, next_postime))
                     """
-                    (next_postime, next_posbin_x, next_posbin_y) = self._position_buffer.recv()
-                    logging.debug(self.CLASS_IDENTIFIER + "Received new position (%d, %d) at %d"%(next_posbin_x, next_posbin_y, next_postime))
+                    (curr_postime, curr_posbin_x, curr_posbin_y) = self._position_buffer.recv()
+                    logging.debug(self.CLASS_IDENTIFIER + "Received new position (%d, %d) at %d"%(curr_posbin_x, curr_posbin_y, curr_postime))
 
                 #add this spike to spike counts for place bin
                 # print("Spike from cluster %d, in bin (%d, %d)"%(spk_cl, current_posbin_x, current_posbin_y))
@@ -173,9 +173,9 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
                 # much, wait for position timestamps to catch up. This
                 # basically forces us to check for a new position entry after
                 # each spike has gone by, minimizing incorrect reporting.
-                spike_positiion_lag = spk_time - curr_postime
-                if (spike_positiion_lag > self._ALLOWED_TIMESTAMPS_LAG):
-                    logging.debug(self.CLASS_IDENTIFIER + "Position lagging spikes by %d timestamps"%spike_positiion_lag)
+                spike_position_lag = float(spk_time) - float(curr_postime)
+                if (spike_position_lag > self._ALLOWED_TIMESTAMPS_LAG):
+                    logging.debug(self.CLASS_IDENTIFIER + "Position lagging spikes by %d timestamps. S.%d, P.%d"%(spike_position_lag, spk_time, curr_postime))
                     break
 
             if pf_update_spk_iter >= update_pf_every_n_spks and not self._has_pf_request:
@@ -187,6 +187,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
                             out=np.zeros_like(self._nspks_in_bin), where=self._bin_occupancy!=0)
                     self._log_place_fields = np.log(self._place_fields, out=np.zeros_like(self._place_fields), \
                        where=self._place_fields!=0)
+                logging.debug(MODULE_IDENTIFIER + "Fields updated.")
 
 
 
