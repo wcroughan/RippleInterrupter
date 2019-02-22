@@ -80,6 +80,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
     Class for creating and updating place fields online
     """
     CLASS_IDENTIFIER = "[PlaceFieldHandler] "
+    _ALLOWED_TIMESTAMPS_LAG = 1000
 
     def __init__(self, position_processor, spike_processor, place_fields):
     # def __init__(self, position_processor, spike_processor, place_fields):
@@ -106,8 +107,9 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
         :returns: Nothing
         """
 
-        current_posbin_x = 0
-        current_posbin_y = 0
+        curr_postime = 0
+        curr_posbin_x = 0
+        curr_posbin_y = 0
         next_posbin_y = 0
         next_posbin_x = 0
         next_postime = 0
@@ -124,7 +126,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
                 time.sleep(0.005) #5ms
                 continue
 
-            pos_buf_empty = False
+            pos_buf_available = self._position_buffer.poll()
 
             # BUG: If position thread is lagging, it will send the position at
             # a later time but we will keep filling the spikes at the oldest
@@ -141,27 +143,40 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
 
                 #if it's after our most recent position update, try and read the next position
                 #keep reading positions until our position data is ahead of our spike data
-                while (not pos_buf_empty) and (spk_time >= next_postime):
-                    current_posbin_x = next_posbin_x
-                    current_posbin_y = next_posbin_y
-                    if not self._position_buffer.poll():
+                while pos_buf_available and (spk_time >= next_postime):
+                    curr_postime  = next_postime
+                    curr_posbin_x = next_posbin_x
+                    curr_posbin_y = next_posbin_y
+                    """
+                    if not pos_buf_available:
                         #If we don't have any position data ahead of spike data,
                         #don't bother checking this every time the outer loop iterates
-                        logging.debug(self.CLASS_IDENTIFIER + "Position buffer empty for spike from %d at %d"%(spk_cl, spk_time))
-                        pos_buf_empty = True
+                        logging.debug(self.CLASS_IDENTIFIER + "Assigning spike from %d at %d to last location bin."%(spk_cl, spk_time))
                         break
                     else:
                         (next_postime, next_posbin_x, next_posbin_y) = self._position_buffer.recv()
                         logging.debug(self.CLASS_IDENTIFIER + "Received new position (%d, %d) at %d"%(next_posbin_x, next_posbin_y, next_postime))
+                    """
+                    (next_postime, next_posbin_x, next_posbin_y) = self._position_buffer.recv()
+                    logging.debug(self.CLASS_IDENTIFIER + "Received new position (%d, %d) at %d"%(next_posbin_x, next_posbin_y, next_postime))
 
                 #add this spike to spike counts for place bin
                 # print("Spike from cluster %d, in bin (%d, %d)"%(spk_cl, current_posbin_x, current_posbin_y))
                 # print(current_posbin_y)
-                self._nspks_in_bin[spk_cl, current_posbin_x, current_posbin_y] += 1
+                self._nspks_in_bin[spk_cl, curr_posbin_x, curr_posbin_y] += 1
                 # Send this to the visualization pipeline to see how spike are being reported
                 for pipe_in in self._spike_place_buffer_connections:
-                    pipe_in.send((spk_cl, current_posbin_x, current_posbin_y, spk_time))
+                    pipe_in.send((spk_cl, curr_posbin_x, curr_posbin_y, spk_time))
                 pf_update_spk_iter += 1
+
+                # If spike timestamp starts leading position timestamps by too
+                # much, wait for position timestamps to catch up. This
+                # basically forces us to check for a new position entry after
+                # each spike has gone by, minimizing incorrect reporting.
+                spike_positiion_lag = spk_time - curr_postime
+                if (spike_positiion_lag > self._ALLOWED_TIMESTAMPS_LAG):
+                    logging.debug(self.CLASS_IDENTIFIER + "Position lagging spikes by %d timestamps"%spike_positiion_lag)
+                    break
 
             if pf_update_spk_iter >= update_pf_every_n_spks and not self._has_pf_request:
                 logging.debug(MODULE_IDENTIFIER + "Updating place fields. Last spike at %d"%spk_time)
