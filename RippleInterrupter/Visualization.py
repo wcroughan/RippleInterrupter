@@ -140,7 +140,7 @@ class GraphicsManager(Process):
     """
 
     __N_POSITION_ELEMENTS_TO_PLOT = 100
-    __N_SPIKES_TO_PLOT = 200
+    __N_SPIKES_TO_PLOT = 2000
     __N_ANIMATION_FRAMES = 5000
     __CLUSTERS_TO_PLOT = [2]
     def __init__(self, ripple_analyzer, spike_listener, position_estimator, \

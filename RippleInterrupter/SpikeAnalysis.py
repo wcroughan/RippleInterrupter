@@ -246,6 +246,7 @@ class SpikeDetector(ThreadExtension.StoppableThread):
                 self._n_clusters += 1
 
         self._last_recorded_tstamp = np.zeros((self._n_clusters, 1), dtype='float')
+        self._most_recent_timestamp = 0
         # Take a look at all the cluster we will be listening to
         # print(tetrode_argument)
         self._spike_stream = sg_client.subscribeSpikesData(TrodesInterface.SPIKE_SUBSCRIPTION_ATTRIBUTE, \
@@ -298,10 +299,15 @@ class SpikeDetector(ThreadExtension.StoppableThread):
                     logging.debug(MODULE_IDENTIFIER + "Warning: Spike Ignored!")
                     continue
                 unique_cluster_identity = self._cluster_identity_map[tetrode_id][cluster_id]
-                timestamp_jump = spike_timestamp - self._last_recorded_tstamp[unique_cluster_identity]
-                if timestamp_jump < 0:
-                    logging.warning(MODULE_IDENTIFIER, "Backward  timestamp jump. uClusterID %d, jump %d"%(unique_cluster_identity, timestamp_jump))
-                self._last_recorded_tstamp[unique_cluster_identity] = spike_timestamp
+                cluster_timestamp_jump = float(spike_timestamp) - self._last_recorded_tstamp[unique_cluster_identity]
+                timestamp_jump = float(spike_timestamp) - self._most_recent_timestamp
+                if cluster_timestamp_jump < 0:
+                    logging.warning(MODULE_IDENTIFIER + "Backward timestamp jump in uClusterID %d, jump %d"%(unique_cluster_identity, cluster_timestamp_jump))
+                elif timestamp_jump < 0:
+                    logging.warning(MODULE_IDENTIFIER + "Backward timestamp jump across uClusterIDs, jump %d"%timestamp_jump)
+                self._last_recorded_tstamp[unique_cluster_identity] = float(spike_timestamp)
+                self._most_recent_timestamp = self._last_recorded_tstamp[unique_cluster_identity]
+
                 logging.debug(MODULE_IDENTIFIER + "Spike Timestamp %d, from uClusterID %d"%(spike_timestamp,unique_cluster_identity))
                 for outp in self._spike_buffer_connections:
                     outp.send((unique_cluster_identity, spike_timestamp))
