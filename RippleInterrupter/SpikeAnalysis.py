@@ -123,8 +123,8 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
             # If thread has been requested to stop an updates to place field
             # data because of an outside access to the data
             if self._has_pf_request:
+                logging.debug(self.CLASS_IDENTIFIER + "Waiting for Place field request to complete.")
                 time.sleep(0.005) #5ms
-                continue
 
             pos_buf_available = self._position_buffer.poll()
 
@@ -168,6 +168,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
                 # Send this to the visualization pipeline to see how spike are being reported
                 for pipe_in in self._spike_place_buffer_connections:
                     pipe_in.send((spk_cl, curr_posbin_x, curr_posbin_y, spk_time))
+                logging.debug(self.CLASS_IDENTIFIER + "Spike at %d sent out to listeners"%spk_time)
                 pf_update_spk_iter += 1
 
                 # If spike timestamp starts leading position timestamps by too

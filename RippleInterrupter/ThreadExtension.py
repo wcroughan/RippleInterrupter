@@ -4,16 +4,36 @@ thread and safely get all the data that the thread has at the moment.
 """
 
 import threading
+import multiprocessing
 
+"""
 class StoppableThread(threading.Thread):
 
+    def __init__(self):
+        threading.Thread.__init__(self, daemon=True)
+        self._stop_event = threading.Event()
+
+    def stop(self):
+        self._stop_event.set()
+
+    def req_stop(self):
+        return self._stop_event.is_set()
+
+    def join(self, timeout=None):
+        # For all implementations of this class, need to extend the join method
+        # to log the time at which thread ended.
+        self.stop()
+        threading.Thread.join(self, timeout)
+"""
+
+class StoppableThread(multiprocessing.Process):
     """
     A thread which can be stopped by calling STOP function on it
     """
 
     def __init__(self):
         """TODO: to be defined1. """
-        threading.Thread.__init__(self, daemon=True)
+        multiprocessing.Process.__init__(self)
         self._stop_event = threading.Event()
 
     def stop(self):
@@ -30,4 +50,4 @@ class StoppableThread(threading.Thread):
         # For all implementations of this class, need to extend the join method
         # to log the time at which thread ended.
         self.stop()
-        threading.Thread.join(self, timeout)
+        multiprocessing.Process.join(self, timeout)
