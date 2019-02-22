@@ -129,7 +129,9 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                 logging.debug(self.CLASS_IDENTIFIER + "Waiting for Place field request to complete.")
                 time.sleep(0.005) #5ms
 
-            pos_buf_available = self._position_buffer.poll()
+            if not self._spike_buffer.poll():
+                logging.debug(self.CLASS_IDENTIFIER + "Spike buffer empty, sleeping")
+                time.sleep(0.005)
 
             # BUG: If position thread is lagging, it will send the position at
             # a later time but we will keep filling the spikes at the oldest
@@ -147,7 +149,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
 
                 #if it's after our most recent position update, try and read the next position
                 #keep reading positions until our position data is ahead of our spike data
-                while pos_buf_available and (spk_time >= curr_postime):
+                while self._position_buffer.poll() and (spk_time >= curr_postime):
                     """
                     curr_postime  = next_postime
                     curr_posbin_x = next_posbin_x
