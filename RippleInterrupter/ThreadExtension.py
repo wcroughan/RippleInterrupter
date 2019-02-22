@@ -6,7 +6,6 @@ thread and safely get all the data that the thread has at the moment.
 import threading
 import multiprocessing
 
-"""
 class StoppableThread(threading.Thread):
 
     def __init__(self):
@@ -24,11 +23,10 @@ class StoppableThread(threading.Thread):
         # to log the time at which thread ended.
         self.stop()
         threading.Thread.join(self, timeout)
-"""
 
-class StoppableThread(multiprocessing.Process):
+class StoppableProcess(multiprocessing.Process):
     """
-    A thread which can be stopped by calling STOP function on it
+    A process which can be stopped by calling STOP function on it
     """
 
     def __init__(self):

@@ -6,7 +6,7 @@ from datetime import datetime
 from scipy import signal, stats
 import matplotlib.pyplot as plt
 import xml.etree.ElementTree as ET
-from multiprocessing import Queue, Pipe
+from multiprocessing import Queue, Pipe, Condition
 from tkinter import Tk, filedialog
 import numpy as np
 import logging
@@ -74,7 +74,7 @@ def readClusterFile(filename=None, tetrodes=None):
     logging.debug(MODULE_IDENTIFIER + "Cluster map... \n", n_trode_to_cluster_idx_map)
     return raw_cluster_idx, n_trode_to_cluster_idx_map
 
-class PlaceFieldHandler(ThreadExtension.StoppableThread):
+class PlaceFieldHandler(ThreadExtension.StoppableProcess):
 
     """
     Class for creating and updating place fields online
@@ -84,7 +84,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
 
     def __init__(self, position_processor, spike_processor, place_fields):
     # def __init__(self, position_processor, spike_processor, place_fields):
-        ThreadExtension.StoppableThread.__init__(self)
+        ThreadExtension.StoppableProcess.__init__(self)
         self._position_buffer = position_processor.get_position_buffer_connection()
         self._spike_buffer = spike_processor.get_spike_buffer_connection()
         self._place_fields = place_fields
@@ -92,7 +92,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
         self._nspks_in_bin = np.zeros(np.shape(place_fields))
         self._bin_occupancy = position_processor.get_bin_occupancy()
         self._has_pf_request = False
-        self._place_field_lock = threading.Condition()
+        self._place_field_lock = Condition()
         self._spike_place_buffer_connections = []
         logging.debug(self.CLASS_IDENTIFIER + time.strftime("Started thread for building place fields at %H:%M:%S"))
 
