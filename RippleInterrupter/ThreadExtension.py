@@ -34,7 +34,7 @@ class StoppableThread(multiprocessing.Process):
     def __init__(self):
         """TODO: to be defined1. """
         multiprocessing.Process.__init__(self)
-        self._stop_event = threading.Event()
+        self._stop_event = multiprocessing.Event()
 
     def stop(self):
         """
