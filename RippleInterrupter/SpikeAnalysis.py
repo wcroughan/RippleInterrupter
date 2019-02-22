@@ -133,6 +133,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableThread):
             # position bin we ever saw. We need to wait for the position thread
             # to catch up.
             while self._spike_buffer.poll() and not self._has_pf_request:
+                # logging.debug(MODULE_IDENTIFIER + "Main loop rentry.")
                 #note this assumes technically that spikes are in strict chronological order. Although realistically
                 #we can break that assumption since that would only cause the few spikes that come late to be assigned
                 #to the next place bin the animal is in
@@ -263,6 +264,8 @@ class SpikeDetector(ThreadExtension.StoppableThread):
         """
         while not self.req_stop():
             n_available_spikes = self._spike_stream.available(0)
+            if n_available_spikes > 0:
+                logging.debug(MODULE_IDENTIFIER + "%d spikes available for reading!"%n_available_spikes)
             for spk_idx in range(n_available_spikes):
                 # Populate the spike record
                 timestamp = self._spike_stream.getData()
@@ -286,3 +289,5 @@ class SpikeDetector(ThreadExtension.StoppableThread):
                 logging.debug(MODULE_IDENTIFIER + "Spike Timestamp %d, from uClusterID %d"%(spike_timestamp,unique_cluster_identity))
                 for outp in self._spike_buffer_connections:
                     outp.send((unique_cluster_identity, spike_timestamp))
+
+        logging.debug(MODULE_IDENTIFIER + "Spike processing loop exitted!")

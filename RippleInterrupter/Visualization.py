@@ -228,8 +228,6 @@ class GraphicsManager(Process):
                     self._spk_pos_y.append(spike_data[2])
                     self._spk_timestamps.append(spike_data[3])
                     logging.debug(MODULE_IDENTIFIER + "Fetched spike from cluster: %d, in bin (%d, %d). TS: %d"%spike_data)
-            else:
-                time.sleep(0.05)
 
     def fetch_position_and_update_frames(self):
         while self._keep_running:
@@ -239,9 +237,6 @@ class GraphicsManager(Process):
                 self._pos_x.append(position_data[1])
                 self._pos_y.append(position_data[2])
                 logging.debug(MODULE_IDENTIFIER + "Fetched Position data... (%d, %d)"%(position_data[1],position_data[2]))
-            else:
-                # Wait for a while for data to appear
-                time.sleep(0.05)
 
     def process_command(self, key_in):
         print(self._key_entry.get())
