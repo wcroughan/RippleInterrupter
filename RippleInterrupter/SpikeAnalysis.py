@@ -239,6 +239,7 @@ class SpikeDetector(ThreadExtension.StoppableThread):
                 tetrode_argument.append(str(ntrode) + "," + str(cluster))
                 self._n_clusters += 1
 
+        self._last_recorded_tstamp = np.zeros((self._n_clusters, 1), dtype='float')
         # Take a look at all the cluster we will be listening to
         # print(tetrode_argument)
         self._spike_stream = sg_client.subscribeSpikesData(TrodesInterface.SPIKE_SUBSCRIPTION_ATTRIBUTE, \
@@ -287,6 +288,10 @@ class SpikeDetector(ThreadExtension.StoppableThread):
                     logging.debug(MODULE_IDENTIFIER + "Warning: Spike Ignored!")
                     continue
                 unique_cluster_identity = self._cluster_identity_map[tetrode_id][cluster_id]
+                timestamp_jump = spike_timestamp - self._last_recorded_tstamp[unique_cluster_identity]
+                if timestamp_jump < 0:
+                    logging.warning(MODULE_IDENTIFIER, "Backward  timestamp jump. uClusterID %d, jump %d"%(unique_cluster_identity, timestamp_jump))
+                self._last_recorded_tstamp[unique_cluster_identity] = spike_timestamp
                 logging.debug(MODULE_IDENTIFIER + "Spike Timestamp %d, from uClusterID %d"%(spike_timestamp,unique_cluster_identity))
                 for outp in self._spike_buffer_connections:
                     outp.send((unique_cluster_identity, spike_timestamp))
