@@ -80,7 +80,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
     Class for creating and updating place fields online
     """
     CLASS_IDENTIFIER = "[PlaceFieldHandler] "
-    _ALLOWED_TIMESTAMPS_LAG = 1000
+    _ALLOWED_TIMESTAMPS_LAG = 10000
 
     def __init__(self, position_processor, spike_processor, place_fields):
     # def __init__(self, position_processor, spike_processor, place_fields):
@@ -272,6 +272,10 @@ class SpikeDetector(ThreadExtension.StoppableThread):
             n_available_spikes = self._spike_stream.available(0)
             if n_available_spikes > 0:
                 logging.debug(MODULE_IDENTIFIER + "%d spikes available for reading!"%n_available_spikes)
+            else:
+                logging.debug(MODULE_IDENTIFIER + "Spike buffer empty... Sleeping.")
+                time.sleep(0.02)
+
             for spk_idx in range(n_available_spikes):
                 # Populate the spike record
                 timestamp = self._spike_stream.getData()
@@ -299,5 +303,6 @@ class SpikeDetector(ThreadExtension.StoppableThread):
                 logging.debug(MODULE_IDENTIFIER + "Spike Timestamp %d, from uClusterID %d"%(spike_timestamp,unique_cluster_identity))
                 for outp in self._spike_buffer_connections:
                     outp.send((unique_cluster_identity, spike_timestamp))
+                logging.debug(MODULE_IDENTIFIER + "Spike at %d sent to listeners."%spike_timestamp)
 
         logging.debug(MODULE_IDENTIFIER + "Spike processing loop exitted!")
