@@ -28,10 +28,11 @@ def main():
     logging.debug(MODULE_IDENTIFIER + "Starting Log file at " + time.ctime())
 
     # Not necessary to add a filename here. Can be read using a dialog box now
-    tetrodes_of_interest = [3, 14]
+    tetrodes_of_interest = [33, 24]
 
     # Uncomment to use a hardcoded file
-    cluster_filename = "./test_clusters.trodesClusters"
+    # cluster_filename = "./test_clusters.trodesClusters"
+    cluster_filename = "open_field_full_config20190220_172702.trodesClusters"
     n_units, cluster_identity_map = SpikeAnalysis.readClusterFile(cluster_filename, tetrodes_of_interest)
 
     # Uncomment to let the user select a file

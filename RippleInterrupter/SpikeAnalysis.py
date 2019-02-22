@@ -94,11 +94,14 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         self._has_pf_request = False
         self._place_field_lock = Condition()
         self._spike_place_buffer_connections = []
+        self._requested_clusters = []
         logging.debug(self.CLASS_IDENTIFIER + time.strftime("Started thread for building place fields at %H:%M:%S"))
 
-    def get_spike_place_buffer_connection(self):
+    def get_spike_place_buffer_connection(self, cluster_idx):
         my_end, your_end = Pipe()
         self._spike_place_buffer_connections.append(my_end)
+        for cl in cluster_idx:
+            self._requested_clusters.append(cl)
         return your_end
 
     def run(self):
@@ -166,9 +169,10 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                 # print(current_posbin_y)
                 self._nspks_in_bin[spk_cl, curr_posbin_x, curr_posbin_y] += 1
                 # Send this to the visualization pipeline to see how spike are being reported
-                for pipe_in in self._spike_place_buffer_connections:
-                    pipe_in.send((spk_cl, curr_posbin_x, curr_posbin_y, spk_time))
-                logging.debug(self.CLASS_IDENTIFIER + "Spike at %d sent out to listeners"%spk_time)
+                if spk_cl in self._requested_clusters:
+                    for pipe_in in self._spike_place_buffer_connections:
+                        pipe_in.send((spk_cl, curr_posbin_x, curr_posbin_y, spk_time))
+                    logging.debug(self.CLASS_IDENTIFIER + "Spike at %d sent out to listeners"%spk_time)
                 pf_update_spk_iter += 1
 
                 # If spike timestamp starts leading position timestamps by too

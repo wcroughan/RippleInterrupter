@@ -142,6 +142,7 @@ class GraphicsManager(Process):
     __N_POSITION_ELEMENTS_TO_PLOT = 100
     __N_SPIKES_TO_PLOT = 200
     __N_ANIMATION_FRAMES = 5000
+    __CLUSTERS_TO_PLOT = [2]
     def __init__(self, ripple_analyzer, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_condition, clusters=None):
         """TODO: to be defined1.
@@ -196,7 +197,7 @@ class GraphicsManager(Process):
 
         # Communication buffers
         self._position_buffer = self._position_estimator.get_position_buffer_connection()
-        self._spike_buffer = self._place_field_handler.get_spike_place_buffer_connection()
+        self._spike_buffer = self._place_field_handler.get_spike_place_buffer_connection(self.__CLUSTERS_TO_PLOT)
     
     def kill_gui(self):
         self._command_window.quit()
@@ -223,11 +224,11 @@ class GraphicsManager(Process):
             if self._spike_buffer.poll():
                 spike_data = self._spike_buffer.recv()
                 # TODO: collect all spikes for a cluster
-                if spike_data[0] == 7:
+                if spike_data[0] in self.__CLUSTERS_TO_PLOT:
                     self._spk_pos_x.append(spike_data[1])
                     self._spk_pos_y.append(spike_data[2])
                     self._spk_timestamps.append(spike_data[3])
-                    logging.debug(MODULE_IDENTIFIER + "Fetched spike from cluster: %d, in bin (%d, %d). TS: %d"%spike_data)
+                logging.debug(MODULE_IDENTIFIER + "Fetched spike from cluster: %d, in bin (%d, %d). TS: %d"%spike_data)
 
     def fetch_position_and_update_frames(self):
         while self._keep_running:
