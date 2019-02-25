@@ -163,7 +163,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                         (next_postime, next_posbin_x, next_posbin_y) = self._position_buffer.recv()
                         logging.debug(self.CLASS_IDENTIFIER + "Received new position (%d, %d) at %d"%(next_posbin_x, next_posbin_y, next_postime))
                     """
-                    (curr_postime, curr_posbin_x, curr_posbin_y) = self._position_buffer.recv()
+                    (curr_postime, curr_posbin_x, curr_posbin_y, curr_speed) = self._position_buffer.recv()
                     logging.debug(self.CLASS_IDENTIFIER + "Received new position (%d, %d) at %d"%(curr_posbin_x, curr_posbin_y, curr_postime))
 
                 #add this spike to spike counts for place bin

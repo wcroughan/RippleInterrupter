@@ -3,6 +3,7 @@ Collect position data from trodes
 """
 import threading
 import time
+from copy import copy
 from datetime import datetime
 import logging
 import numpy as np
@@ -14,6 +15,7 @@ import ThreadExtension
 
 MODULE_IDENTIFIER = "[PositionAnalysis] "
 N_POSITION_BINS = (60, 60)
+FIELD_SIZE = (100, 100) # Actual size of the field in cms
 class PositionEstimator(ThreadExtension.StoppableThread):
     """
     Run a thread that collects position data from trodes.
@@ -24,8 +26,12 @@ class PositionEstimator(ThreadExtension.StoppableThread):
     __P_MIN_Y = -100
     __P_MAX_X = 1200
     __P_MAX_Y = 1000
+    __VELOCITY_THRESOLD = 5
     __P_BIN_SIZE_X = (__P_MAX_X - __P_MIN_X)
     __P_BIN_SIZE_Y = (__P_MAX_Y - __P_MIN_Y)
+    __REAL_BIN_SIZE_X = FIELD_SIZE[0]/__P_BIN_SIZE_X
+    __REAL_BIN_SIZE_Y = FIELD_SIZE[1]/__P_BIN_SIZE_Y
+    __SPEED_SMOOTHING_FACTOR = 0.1
 
     #def __init__(self, sg_client, n_bins, past_position_buffer, camera_number=1):
     def __init__(self, sg_client, n_bins=N_POSITION_BINS, camera_number=1):
@@ -91,6 +97,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
         curr_y_bin = -1
         prev_x_bin = -1
         prev_y_bin = -1
+        last_velocity = 0
         thread_start_time = time.time()
 
         # TODO: Because it will not be possible to get the correct first time
@@ -114,19 +121,29 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                     # First recorded bin!
                     #self._past_position_buffer.put((self._data_field['timestamp'], curr_bin_id))
                     for outp in self._position_buffer_connections:
-                        outp.send((self._data_field['timestamp'], curr_x_bin, curr_y_bin))
+                        outp.send((self._data_field['timestamp'], curr_x_bin, curr_y_bin, 0.0))
                     prev_x_bin = curr_x_bin
                     prev_y_bin = curr_y_bin
                     logging.debug(MODULE_IDENTIFIER + "Position Started (%d, %d)"%(curr_x_bin, curr_y_bin))
+                    prev_step_timestamp = copy(self._data_field['timestamp'])
                 elif ((curr_x_bin != prev_x_bin) or (curr_y_bin != prev_y_bin)):
                     current_timestamp = self._data_field['timestamp']
                     time_spent_in_prev_bin = current_timestamp - prev_step_timestamp
-                    prev_step_timestamp = current_timestamp
+
+                    # This is some serious overkill.. Most of the times, we
+                    # will be moving by just 1 position bin... That too either
+                    # in X or Y
+                    real_time_spent_in_prev_bin = float(time_spent_in_prev_bin)/RiD.SPIKE_SAMPLING_FREQ
+                    real_distance_moved = np.sqrt(pow(curr_x_bin-prev_x_bin,2) + pow(curr_y_bin-prev_y_bin,2))
+                    logging.debug(MODULE_IDENTIFIER + "Moved %.2fcm in %.2fs."%(real_distance_moved,real_time_spent_in_prev_bin))
+                    if (time_spent_in_prev_bin != 0):
+                        last_velocity = self.__SPEED_SMOOTHING_FACTOR * real_distance_moved/real_time_spent_in_prev_bin + \
+                                (1 - self.__SPEED_SMOOTHING_FACTOR) * last_velocity
 
                     #self._past_position_buffer.put((prev_step_timestamp, prev_bin_id))
                     
                     for outp in self._position_buffer_connections:
-                        outp.send((current_timestamp, curr_x_bin, curr_y_bin))
+                        outp.send((current_timestamp, curr_x_bin, curr_y_bin, last_velocity))
                     #self._past_position_buffer.put((current_timestamp, x_bin, y_bin))
 
                     # Update the total time spent in the bin we were previously in
@@ -137,6 +154,10 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                     # logging.debug(MODULE_IDENTIFIER + "Position binned (%d, %d) = (%d,%d)"%(curr_x_bin, curr_y_bin, \
                     #       self._data_field['position_x'], self._data_field['position_y']))
 
-                    # Update the current bin
+                    # Update the current bin and timestamps
+                    # An assignment here just binds the variable
+                    # prev_step_timestamp to current_timestamp, never giving us
+                    # the actual time  jump... Mystery
+                    prev_step_timestamp = copy(current_timestamp)
                     prev_x_bin = curr_x_bin
                     prev_y_bin = curr_y_bin

@@ -185,6 +185,7 @@ class GraphicsManager(Process):
         self._pos_timestamps = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._pos_x = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._pos_y = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
+        self._speed = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._spk_clusters = deque([], self.__N_SPIKES_TO_PLOT)
         self._spk_timestamps = deque([], self.__N_SPIKES_TO_PLOT)
         self._spk_pos_x = deque([], self.__N_SPIKES_TO_PLOT)
@@ -215,6 +216,9 @@ class GraphicsManager(Process):
             self._spk_pos_frame[0].set_data((self._spk_pos_x, self._spk_pos_y))
             # self._spk_pos_frame[0].set_color(self._spk_clusters)
             self._spk_pos_frame[1].set_data((self._pos_x, self._pos_y))
+            if len(self._speed) > 0:
+                self._spk_pos_frame[2].set_text('speed = %.2fcm/s'%self._speed[-1])
+
             if step == self.__N_ANIMATION_FRAMES:
                 logging.debug(MODULE_IDENTIFIER + datetime.now().strftime("Animation Finished at %H:%M:%S.%f"))
             return self._spk_pos_frame
@@ -237,7 +241,9 @@ class GraphicsManager(Process):
                 self._pos_timestamps.append(position_data[0])
                 self._pos_x.append(position_data[1])
                 self._pos_y.append(position_data[2])
-                logging.debug(MODULE_IDENTIFIER + "Fetched Position data... (%d, %d)"%(position_data[1],position_data[2]))
+                self._speed.append(position_data[3])
+                logging.debug(MODULE_IDENTIFIER + "Fetched Position data... (%d, %d), v: %.2fcm/s"% \
+                        (position_data[1],position_data[2], position_data[3]))
 
     def process_command(self, key_in):
         print(self._key_entry.get())
@@ -275,8 +281,10 @@ class GraphicsManager(Process):
         # Create graphics entries for the actual position and also each of the spike clusters
         pos_frame, = plt.plot([], [], animated=True)
         spk_frame, = plt.plot([], [], linestyle='None', marker='o', animated=True)
+        vel_frame  = plt.text(30.0, 1.0, 'speed = 0 cm/s', transform=self._spk_pos_ax.transAxes)
         self._spk_pos_frame.append(spk_frame)
         self._spk_pos_frame.append(pos_frame)
+        self._spk_pos_frame.append(vel_frame)
 
         anim_obj = animation.FuncAnimation(self._pos_fig, self.update_position_and_spike_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
         plt.show()
