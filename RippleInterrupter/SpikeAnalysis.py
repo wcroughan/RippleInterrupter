@@ -12,6 +12,7 @@ import numpy as np
 import logging
 
 # Local imports
+import RippleDefinitions as RiD
 import TrodesInterface
 import ThreadExtension
 
@@ -117,6 +118,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         next_posbin_x = 0
         next_postime = 0
         last_postime = 0
+        curr_speed = 0
         spk_time = 0
 
         update_pf_every_n_spks = 100 #this controls how many spikes are collected before place fields are recalculated
@@ -169,12 +171,16 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                 #add this spike to spike counts for place bin
                 # print("Spike from cluster %d, in bin (%d, %d)"%(spk_cl, current_posbin_x, current_posbin_y))
                 # print(current_posbin_y)
-                self._nspks_in_bin[spk_cl, curr_posbin_x, curr_posbin_y] += 1
-                # Send this to the visualization pipeline to see how spike are being reported
-                if spk_cl in self._requested_clusters:
-                    for pipe_in in self._spike_place_buffer_connections:
-                        pipe_in.send((spk_cl, curr_posbin_x, curr_posbin_y, spk_time))
-                    logging.debug(self.CLASS_IDENTIFIER + "Spike at %d sent out to listeners"%spk_time)
+
+                if curr_speed > RiD.MOVE_VELOCITY_THRESOLD:
+                    self._nspks_in_bin[spk_cl, curr_posbin_x, curr_posbin_y] += 1
+                    # Send this to the visualization pipeline to see how spike are being reported
+                    if spk_cl in self._requested_clusters:
+                        for pipe_in in self._spike_place_buffer_connections:
+                            pipe_in.send((spk_cl, curr_posbin_x, curr_posbin_y, spk_time))
+                        logging.debug(self.CLASS_IDENTIFIER + "Spike at %d sent out to listeners"%spk_time)
+                else:
+                    logging.debug(self.CLASS_IDENTIFIER + "Spike at %d skipped, speed %.2fcm/s below threshold"%(spk_time, curr_speed))
                 pf_update_spk_iter += 1
 
                 # If spike timestamp starts leading position timestamps by too
