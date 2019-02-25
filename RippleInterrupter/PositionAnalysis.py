@@ -137,8 +137,8 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                     real_distance_moved = np.sqrt(pow(curr_x_bin-prev_x_bin,2) + pow(curr_y_bin-prev_y_bin,2))
                     logging.debug(MODULE_IDENTIFIER + "Moved %.2fcm in %.2fs."%(real_distance_moved,real_time_spent_in_prev_bin))
                     if (time_spent_in_prev_bin != 0):
-                        last_velocity = self.__SPEED_SMOOTHING_FACTOR * real_distance_moved/real_time_spent_in_prev_bin + \
-                                (1 - self.__SPEED_SMOOTHING_FACTOR) * last_velocity
+                        last_velocity = (1 - self.__SPEED_SMOOTHING_FACTOR) * real_distance_moved/real_time_spent_in_prev_bin + \
+                                self.__SPEED_SMOOTHING_FACTOR * last_velocity
 
                     #self._past_position_buffer.put((prev_step_timestamp, prev_bin_id))
                     

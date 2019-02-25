@@ -281,7 +281,8 @@ class GraphicsManager(Process):
         # Create graphics entries for the actual position and also each of the spike clusters
         pos_frame, = plt.plot([], [], animated=True)
         spk_frame, = plt.plot([], [], linestyle='None', marker='o', animated=True)
-        vel_frame  = plt.text(30.0, 1.0, 'speed = 0 cm/s', transform=self._spk_pos_ax.transAxes)
+        # vel_frame  = plt.text(30.0, 10.0, 'speed = 0 cm/s', transform=self._spk_pos_ax.transAxes)
+        vel_frame  = plt.text(40.0, 5.0, 'speed = 0cm/s')
         self._spk_pos_frame.append(spk_frame)
         self._spk_pos_frame.append(pos_frame)
         self._spk_pos_frame.append(vel_frame)
