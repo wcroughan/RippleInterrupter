@@ -142,15 +142,16 @@ class GraphicsManager(Process):
     __N_POSITION_ELEMENTS_TO_PLOT = 100
     __N_SPIKES_TO_PLOT = 2000
     __N_ANIMATION_FRAMES = 5000
+    __PLACE_FIELD_REFRESH_RATE = 1
     __CLUSTERS_TO_PLOT = [4]
     def __init__(self, ripple_analyzer, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_condition, clusters=None):
         """TODO: to be defined1.
 
-        :ripple_analyzer: TODO
-        :spike_listener: TODO
-        :position_estimator: TODO
-        :place_field_handler: TODO
+        :ripple_analyzer: Process/Thread listening to LFP and detecting ripples
+        :spike_listener: Thread listening to incoming raw spike stream from trodes.
+        :position_estimator: Thread listening to position data from camera stream
+        :place_field_handler: Process constructing place fields
         :ripple_trigger_condition: TODO
         :clusters: User specified cluster indices that we should be looking at.
         """
@@ -192,7 +193,9 @@ class GraphicsManager(Process):
         self._spk_pos_y = deque([], self.__N_SPIKES_TO_PLOT)
 
         # Figure elements
+        self._pf_fig = None
         self._pos_fig = None
+        self._pf_ax = None
         self._spk_pos_ax = None
         self._spk_pos_frame = []
 
@@ -223,6 +226,30 @@ class GraphicsManager(Process):
                 logging.debug(MODULE_IDENTIFIER + datetime.now().strftime("Animation Finished at %H:%M:%S.%f"))
             return self._spk_pos_frame
 
+    def update_place_field_frame(self, step=0):
+        """
+        Function used for animating the place field for a particular spike cluster.
+        TODO: Utility to be expanded to multiple clusters in the future.
+
+        :step: Animation iteration
+        :returns: Animation frames to be plotted.
+        """
+
+        raise NotImplementedError()
+
+    def fetch_place_fields(self):
+        """
+        Fetch place field data from place field handler.
+        """
+        while self._keep_running:
+            time.sleep(self.__PLACE_FIELD_REFRESH_RATE)
+            # Request place field handler to pause place field calculation
+            # while we fetch the data
+            self._place_field_handler.submit_immediate_request()
+            place_field = self.place_field_handler.get_raw_place_fields()
+            # Release the request that paused place field computation
+            self._place_field_handler.end_immediate_request()
+
     def fetch_spikes_and_update_frames(self):
         while self._keep_running:
             if self._spike_buffer.poll():
@@ -250,6 +277,37 @@ class GraphicsManager(Process):
         self._key_entry.delete(0, tkinter.END)
         pass
 
+    def initialize_spike_pos_fig(self):
+        """
+        Initialize figure window for showing spikes overlaid on position
+        """
+        self._pos_fig = plt.figure()
+        self._spk_pos_ax  = plt.axes()
+        self._spk_pos_ax.set_xlabel("x (bin)")
+        self._spk_pos_ax.set_ylabel("y (bin)")
+        self._spk_pos_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
+        self._spk_pos_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
+        self._spk_pos_ax.grid(True)
+
+        # Create graphics entries for the actual position and also each of the spike clusters
+        pos_frame, = plt.plot([], [], animated=True)
+        spk_frame, = plt.plot([], [], linestyle='None', marker='o', alpha=0.4, animated=True)
+        # vel_frame  = plt.text(30.0, 10.0, 'speed = 0 cm/s', transform=self._spk_pos_ax.transAxes)
+        vel_frame  = plt.text(40.0, 2.0, 'speed = 0cm/s')
+        self._spk_pos_frame.append(spk_frame)
+        self._spk_pos_frame.append(pos_frame)
+        self._spk_pos_frame.append(vel_frame)
+
+        anim_obj = animation.FuncAnimation(self._pos_fig, self.update_position_and_spike_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
+        plt.show()
+
+    def initialize_place_field_fig(self):
+        """
+        Initialize figure window for dynamically showing place fields.
+        """
+
+        raise NotImplementedError()
+
     def run(self):
         """
         Start a GUI, launch all the graphics windows that have been requested
@@ -270,25 +328,8 @@ class GraphicsManager(Process):
         position_fetcher.start()
         spike_fetcher.start()
 
-        self._pos_fig = plt.figure()
-        self._spk_pos_ax  = plt.axes()
-        self._spk_pos_ax.set_xlabel("x (bin)")
-        self._spk_pos_ax.set_ylabel("y (bin)")
-        self._spk_pos_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
-        self._spk_pos_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
-        self._spk_pos_ax.grid(True)
-
-        # Create graphics entries for the actual position and also each of the spike clusters
-        pos_frame, = plt.plot([], [], animated=True)
-        spk_frame, = plt.plot([], [], linestyle='None', marker='o', animated=True)
-        # vel_frame  = plt.text(30.0, 10.0, 'speed = 0 cm/s', transform=self._spk_pos_ax.transAxes)
-        vel_frame  = plt.text(40.0, 5.0, 'speed = 0cm/s')
-        self._spk_pos_frame.append(spk_frame)
-        self._spk_pos_frame.append(pos_frame)
-        self._spk_pos_frame.append(vel_frame)
-
-        anim_obj = animation.FuncAnimation(self._pos_fig, self.update_position_and_spike_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
-        plt.show()
+        # Start the animation for Spike-Position figure
+        self.initialize_spike_pos_fig()
 
         # This is a blocking command... After you exit this, everything will end.
         self._command_window.mainloop()

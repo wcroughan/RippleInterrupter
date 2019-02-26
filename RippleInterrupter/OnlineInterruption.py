@@ -91,13 +91,13 @@ def main():
         # Run cleanup here
         # graphical_interface.terminate()
         graphical_interface.join()
-        logging.debug(MODULE_IDENTIFIER + "GUI terminated")
+        logging.info(MODULE_IDENTIFIER + "GUI terminated")
         spike_listener.join()
-        logging.debug(MODULE_IDENTIFIER  + "Spike Listener Stopped")
+        logging.info(MODULE_IDENTIFIER  + "Spike Listener Stopped")
         position_estimator.join()
-        logging.debug(MODULE_IDENTIFIER + "Position data collection Stopped")
+        logging.info(MODULE_IDENTIFIER + "Position data collection Stopped")
         place_field_handler.join()
-        logging.debug(MODULE_IDENTIFIER + "Place field builder Stopped")
+        logging.info(MODULE_IDENTIFIER + "Place field builder Stopped")
         """
         ripple_detector.join()
         ripple_trigger.join()

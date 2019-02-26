@@ -228,10 +228,37 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         """
         self._has_pf_request = False
 
-    def get_place_fields(self):
-        logging.debug([MODULE_IDENTIFIER] + "Place fields requested.")
+    def get_raw_place_fields(self, cluster_idx=None):
+        """
+        Get the raw place fields. These are to be used for visualization. For
+        decoding, get log place fields instead.
+
+        :cluster_idx: Cluster for which place field is needed. If no argument
+            is provided, all fields will be returned.
+        :returns: Matrix of values (N_BINS_X, N_BINS_Y) giving firing rate as a
+            function of position on the field.
+        """
+        logging.debug([MODULE_IDENTIFIER] + "Raw place fields requested.")
         with self._place_field_lock:
-            return (np.copy(self._log_place_fields), np.sum(self._place_fields, axis=0))
+            if cluster_idx is None:
+                return np.copy(self._place_fields)
+            return np.copy(self._place_fields[cluster_idx, :, :])
+
+    def get_log_place_fields(self, cluster_idx=None):
+        """
+        Get the log place fields. These are to be used for decoding. For
+        visualization, get log place fields instead.
+
+        :cluster_idx: Cluster for which place field is needed. If no argument
+            is provided, all fields will be returned.
+        :returns: Matrix of values (N_BINS_X, N_BINS_Y) giving firing rate as a
+            function of position on the field.
+        """
+        logging.debug([MODULE_IDENTIFIER] + "Log place fields requested.")
+        with self._place_field_lock:
+            if cluster_idx is None:
+                return np.copy(self._log_place_fields)
+            return np.copy(self._log_place_fields[cluster_idx, :, :])
 
 
 class SpikeDetector(ThreadExtension.StoppableThread):
