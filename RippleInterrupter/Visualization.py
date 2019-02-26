@@ -183,6 +183,10 @@ class GraphicsManager(Process):
         self._cluster_colormap = colormap.magma(np.linspace(0, 1, self._n_clusters))
         
         # Automatically keep only a fixed number of entries in this buffer... Useful for plotting
+        # TODO: All of this will need some tweaking if/when we move on to
+        # visuzliaing multiple clusters and their place fields.
+        self._most_recent_pf = np.zeros((1, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]), \
+                dtype='float')
         self._pos_timestamps = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._pos_x = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._pos_y = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
@@ -198,6 +202,7 @@ class GraphicsManager(Process):
         self._pf_ax = None
         self._spk_pos_ax = None
         self._spk_pos_frame = []
+        self._pf_frame = []
 
         # Communication buffers
         self._position_buffer = self._position_estimator.get_position_buffer_connection()
@@ -205,8 +210,14 @@ class GraphicsManager(Process):
     
     def kill_gui(self):
         self._command_window.quit()
-        plt.close(self._pos_fig)
-        self._command_window.destroy()
+        try:
+            plt.close(self._pos_fig)
+            plt.close(self._pf_fig)
+        except Exception as err:
+            logging.debug(MODULE_IDENTIFIER + "Error closing figure window")
+            print(err)
+        finally:
+            self._command_window.destroy()
 
     def update_position_and_spike_frame(self, step=0):
         """
@@ -234,8 +245,9 @@ class GraphicsManager(Process):
         :step: Animation iteration
         :returns: Animation frames to be plotted.
         """
-
-        raise NotImplementedError()
+        if self._pf_ax is not None:
+            self._pf_frame[0].set_array(self._most_recent_pf[0,:,:])
+            return self._pf_frame
 
     def fetch_place_fields(self):
         """
@@ -246,7 +258,7 @@ class GraphicsManager(Process):
             # Request place field handler to pause place field calculation
             # while we fetch the data
             self._place_field_handler.submit_immediate_request()
-            place_field = self.place_field_handler.get_raw_place_fields()
+            self._most_recent_pf[0,:,:] = self._place_field_handler.get_raw_place_fields(self.__CLUSTERS_TO_PLOT[0])
             # Release the request that paused place field computation
             self._place_field_handler.end_immediate_request()
 
@@ -305,8 +317,20 @@ class GraphicsManager(Process):
         """
         Initialize figure window for dynamically showing place fields.
         """
+        self._pf_fig = plt.figure()
+        self._pf_ax = plt.axes()
+        self._pf_ax.set_xlabel("x (bin)")
+        self._pf_ax.set_ylabel("y (bin)")
+        self._pf_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
+        self._pf_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
+        self._pf_ax.grid(True)
 
-        raise NotImplementedError()
+        pf_heatmap = self._pf_ax.imshow(np.zeros((PositionAnalysis.N_POSITION_BINS[0], \
+                PositionAnalysis.N_POSITION_BINS[1]), dtype='float'))
+        self._pf_frame.append(pf_heatmap)
+        anim_obj = animation.FuncAnimation(self._pf_fig, self.update_place_field_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
+        plt.show()
+
 
     def run(self):
         """
@@ -324,12 +348,16 @@ class GraphicsManager(Process):
                 target=self.fetch_position_and_update_frames)
         spike_fetcher = threading.Thread(name="SpikeFetcher", daemon=True, \
                 target=self.fetch_spikes_and_update_frames)
+        place_field_fetcher = threading.Thread(name="PlaceFieldFetched", daemon=True, \
+                target=self.fetch_place_fields)
 
         position_fetcher.start()
         spike_fetcher.start()
+        place_field_fetcher.start()
 
         # Start the animation for Spike-Position figure
         self.initialize_spike_pos_fig()
+        self.initialize_place_field_fig()
 
         # This is a blocking command... After you exit this, everything will end.
         self._command_window.mainloop()

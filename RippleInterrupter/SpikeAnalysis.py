@@ -190,6 +190,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                 spike_position_lag = float(spk_time) - float(curr_postime)
                 if (spike_position_lag > self._ALLOWED_TIMESTAMPS_LAG):
                     logging.debug(self.CLASS_IDENTIFIER + "Position lagging spikes by %d timestamps. S.%d, P.%d"%(spike_position_lag, spk_time, curr_postime))
+                    curr_speed = 0
                     break
 
             if pf_update_spk_iter >= update_pf_every_n_spks and not self._has_pf_request:
@@ -238,7 +239,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         :returns: Matrix of values (N_BINS_X, N_BINS_Y) giving firing rate as a
             function of position on the field.
         """
-        logging.debug([MODULE_IDENTIFIER] + "Raw place fields requested.")
+        logging.debug(MODULE_IDENTIFIER + "Raw place fields requested.")
         with self._place_field_lock:
             if cluster_idx is None:
                 return np.copy(self._place_fields)
@@ -254,7 +255,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         :returns: Matrix of values (N_BINS_X, N_BINS_Y) giving firing rate as a
             function of position on the field.
         """
-        logging.debug([MODULE_IDENTIFIER] + "Log place fields requested.")
+        logging.debug(MODULE_IDENTIFIER + "Log place fields requested.")
         with self._place_field_lock:
             if cluster_idx is None:
                 return np.copy(self._log_place_fields)
