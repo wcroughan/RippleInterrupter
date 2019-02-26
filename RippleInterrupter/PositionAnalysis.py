@@ -14,7 +14,7 @@ import RippleDefinitions as RiD
 import ThreadExtension
 
 MODULE_IDENTIFIER = "[PositionAnalysis] "
-N_POSITION_BINS = (6, 6)
+N_POSITION_BINS = (16, 16)
 FIELD_SIZE = (100, 100) # Actual size of the field in cms
 class PositionEstimator(ThreadExtension.StoppableThread):
     """

@@ -143,7 +143,7 @@ class GraphicsManager(Process):
     __N_SPIKES_TO_PLOT = 2000
     __N_ANIMATION_FRAMES = 5000
     __PLACE_FIELD_REFRESH_RATE = 1
-    __CLUSTERS_TO_PLOT = [2]
+    __CLUSTERS_TO_PLOT = [6]
     def __init__(self, ripple_analyzer, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_condition, clusters=None):
         """TODO: to be defined1.

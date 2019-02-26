@@ -166,6 +166,8 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                     # This should also take care of negative jumps in
                     # timestamps, leading to negative place fields.
                     if timestamps_in_prev_bin > 0:
+                        logging.info(self.CLASS_IDENTIFIER + "Updating occupancy in bin (%d, %d), time spent %.2fs"%\
+                                (prev_posbin_x,prev_posbin_y,real_time_spent_in_prev_bin))
                         self._bin_occupancy[prev_posbin_x, prev_posbin_y] += real_time_spent_in_prev_bin
 
                     prev_posbin_x = curr_posbin_x
