@@ -143,7 +143,7 @@ class GraphicsManager(Process):
     __N_SPIKES_TO_PLOT = 2000
     __N_ANIMATION_FRAMES = 5000
     __PLACE_FIELD_REFRESH_RATE = 1
-    __CLUSTERS_TO_PLOT = [4]
+    __CLUSTERS_TO_PLOT = [2]
     def __init__(self, ripple_analyzer, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_condition, clusters=None):
         """TODO: to be defined1.
@@ -196,13 +196,14 @@ class GraphicsManager(Process):
         self._spk_pos_x = deque([], self.__N_SPIKES_TO_PLOT)
         self._spk_pos_y = deque([], self.__N_SPIKES_TO_PLOT)
 
-        # Figure elements
+        # Figure/Animation elements
         self._pf_fig = None
         self._pos_fig = None
         self._pf_ax = None
         self._spk_pos_ax = None
         self._spk_pos_frame = []
         self._pf_frame = []
+        self._anim_objs = []
 
         # Communication buffers
         self._position_buffer = self._position_estimator.get_position_buffer_connection()
@@ -217,6 +218,10 @@ class GraphicsManager(Process):
             logging.debug(MODULE_IDENTIFIER + "Error closing figure window")
             print(err)
         finally:
+            # Clean up
+            del self._pf_fig
+            del self._pos_fig
+            del self._anim_objs
             self._command_window.destroy()
 
     def update_position_and_spike_frame(self, step=0):
@@ -246,6 +251,7 @@ class GraphicsManager(Process):
         :returns: Animation frames to be plotted.
         """
         if self._pf_ax is not None:
+            print("Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._most_recent_pf[0,:,:]), np.mean(self._most_recent_pf[0,:,:])))
             self._pf_frame[0].set_array(self._most_recent_pf[0,:,:])
             return self._pf_frame
 
@@ -259,7 +265,10 @@ class GraphicsManager(Process):
             # while we fetch the data
             self._place_field_handler.submit_immediate_request()
             self._most_recent_pf[0,:,:] = self._place_field_handler.get_raw_place_fields(self.__CLUSTERS_TO_PLOT[0])
+            # self._most_recent_pf[0,:,:] = np.sum(self._place_field_handler.get_raw_place_fields(), axis=0)
             # Release the request that paused place field computation
+            logging.debug(MODULE_IDENTIFIER + "Fetched place fields. Peak FR: %.2f, Mean FR: %.2f"%\
+                    (np.mean(self._most_recent_pf), np.max(self._most_recent_pf)))
             self._place_field_handler.end_immediate_request()
 
     def fetch_spikes_and_update_frames(self):
@@ -311,7 +320,7 @@ class GraphicsManager(Process):
         self._spk_pos_frame.append(vel_frame)
 
         anim_obj = animation.FuncAnimation(self._pos_fig, self.update_position_and_spike_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
-        plt.show()
+        self._anim_objs.append(anim_obj)
 
     def initialize_place_field_fig(self):
         """
@@ -326,11 +335,10 @@ class GraphicsManager(Process):
         self._pf_ax.grid(True)
 
         pf_heatmap = self._pf_ax.imshow(np.zeros((PositionAnalysis.N_POSITION_BINS[0], \
-                PositionAnalysis.N_POSITION_BINS[1]), dtype='float'))
+                PositionAnalysis.N_POSITION_BINS[1]), dtype='float'), animated=True)
         self._pf_frame.append(pf_heatmap)
         anim_obj = animation.FuncAnimation(self._pf_fig, self.update_place_field_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
-        plt.show()
-
+        self._anim_objs.append(anim_obj)
 
     def run(self):
         """
@@ -355,9 +363,10 @@ class GraphicsManager(Process):
         spike_fetcher.start()
         place_field_fetcher.start()
 
-        # Start the animation for Spike-Position figure
+        # Start the animation for Spike-Position figure, place field figure
         self.initialize_spike_pos_fig()
         self.initialize_place_field_fig()
+        plt.show()
 
         # This is a blocking command... After you exit this, everything will end.
         self._command_window.mainloop()

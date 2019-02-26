@@ -13,6 +13,7 @@ import logging
 
 # Local imports
 import RippleDefinitions as RiD
+import PositionAnalysis
 import TrodesInterface
 import ThreadExtension
 
@@ -91,7 +92,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         self._place_fields = place_fields
         self._log_place_fields = np.zeros_like(self._place_fields)
         self._nspks_in_bin = np.zeros(np.shape(place_fields))
-        self._bin_occupancy = position_processor.get_bin_occupancy()
+        self._bin_occupancy = np.zeros((PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]), dtype='float')
         self._has_pf_request = False
         self._place_field_lock = Condition()
         self._spike_place_buffer_connections = []
@@ -114,9 +115,9 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         curr_postime = 0
         curr_posbin_x = 0
         curr_posbin_y = 0
-        next_posbin_y = 0
-        next_posbin_x = 0
-        next_postime = 0
+        prev_posbin_y = 0
+        prev_posbin_x = 0
+        prev_postime = np.Inf
         last_postime = 0
         curr_speed = 0
         spk_time = 0
@@ -147,26 +148,29 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
 
                 #get the next spike
                 (spk_cl, spk_time) = self._spike_buffer.recv()
-                logging.debug(self.CLASS_IDENTIFIER + "Received spike from %d at %d"%(spk_cl, spk_time))
+                logging.info(self.CLASS_IDENTIFIER + "Received spike from %d at %d"%(spk_cl, spk_time))
 
                 #if it's after our most recent position update, try and read the next position
                 #keep reading positions until our position data is ahead of our spike data
                 while self._position_buffer.poll() and (spk_time >= curr_postime):
-                    """
-                    curr_postime  = next_postime
-                    curr_posbin_x = next_posbin_x
-                    curr_posbin_y = next_posbin_y
-                    if not pos_buf_available:
-                        #If we don't have any position data ahead of spike data,
-                        #don't bother checking this every time the outer loop iterates
-                        logging.debug(self.CLASS_IDENTIFIER + "Assigning spike from %d at %d to last location bin."%(spk_cl, spk_time))
-                        break
-                    else:
-                        (next_postime, next_posbin_x, next_posbin_y) = self._position_buffer.recv()
-                        logging.debug(self.CLASS_IDENTIFIER + "Received new position (%d, %d) at %d"%(next_posbin_x, next_posbin_y, next_postime))
-                    """
                     (curr_postime, curr_posbin_x, curr_posbin_y, curr_speed) = self._position_buffer.recv()
-                    logging.debug(self.CLASS_IDENTIFIER + "Received new position (%d, %d) at %d"%(curr_posbin_x, curr_posbin_y, curr_postime))
+
+                    logging.info(self.CLASS_IDENTIFIER + "Received new position (%d, %d) at %d"%(curr_posbin_x, curr_posbin_y, curr_postime))
+                    
+                    # NOTE: We have to do some repeated computation here but
+                    # passing occupancy from PositionAnalysis to this process
+                    # was turning out to be a pain
+                    timestamps_in_prev_bin = curr_postime - prev_postime
+                    real_time_spent_in_prev_bin = float(timestamps_in_prev_bin)/RiD.SPIKE_SAMPLING_FREQ
+
+                    # This should also take care of negative jumps in
+                    # timestamps, leading to negative place fields.
+                    if timestamps_in_prev_bin > 0:
+                        self._bin_occupancy[prev_posbin_x, prev_posbin_y] += real_time_spent_in_prev_bin
+
+                    prev_posbin_x = curr_posbin_x
+                    prev_posbin_y = curr_posbin_y
+                    prev_postime  = curr_postime
 
                 #add this spike to spike counts for place bin
                 # print("Spike from cluster %d, in bin (%d, %d)"%(spk_cl, current_posbin_x, current_posbin_y))
@@ -180,7 +184,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                             pipe_in.send((spk_cl, curr_posbin_x, curr_posbin_y, spk_time))
                         logging.debug(self.CLASS_IDENTIFIER + "Spike at %d sent out to listeners"%spk_time)
                 else:
-                    logging.debug(self.CLASS_IDENTIFIER + "Spike at %d skipped, speed %.2fcm/s below threshold"%(spk_time, curr_speed))
+                    logging.info(self.CLASS_IDENTIFIER + "Spike at %d skipped, speed %.2fcm/s below threshold"%(spk_time, curr_speed))
                 pf_update_spk_iter += 1
 
                 # If spike timestamp starts leading position timestamps by too
@@ -189,20 +193,28 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                 # each spike has gone by, minimizing incorrect reporting.
                 spike_position_lag = float(spk_time) - float(curr_postime)
                 if (spike_position_lag > self._ALLOWED_TIMESTAMPS_LAG):
-                    logging.debug(self.CLASS_IDENTIFIER + "Position lagging spikes by %d timestamps. S.%d, P.%d"%(spike_position_lag, spk_time, curr_postime))
+                    logging.info(self.CLASS_IDENTIFIER + "Position lagging spikes by %d timestamps. S.%d, P.%d"%(spike_position_lag, spk_time, curr_postime))
                     curr_speed = 0
                     break
 
             if pf_update_spk_iter >= update_pf_every_n_spks and not self._has_pf_request:
-                logging.debug(MODULE_IDENTIFIER + "Updating place fields. Last spike at %d"%spk_time)
+                logging.info(MODULE_IDENTIFIER + "Updating place fields. Last spike at %d"%spk_time)
                 with self._place_field_lock:
                     pf_update_spk_iter = 0
                     # Deal with divide by zero when the occupancy is zero for some of the place bins
+                    """
                     self._place_fields = np.divide(self._nspks_in_bin, self._bin_occupancy, \
                             out=np.zeros_like(self._nspks_in_bin), where=self._bin_occupancy!=0)
-                    self._log_place_fields = np.log(self._place_fields, out=np.zeros_like(self._place_fields), \
+                    """
+                    self._place_fields = np.divide(self._nspks_in_bin, self._bin_occupancy, \
+                            where=self._bin_occupancy!=0)
+                    self._log_place_fiearlds = np.log(self._place_fields, out=np.zeros_like(self._place_fields), \
                        where=self._place_fields!=0)
-                logging.debug(MODULE_IDENTIFIER + "Fields updated.")
+                    """
+                    self._log_place_fields = np.log(self._place_fields, where=self._place_fields!=0)
+                    """
+                    print(self.CLASS_IDENTIFIER + "Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._place_fields), np.mean(self._place_fields)))
+                logging.debug(self.CLASS_IDENTIFIER + "Fields updated.")
 
 
 
@@ -239,10 +251,11 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         :returns: Matrix of values (N_BINS_X, N_BINS_Y) giving firing rate as a
             function of position on the field.
         """
-        logging.debug(MODULE_IDENTIFIER + "Raw place fields requested.")
         with self._place_field_lock:
             if cluster_idx is None:
+                logging.info(MODULE_IDENTIFIER + "Raw place fields requested.")
                 return np.copy(self._place_fields)
+            logging.info(self.CLASS_IDENTIFIER + "Raw place fields requested for cluster %d. Peak FR: %.2f"%(cluster_idx, np.max(self._place_fields[cluster_idx, :, :])))
             return np.copy(self._place_fields[cluster_idx, :, :])
 
     def get_log_place_fields(self, cluster_idx=None):
@@ -258,7 +271,9 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         logging.debug(MODULE_IDENTIFIER + "Log place fields requested.")
         with self._place_field_lock:
             if cluster_idx is None:
+                logging.info(MODULE_IDENTIFIER + "Raw place fields requested.")
                 return np.copy(self._log_place_fields)
+            logging.info(MODULE_IDENTIFIER + "Raw place fields requested for cluster %d"%cluster_idx)
             return np.copy(self._log_place_fields[cluster_idx, :, :])
 
 

@@ -14,7 +14,7 @@ import RippleDefinitions as RiD
 import ThreadExtension
 
 MODULE_IDENTIFIER = "[PositionAnalysis] "
-N_POSITION_BINS = (60, 60)
+N_POSITION_BINS = (6, 6)
 FIELD_SIZE = (100, 100) # Actual size of the field in cms
 class PositionEstimator(ThreadExtension.StoppableThread):
     """
@@ -26,7 +26,6 @@ class PositionEstimator(ThreadExtension.StoppableThread):
     __P_MIN_Y = -100
     __P_MAX_X = 1200
     __P_MAX_Y = 1000
-    __VELOCITY_THRESOLD = 5
     __P_BIN_SIZE_X = (__P_MAX_X - __P_MIN_X)
     __P_BIN_SIZE_Y = (__P_MAX_Y - __P_MIN_Y)
     __REAL_BIN_SIZE_X = FIELD_SIZE[0]/__P_BIN_SIZE_X
@@ -44,7 +43,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
         self._position_consumer = sg_client.subscribeHighFreqData("PositionData", "CameraModule")
         self._n_bins_x = int(n_bins[0])
         self._n_bins_y = int(n_bins[1])
-        self._bin_occupancy = np.zeros((self._n_bins_x, self._n_bins_y), dtype='float')
+        # self._bin_occupancy = np.zeros((self._n_bins_x, self._n_bins_y), dtype='float')
         #self._past_position_buffer = past_position_buffer
 
         # TODO: This is assuming that the jump in timestamps will not
@@ -79,8 +78,10 @@ class PositionEstimator(ThreadExtension.StoppableThread):
         y_bin = np.floor_divide(self._n_bins_y * (self.__P_MAX_Y - py),self.__P_BIN_SIZE_Y)
         return (x_bin, y_bin)
 
+    """
     def get_bin_occupancy(self):
-        return self._bin_occupancy
+        return np.copy(self._bin_occupancy)
+    """
 
     def get_position_buffer_connection(self):
         my_end, your_end = Pipe()
@@ -147,7 +148,8 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                     #self._past_position_buffer.put((current_timestamp, x_bin, y_bin))
 
                     # Update the total time spent in the bin we were previously in
-                    self._bin_occupancy[prev_x_bin, prev_y_bin] += float(time_spent_in_prev_bin)/RiD.SPIKE_SAMPLING_FREQ
+                    # self._bin_occupancy[prev_x_bin, prev_y_bin] += real_time_spent_in_prev_bin
+                    # print(np.max(self._bin_occupancy))
 
                     # DEBUG: Report the jump in position bins
                     logging.debug(MODULE_IDENTIFIER + "Position jumped (%d, %d) -> (%d,%d), TS:%d"%(prev_x_bin, prev_y_bin, curr_x_bin, curr_y_bin, current_timestamp))
