@@ -84,14 +84,15 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
     CLASS_IDENTIFIER = "[PlaceFieldHandler] "
     _ALLOWED_TIMESTAMPS_LAG = 10000
 
-    def __init__(self, position_processor, spike_processor, place_fields):
+    def __init__(self, position_processor, spike_processor, shared_place_fields):
     # def __init__(self, position_processor, spike_processor, place_fields):
         ThreadExtension.StoppableProcess.__init__(self)
         self._position_buffer = position_processor.get_position_buffer_connection()
         self._spike_buffer = spike_processor.get_spike_buffer_connection()
-        self._place_fields = place_fields
+        n_units = spike_processor.get_n_clusters()
+        self._place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), (n_units, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
         self._log_place_fields = np.zeros_like(self._place_fields)
-        self._nspks_in_bin = np.zeros(np.shape(place_fields))
+        self._nspks_in_bin = np.zeros(np.shape(self._place_fields))
         self._bin_occupancy = np.zeros((PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]), dtype='float')
         self._has_pf_request = False
         self._place_field_lock = Condition()
@@ -204,18 +205,11 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                 with self._place_field_lock:
                     pf_update_spk_iter = 0
                     # Deal with divide by zero when the occupancy is zero for some of the place bins
-                    """
-                    self._place_fields = np.divide(self._nspks_in_bin, self._bin_occupancy, \
-                            out=np.zeros_like(self._nspks_in_bin), where=self._bin_occupancy!=0)
-                    """
-                    self._place_fields = np.divide(self._nspks_in_bin, self._bin_occupancy, \
+                    # If we assign the values to a new location, new memory is allocated!
+                    np.divide(self._nspks_in_bin, self._bin_occupancy, out=self._place_fields, \
                             where=self._bin_occupancy!=0)
-                    self._log_place_fiearlds = np.log(self._place_fields, out=np.zeros_like(self._place_fields), \
-                       where=self._place_fields!=0)
-                    """
-                    self._log_place_fields = np.log(self._place_fields, where=self._place_fields!=0)
-                    """
-                    print(self.CLASS_IDENTIFIER + "Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._place_fields), np.mean(self._place_fields)))
+                    np.log(self._place_fields, out=self._log_place_fields, where=self._place_fields!=0)
+                    logging.info(self.CLASS_IDENTIFIER + "Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._place_fields), np.mean(self._place_fields)))
                 logging.debug(self.CLASS_IDENTIFIER + "Fields updated.")
 
 
@@ -242,6 +236,12 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         access is finished
         """
         self._has_pf_request = False
+
+    def get_bin_occupancy(self):
+        with self._place_field_lock:
+            logging.info("Bin occupancy requested. Peak: %.2fs, Mean: %.2fs"%\
+                    (np.max(self._bin_occupancy), np.mean(self._bin_occupancy)))
+            return np.copy(self._bin_occupancy)
 
     def get_raw_place_fields(self, cluster_idx=None):
         """

@@ -145,7 +145,7 @@ class GraphicsManager(Process):
     __PLACE_FIELD_REFRESH_RATE = 1
     __CLUSTERS_TO_PLOT = [6]
     def __init__(self, ripple_analyzer, spike_listener, position_estimator, \
-            place_field_handler, ripple_trigger_condition, clusters=None):
+            place_field_handler, ripple_trigger_condition, shared_place_fields, clusters=None):
         """TODO: to be defined1.
 
         :ripple_analyzer: Process/Thread listening to LFP and detecting ripples
@@ -185,7 +185,8 @@ class GraphicsManager(Process):
         # Automatically keep only a fixed number of entries in this buffer... Useful for plotting
         # TODO: All of this will need some tweaking if/when we move on to
         # visuzliaing multiple clusters and their place fields.
-        self._most_recent_pf = np.zeros((1, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]), \
+        self._shared_place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), (self._n_clusters, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
+        self._most_recent_pf = np.zeros((PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]), \
                 dtype='float')
         self._pos_timestamps = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._pos_x = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
@@ -251,8 +252,8 @@ class GraphicsManager(Process):
         :returns: Animation frames to be plotted.
         """
         if self._pf_ax is not None:
-            print("Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._most_recent_pf[0,:,:]), np.mean(self._most_recent_pf[0,:,:])))
-            self._pf_frame[0].set_array(self._most_recent_pf[0,:,:])
+            # print("Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._most_recent_pf[:,:]), np.mean(self._most_recent_pf[:,:])))
+            self._pf_frame[0].set_array(self._most_recent_pf[:,:])
             return self._pf_frame
 
     def fetch_place_fields(self):
@@ -264,11 +265,13 @@ class GraphicsManager(Process):
             # Request place field handler to pause place field calculation
             # while we fetch the data
             self._place_field_handler.submit_immediate_request()
-            self._most_recent_pf[0,:,:] = self._place_field_handler.get_raw_place_fields(self.__CLUSTERS_TO_PLOT[0])
-            # self._most_recent_pf[0,:,:] = np.sum(self._place_field_handler.get_raw_place_fields(), axis=0)
-            # Release the request that paused place field computation
+            np.copyto(self._most_recent_pf, self._shared_place_fields[self.__CLUSTERS_TO_PLOT[0], :, :])
+            # self._most_recent_pf[:,:] = self._place_field_handler.get_bin_occupancy()
+            # self._most_recent_pf[:,:] = self._place_field_handler.get_raw_place_fields(self.__CLUSTERS_TO_PLOT[0])
+            # self._most_recent_pf[:,:] = np.sum(self._place_field_handler.get_raw_place_fields(), axis=0)
             logging.debug(MODULE_IDENTIFIER + "Fetched place fields. Peak FR: %.2f, Mean FR: %.2f"%\
-                    (np.mean(self._most_recent_pf), np.max(self._most_recent_pf)))
+                    (np.max(self._shared_place_fields), np.mean(self._shared_place_fields)))
+            # Release the request that paused place field computation
             self._place_field_handler.end_immediate_request()
 
     def fetch_spikes_and_update_frames(self):

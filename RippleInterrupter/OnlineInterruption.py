@@ -2,9 +2,10 @@
 import sys
 import threading
 import time
+import ctypes
 import numpy as np
 import logging
-from multiprocessing import Queue
+from multiprocessing import Queue, RawArray
 
 # Local imports
 import Logger
@@ -39,8 +40,8 @@ def main():
     # n_units, cluster_identity_map = SpikeAnalysis.readClusterFile(tetrodes=tetrodes_of_interest)
     # print(cluster_identity_map)
 
-    place_fields = np.zeros((n_units, PositionAnalysis.N_POSITION_BINS[0], \
-            PositionAnalysis.N_POSITION_BINS[1]), dtype='float')
+    shared_place_fields = RawArray(ctypes.c_double, n_units * PositionAnalysis.N_POSITION_BINS[0] * \
+            PositionAnalysis.N_POSITION_BINS[1])
 
     # Trodes needs strings!
     tetrode_argument = [str(tet) for tet in tetrodes_of_interest]
@@ -64,14 +65,14 @@ def main():
     # Initialize threads for looking at the actual/decoded position
     spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, cluster_identity_map)
     position_estimator  = PositionAnalysis.PositionEstimator(sg_client)
-    place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, place_fields)
+    place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, shared_place_fields)
     # bayesian_estimator  = PositionDecoding.BayesianEstimator(spike_listener, place_fields)
 
     # Optionally, launch a graphics thread for continuously monitoring
     # different threads for spikes, position data and ripples and show them to
     # the user in real time.
     graphical_interface = Visualization.GraphicsManager(ripple_detector, spike_listener, position_estimator, \
-            place_field_handler, trig_condition)
+            place_field_handler, trig_condition, shared_place_fields)
 
     # Spawn threads for handling all the place fields. We can convert this into
     # separate threads for separate fields too but that seems overkill at this
