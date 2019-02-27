@@ -4,6 +4,7 @@ import time
 import threading
 from datetime import datetime
 from scipy import signal, stats
+from scipy.ndimage import gaussian_filter
 import matplotlib.pyplot as plt
 import xml.etree.ElementTree as ET
 from multiprocessing import Queue, Pipe, Condition
@@ -166,7 +167,11 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
 
                     # This should also take care of negative jumps in
                     # timestamps, leading to negative place fields.
-                    if timestamps_in_prev_bin > 0:
+
+                    # NOTE: Do not add time spent in bins when the target is
+                    # stationary.. Since we are not counting spikes during this
+                    # period, this penalizes bins where the animal stops.
+                    if (timestamps_in_prev_bin > 0) and (curr_speed > RiD.MOVE_VELOCITY_THRESOLD):
                         logging.info(self.CLASS_IDENTIFIER + "Updating occupancy in bin (%d, %d), time spent %.2fs"%\
                                 (prev_posbin_x,prev_posbin_y,real_time_spent_in_prev_bin))
                         self._bin_occupancy[prev_posbin_x, prev_posbin_y] += real_time_spent_in_prev_bin
@@ -208,6 +213,8 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                     # If we assign the values to a new location, new memory is allocated!
                     np.divide(self._nspks_in_bin, self._bin_occupancy, out=self._place_fields, \
                             where=self._bin_occupancy!=0)
+                    # Apply gaussian smoothing to the computed place fields`
+                    gaussian_filter(self._place_fields, sigma=3, output=self._place_fields)
                     np.log(self._place_fields, out=self._log_place_fields, where=self._place_fields!=0)
                     logging.info(self.CLASS_IDENTIFIER + "Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._place_fields), np.mean(self._place_fields)))
                 logging.debug(self.CLASS_IDENTIFIER + "Fields updated.")

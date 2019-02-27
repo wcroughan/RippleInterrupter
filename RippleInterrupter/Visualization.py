@@ -144,7 +144,7 @@ class GraphicsManager(Process):
     __N_ANIMATION_FRAMES = 5000
     __PLACE_FIELD_REFRESH_RATE = 1
     __CLUSTERS_TO_PLOT = [6]
-    __MAX_FIRING_RATE = 200
+    __MAX_FIRING_RATE = 100
     def __init__(self, ripple_analyzer, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_condition, shared_place_fields, clusters=None):
         """TODO: to be defined1.
