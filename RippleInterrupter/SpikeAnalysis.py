@@ -212,11 +212,6 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                     logging.info(self.CLASS_IDENTIFIER + "Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._place_fields), np.mean(self._place_fields)))
                 logging.debug(self.CLASS_IDENTIFIER + "Fields updated.")
 
-
-
-
-
-
     def submit_immediate_request(self):
         """
         Indicate that another thread wants to access the place field. This will

@@ -144,6 +144,7 @@ class GraphicsManager(Process):
     __N_ANIMATION_FRAMES = 5000
     __PLACE_FIELD_REFRESH_RATE = 1
     __CLUSTERS_TO_PLOT = [6]
+    __MAX_FIRING_RATE = 200
     def __init__(self, ripple_analyzer, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_condition, shared_place_fields, clusters=None):
         """TODO: to be defined1.
@@ -252,8 +253,10 @@ class GraphicsManager(Process):
         :returns: Animation frames to be plotted.
         """
         if self._pf_ax is not None:
-            # print("Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._most_recent_pf[:,:]), np.mean(self._most_recent_pf[:,:])))
-            self._pf_frame[0].set_array(self._most_recent_pf[:,:])
+            # print("Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._most_recent_pf), np.mean(self._most_recent_pf)))
+            # min_fr = np.min(self._most_recent_pf)
+            # max_fr = np.max(self._most_recent_pf)
+            self._pf_frame[0].set_array(self._most_recent_pf.T)
             return self._pf_frame
 
     def fetch_place_fields(self):
@@ -265,10 +268,8 @@ class GraphicsManager(Process):
             # Request place field handler to pause place field calculation
             # while we fetch the data
             self._place_field_handler.submit_immediate_request()
-            np.copyto(self._most_recent_pf, self._shared_place_fields[self.__CLUSTERS_TO_PLOT[0], :, :])
-            # self._most_recent_pf[:,:] = self._place_field_handler.get_bin_occupancy()
-            # self._most_recent_pf[:,:] = self._place_field_handler.get_raw_place_fields(self.__CLUSTERS_TO_PLOT[0])
-            # self._most_recent_pf[:,:] = np.sum(self._place_field_handler.get_raw_place_fields(), axis=0)
+            # np.copyto(self._most_recent_pf, self._shared_place_fields[self.__CLUSTERS_TO_PLOT[0], :, :])
+            np.sum(self._shared_place_fields, out=self._most_recent_pf, axis=0)
             logging.debug(MODULE_IDENTIFIER + "Fetched place fields. Peak FR: %.2f, Mean FR: %.2f"%\
                     (np.max(self._shared_place_fields), np.mean(self._shared_place_fields)))
             # Release the request that paused place field computation
@@ -338,7 +339,9 @@ class GraphicsManager(Process):
         self._pf_ax.grid(True)
 
         pf_heatmap = self._pf_ax.imshow(np.zeros((PositionAnalysis.N_POSITION_BINS[0], \
-                PositionAnalysis.N_POSITION_BINS[1]), dtype='float'), animated=True)
+                PositionAnalysis.N_POSITION_BINS[1]), dtype='float'), vmin=0, \
+                vmax=self.__MAX_FIRING_RATE, animated=True)
+        plt.colorbar(pf_heatmap)
         self._pf_frame.append(pf_heatmap)
         anim_obj = animation.FuncAnimation(self._pf_fig, self.update_place_field_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
         self._anim_objs.append(anim_obj)
