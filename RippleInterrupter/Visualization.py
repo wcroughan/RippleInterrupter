@@ -145,6 +145,7 @@ class GraphicsManager(Process):
     __PLACE_FIELD_REFRESH_RATE = 1
     __CLUSTERS_TO_PLOT = [6]
     __MAX_FIRING_RATE = 100
+    __RIPPLE_DETECTION_TIMEOUT = 0.1
     def __init__(self, ripple_analyzer, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_condition, shared_place_fields, clusters=None):
         """TODO: to be defined1.
@@ -198,11 +199,17 @@ class GraphicsManager(Process):
         self._spk_pos_x = deque([], self.__N_SPIKES_TO_PLOT)
         self._spk_pos_y = deque([], self.__N_SPIKES_TO_PLOT)
 
-        # Figure/Animation elements
+        # Figure/Animation element. So far the following have been included
+        # Ripple detection
+        # Place Fields
+        # Position/Spikes overalaid
+        self._rd_fig = None
         self._pf_fig = None
         self._pos_fig = None
+        self._rd_ax = None
         self._pf_ax = None
         self._spk_pos_ax = None
+        self._rd_frame = []
         self._spk_pos_frame = []
         self._pf_frame = []
         self._anim_objs = []
@@ -225,6 +232,21 @@ class GraphicsManager(Process):
             del self._pos_fig
             del self._anim_objs
             self._command_window.destroy()
+
+    def update_ripple_detection_frame(self, step=0):
+        """
+        Function used to show a ripple frame whenever a ripple is trigerred.
+        This is a little different from the other frame update functions as it
+        does not continuously update the frame but only when a ripple is triggerred.
+        """
+        
+        # NOTE: This call blocks access to ripple_trigger_condition for
+        # __RIPPLE_DETECTION_TIMEOUT, which could be a long while. Don't let
+        # this block any important functionality.
+        if self._rd_ax is not None:
+            self._rd_frame[0].set_data(self._lfp_tstamps, self._raw_lfp)
+            self._rd_frame[1].set_data(self._lfp_tstamps, self._ripple_power)
+            return self._rd_frame
 
     def update_position_and_spike_frame(self, step=0):
         """
@@ -258,6 +280,12 @@ class GraphicsManager(Process):
             # max_fr = np.max(self._most_recent_pf)
             self._pf_frame[0].set_array(self._most_recent_pf.T)
             return self._pf_frame
+
+    def fetch_incident_ripple(self):
+        while self._keep_running:
+            self._ripple_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
+            if self._ripple_trigger_condition.is_set():
+                # Move the shared LFP buffer into a local copy
 
     def fetch_place_fields(self):
         """

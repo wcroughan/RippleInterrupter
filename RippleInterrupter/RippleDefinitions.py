@@ -10,6 +10,7 @@ SPIKE_SAMPLING_FREQ = 30000.0
 LFP_FREQUENCY     = 1500.0
 LFP_FILTER_LENGTH = 0.002     # 1ms long window for filtering ripples
 LFP_FILTER_ORDER  = int(LFP_FILTER_LENGTH * LFP_FREQUENCY)
+LFP_BUFFER_LENGTH = int(LFP_FREQUENCY * 1.0) # 1.0s long display window
 
 # Frequency range for Ripple. Keep in mind that a high range completely gets
 # rid of the sharp wave ripple - It is a little harder to see the filtered

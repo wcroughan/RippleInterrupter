@@ -51,7 +51,8 @@ class RippleDetector(ThreadExtension.StoppableThread):
     Thread for ripple detection on a set of channels [ONLINE]
     """
 
-    def __init__(self, sg_client, target_tetrodes, baseline_stats=None, trigger_condition=None):
+    def __init__(self, sg_client, target_tetrodes, baseline_stats=None, \
+            trigger_condition=None, shared_buffers=None):
         """
         Subsribe to LFP stream on a given client and start listening
         to/filtering data for a set of target tetrode channels.
@@ -74,6 +75,10 @@ class RippleDetector(ThreadExtension.StoppableThread):
 
         # Output connections
         self._ripple_buffer_connections = []
+
+        # Shared variables
+        self._raw_lfp_buffer = np.reshape(np.frombuffer(shared_buffers[1]), (self._n_tetrodes, RiD.LFP_BUFFER_LENGTH))
+        self._ripple_power_buffer = np.reshape(np.frombuffer(shared_buffers[1]), (self._n_tetrodes, RiD.LFP_BUFFER_LENGTH))
 
         # Data streams
         self._lfp_stream = sg_client.subscribeLFPData(TrodesInterface.LFP_SUBSCRIPTION_ATTRIBUTE, \
@@ -122,6 +127,7 @@ class RippleDetector(ThreadExtension.StoppableThread):
         curr_time   = 0
         start_wall_time = time.time()
         curr_wall_time = start_wall_time
+        shared_arr_idx = 0
         while not self.req_stop():
             # Acquire buffered LFP frames and fill them in a filter buffer
             n_lfp_frames = self._lfp_stream.available(0)
@@ -138,6 +144,9 @@ class RippleDetector(ThreadExtension.StoppableThread):
                            raw_lfp_window, axis=1, zi=ripple_frame_filter)
                     ripple_power[:, pow_window_ptr] = np.sqrt(np.mean(np.power( \
                             filtered_window, 2), axis=1))
+
+                    # Fill in the shared data variables
+                    self._raw_lfp_buffer[:, shared_arr_idx] = ripple_power[:, pow_window_ptr]
 
                     # TODO: Uncomment this to work with a moving average of ripple power
                     # pow_window_ptr += 1

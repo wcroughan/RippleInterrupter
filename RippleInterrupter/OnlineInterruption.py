@@ -15,6 +15,7 @@ import RippleAnalysis
 import PositionAnalysis
 import TrodesInterface
 import PositionDecoding
+import RippleDefinitions as RiD
 
 MODULE_IDENTIFIER = "[OnlineInterruption] "
 
@@ -40,6 +41,10 @@ def main():
     # n_units, cluster_identity_map = SpikeAnalysis.readClusterFile(tetrodes=tetrodes_of_interest)
     # print(cluster_identity_map)
 
+    # NOTE: Using all the tetrodes that have clusters marked on them for ripple analysis
+    n_tetrodes = len(cluster_identity_map)
+    shared_ripple_buffer = RawArray(ctypes.c_double, n_tetrodes * RiD.LFP_BUFFER_LENGTH)
+    shared_raw_lfp_buffer = RawArray(ctypes.c_double, n_tetrodes * RiD.LFP_BUFFER_LENGTH)
     shared_place_fields = RawArray(ctypes.c_double, n_units * PositionAnalysis.N_POSITION_BINS[0] * \
             PositionAnalysis.N_POSITION_BINS[1])
 
@@ -55,7 +60,8 @@ def main():
 
     # Start threads for collecting spikes and LFP
     ripple_detector = RippleAnalysis.RippleDetector(sg_client, tetrode_argument, \
-            baseline_stats=[60.0, 30.0], trigger_condition=trig_condition)
+            baseline_stats=[60.0, 30.0], trigger_condition=trig_condition, \
+            shared_buffers=(shared_raw_lfp_buffer, shared_ripple_buffer))
 
     # Create a buffer for spikes to be accessed until they are taken out of the
     # queue by the Bayesian Estimator.
@@ -82,8 +88,8 @@ def main():
     spike_listener.start()
     position_estimator.start()
     place_field_handler.start()
-    """
     ripple_detector.start()
+    """
     ripple_trigger.start()
     """
 
