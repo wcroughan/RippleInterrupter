@@ -291,6 +291,7 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
                                 interruption_axes.plot(timestamps[data_begin_idx:iter_idx], raw_lfp_buffer[0, \
                                         data_begin_idx:iter_idx])
                                 interruption_axes.scatter(prev_ripple, 0, c="r")
+                                interruption_axes.set_ylim(-3000, 3000)
                                 plt.grid(True)
                                 plt.draw()
                                 plt.pause(0.001)
@@ -346,11 +347,11 @@ def main():
                 analysis_time=10.0)
     elif (int(sys.argv[1][0]) == 0):
         getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
-                interruption_statistics=[60.0, 30.0], show_interruptions=True, \
-                interrupt_ripples=True, analysis_time=20)
+                interruption_statistics=[50.0, 40.0], show_interruptions=True, \
+                interrupt_ripples=True, analysis_time=200)
     elif (int(sys.argv[1][0]) == 1):
         getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
-                interruption_statistics=[60.0, 30.0], show_interruptions=True, \
+                interruption_statistics=[50.0, 40.0], show_interruptions=True, \
                 interrupt_ripples=False, analysis_time=20)
 
 if (__name__ == "__main__"):
