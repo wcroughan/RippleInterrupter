@@ -1,8 +1,13 @@
+import os
 import time
+from datetime import datetime
 import logging
+from tkinter import filedialog
+
+MODULE_IDENTIFIER = "[DataLogger] "
 
 def getCurrentTime(self):
-    return time.strftime("%H:%M:%S ")
+    return datetime.now().strftime("%H:%M:%S.%f")
 
 class InterruptionLogger(object):
     """
@@ -18,9 +23,6 @@ class InterruptionLogger(object):
         """
 
         time_now = time.gmtime()
-        self._filename = time.strftime(file_prefix + "_%Y%m%d_%H%M%S")
-        logging.basicConfig(filename=self._filename, level=logging.DEBUG)
-        logging.debug("Starting Log file at " + time.ctime())
 
     def log(self, message):
         logging.debug(getCurrentTime() + message)
@@ -31,5 +33,5 @@ class InterruptionLogger(object):
         Exit logging and close file
         """
         
-        logging.debug("Finished logging at " + time.ctime())
+        logging.debug(MODULE_IDENTIFIER + "Finished logging at " + getCurrentTime())
         raise NotImplementedError()

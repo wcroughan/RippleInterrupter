@@ -1,20 +1,22 @@
 # System imports
 import threading
+import multiprocessing
 import numpy as np
 
 # Local imports
 import SpikeAnalysis
 import PositionAnalysis
 import StimHardware
+import ThreadExtension
 
-class BayesianEstimator(threading.Thread):
+class BayesianEstimator(ThreadExtension.StoppableProcess):
     """
     When a ripple trigger arrives, switches to replay decoding immediately.
     """
 
     def __init__(self, spike_sender, place_field_provider):
         """TODO: to be defined1. """
-        threading.Thread.__init__(self)
+        ThreadExtension.StoppableProcess.__init__(self)
         # Hoping that everything in python is pass by reference. Place fields
         # is a giant array! Both spike buffer and place fields are shared
         # resources.
@@ -34,7 +36,7 @@ class BayesianEstimator(threading.Thread):
         self._log_probs_out = np.zeros((self.prob_buffer_size, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
         self._probs_out = np.add(np.zeros_like(self._log_probs_out), 1.0 / (PositionAnalysis.N_POSITION_BINS[0] + PositionAnalysis.N_POSITION_BINS[1]))
 
-        self._output_lock = threading.Condition()
+        self._output_lock = multiprocessing.Condition()
 
 
     def run(self):
