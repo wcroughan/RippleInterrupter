@@ -22,6 +22,13 @@ import RippleDefinitions as RiD
 
 MODULE_IDENTIFIER = "[GraphicsHandler] "
 
+def normalizeData(in_data):
+    # TODO: Might need tiling of data if there are multiple dimensions
+    data_mean = np.mean(in_data, axis=0)
+    data_std  = np.std(in_data, axis=0)
+    norm_data = np.divide((in_data - data_mean), data_std)
+    return (norm_data, data_mean, data_std)
+
 def animateLFP(timestamps, lfp, raw_ripple, ripple_power, frame_size, statistic=None):
     """
     Animate a given LFP by plotting a fixed size sliding frame.

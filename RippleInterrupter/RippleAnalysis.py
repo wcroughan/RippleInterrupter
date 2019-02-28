@@ -368,13 +368,6 @@ def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
                                 current_wall_time = time.time() - start_wall_time
                                 time_lag = (current_wall_time - current_time)
                                 print("Ripple @ %.2f, Real Time %.2f [Lag: %.2f], strength: %.1f"%(current_time, current_wall_time, time_lag, ripple_to_baseline_ratio))
-                                if interrupt_ripples and ((current_time - prev_interrupt) > RiD.INTERRUPT_REFRACTORY_PERIOD):
-                                    prev_interrupt = current_time;
-                                    sendBiphasicPulse(ser)
-                                    # TODO: Add ripple interruption code
-                                    interruption_time = time.time() - start_wall_time
-                                    print("Ripple Interrupted@ %.2f!"% interruption_time)
-                                    interrupt_events.append(interruption_time)
                                 trodes_timestamps.append(trodes_time_stamp)
                                 ripple_events.append(current_time)
                                 wall_ripple_times.append(current_wall_time)
@@ -395,20 +388,14 @@ def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
     return (power_mean, power_std)
 
 def main():
-    # tetrodes_to_be_analyzed = [1,2,3,14,15,16,17,18,19,20,21,22,23,24,25,26,32,37,39,40]
-    # tetrodes_to_be_analyzed = [23,14,17,18,39]
-    tetrodes_to_be_analyzed = [3]
+    tetrodes_to_be_analyzed = [24,33]
     if len(sys.argv) == 1:
         (power_mean, power_std) = getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
                 analysis_time=10.0)
-    elif (int(sys.argv[1][0]) == 0):
-        getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
-                ripple_statistics=[60.0, 30.0], show_ripples=True, \
-                interrupt_ripples=True, analysis_time=20)
     elif (int(sys.argv[1][0]) == 1):
         getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
                 ripple_statistics=[60.0, 30.0], show_ripples=True, \
-                interrupt_ripples=False, analysis_time=20)
+                analysis_time=20)
 
 if (__name__ == "__main__"):
     main()
