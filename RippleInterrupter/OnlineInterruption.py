@@ -5,7 +5,7 @@ import time
 import ctypes
 import numpy as np
 import logging
-from multiprocessing import Queue, RawArray
+from multiprocessing import Queue, RawArray, Condition
 
 # Local imports
 import Logger
@@ -48,19 +48,19 @@ def main():
     shared_place_fields = RawArray(ctypes.c_double, n_units * PositionAnalysis.N_POSITION_BINS[0] * \
             PositionAnalysis.N_POSITION_BINS[1])
 
-    # Trodes needs strings!
-    tetrode_argument = [str(tet) for tet in tetrodes_of_interest]
 
     # Open connection to trodes.
     sg_client = TrodesInterface.SGClient("ReplayInterruption")
 
     # Start a thread for triggering analysis when ripple is triggered.
-    trig_condition  = threading.Condition()
+    trig_condition  = Condition()
     # ripple_trigger  = RippleAnalysis.RippleSynchronizer(trig_condition)
 
     # Start threads for collecting spikes and LFP
+    # Trodes needs strings!
+    tetrode_argument = [str(tet) for tet in tetrodes_of_interest]
     ripple_detector = RippleAnalysis.RippleDetector(sg_client, tetrode_argument, \
-            baseline_stats=[60.0, 30.0], trigger_condition=trig_condition, \
+            trigger_condition=trig_condition, \
             shared_buffers=(shared_raw_lfp_buffer, shared_ripple_buffer))
 
     # Create a buffer for spikes to be accessed until they are taken out of the

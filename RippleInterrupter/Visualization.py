@@ -234,6 +234,7 @@ class GraphicsManager(Process):
         try:
             plt.close(self._pos_fig)
             plt.close(self._pf_fig)
+            plt.close(self._rd_fig)
         except Exception as err:
             logging.debug(MODULE_IDENTIFIER + "Error closing figure window")
             print(err)
@@ -255,9 +256,8 @@ class GraphicsManager(Process):
         # __RIPPLE_DETECTION_TIMEOUT, which could be a long while. Don't let
         # this block any important functionality.
         if self._rd_ax is not None:
-            self._new_ripple_frame_availale.wait()
-            self._rd_frame[0].set_data(self._lfp_tpts, self._local_lfp_buffer)
-            self._rd_frame[1].set_data(self._ripple_power_tpts, self._local_ripple_power_buffer)
+            self._rd_frame[0].set_data(self._lfp_tpts, self._local_lfp_buffer[0,:])
+            self._rd_frame[1].set_data(self._ripple_power_tpts, self._local_ripple_power_buffer[0,:])
             return self._rd_frame
 
     def update_position_and_spike_frame(self, step=0):
@@ -300,7 +300,8 @@ class GraphicsManager(Process):
         while self._keep_running:
             with self._ripple_trigger_condition:
                 self._ripple_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
-                # self._new_ripple_frame_availale.set()
+                np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
+                np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
 
     def fetch_place_fields(self):
         """
@@ -355,10 +356,11 @@ class GraphicsManager(Process):
         self._rd_ax.set_xlabel("Time (s)")
         self._rd_ax.set_ylabel("EEG (uV)")
         self._rd_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
+        self._rd_ax.set_ylim((-3000.0, 3000.0))
         self._rd_ax.grid(True)
 
         lfp_frame, = plt.plot([], [], animated=True)
-        ripple_power_frame = plt.plot([], [], animated=True)
+        ripple_power_frame, = plt.plot([], [], animated=True)
         self._rd_frame.append(lfp_frame)
         self._rd_frame.append(ripple_power_frame)
 
@@ -437,7 +439,7 @@ class GraphicsManager(Process):
         ripple_frame_fetcher.start()
 
         # Start the animation for Spike-Position figure, place field figure
-        # self.initialize_ripple_detection_fig()
+        self.initialize_ripple_detection_fig()
         self.initialize_spike_pos_fig()
         self.initialize_place_field_fig()
         plt.show()

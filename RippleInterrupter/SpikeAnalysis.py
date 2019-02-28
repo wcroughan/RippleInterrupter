@@ -135,7 +135,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                 time.sleep(0.005) #5ms
 
             if not self._spike_buffer.poll():
-                logging.debug(self.CLASS_IDENTIFIER + "Spike buffer empty, sleeping")
+                # logging.debug(self.CLASS_IDENTIFIER + "Spike buffer empty, sleeping")
                 time.sleep(0.005)
 
             # BUG: If position thread is lagging, it will send the position at
@@ -333,7 +333,7 @@ class SpikeDetector(ThreadExtension.StoppableThread):
             if n_available_spikes > 0:
                 logging.debug(MODULE_IDENTIFIER + "%d spikes available for reading!"%n_available_spikes)
             else:
-                logging.debug(MODULE_IDENTIFIER + "Spike buffer empty... Sleeping.")
+                # logging.debug(MODULE_IDENTIFIER + "Spike buffer empty... Sleeping.")
                 time.sleep(0.02)
 
             for spk_idx in range(n_available_spikes):

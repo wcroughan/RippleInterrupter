@@ -1,0 +1,14 @@
+[TODO]
+1. Separate smoothing for bin occupancy and spikes in each bin. Current scheme,
+where only the final place fields are smoothed seems inadequate - produces very
+patchy results.
+
+2. Separate bin sizes for position binning and place fields. Velocity
+thresholding requires us to has small bins for position, but it might be too
+fine grained for place fields.
+
+3. Running ripple detection as a 'thread' makes spike collection and place
+binning very slow. It probably leads to spike listener be scheduled less
+frequently.
+
+[DONE]

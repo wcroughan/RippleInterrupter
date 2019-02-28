@@ -49,7 +49,7 @@ class RippleSynchronizer(ThreadExtension.StoppableThread):
                 self._sync_event.wait()
             logging.debug(MODULE_IDENTIFIER + "Ripple tiggered.")
 
-class RippleDetector(ThreadExtension.StoppableThread):
+class RippleDetector(ThreadExtension.StoppableProcess):
     """
     Thread for ripple detection on a set of channels [ONLINE]
     """
@@ -63,11 +63,11 @@ class RippleDetector(ThreadExtension.StoppableThread):
         :sg_client: SpikeGadgets client for subscribing LFP steam
         :target_tetrodes: Set of tetrodes to listen to for ripples
         :baseline_stats: Ripple power mean and std to detect/trigger interruption
-        :trigger_condition: Instance of threading.Event() (or
+        :trigger_condition: Instance of multiprocessing.Event() (or
             threading.Condition()) to communicate synchronization with other threads.
         """
 
-        ThreadExtension.StoppableThread.__init__(self)
+        ThreadExtension.StoppableProcess.__init__(self)
         # TODO: Error handling if baseline stats are not provided - Get them by
         # looking at the data for some time.
         self._target_tetrodes = target_tetrodes
@@ -104,7 +104,7 @@ class RippleDetector(ThreadExtension.StoppableThread):
                 analog=False, output='sos', fs=RiD.LFP_FREQUENCY)
 
         self._lfp_buffer = self._lfp_stream.create_numpy_array()
-        logging.debug(MODULE_IDENTIFIER + datetime.now().strftime("Started Ripple detection thread at %H:%M:%S.%f"))
+        logging.debug(MODULE_IDENTIFIER + "Started Ripple detection thread.")
 
     def get_ripple_buffer_connections(self):
         """
@@ -146,6 +146,9 @@ class RippleDetector(ThreadExtension.StoppableThread):
         while not self.req_stop():
             # Acquire buffered LFP frames and fill them in a filter buffer
             n_lfp_frames = self._lfp_stream.available(0)
+            if n_lfp_frames == 0:
+                logging.debug(MODULE_IDENTIFIER + "No LFP Frames to read... Sleeping.")
+                time.sleep(0.005)
             for frame_idx in range(n_lfp_frames):
                 timestamp = self._lfp_stream.getData()
                 raw_lfp_window[:, lfp_window_ptr] = self._lfp_buffer[:]
@@ -157,10 +160,11 @@ class RippleDetector(ThreadExtension.StoppableThread):
                     lfp_window_ptr = 0
                     filtered_window, ripple_frame_filter = signal.sosfilt(self._ripple_filter, \
                            raw_lfp_window, axis=1, zi=ripple_frame_filter)
-                    ripple_power.append(np.sqrt(np.mean(np.power(filtered_window, 2), axis=1)))
+                    current_ripple_power = np.sqrt(np.mean(np.power(filtered_window, 2), axis=1))
+                    ripple_power.append(current_ripple_power)
 
                     # Fill in the shared data variables
-                    self._local_ripple_power_buffer.append(ripple_power[:, pow_window_ptr])
+                    self._local_ripple_power_buffer.append(current_ripple_power)
 
                     # TODO: Enable this part of the code to update the mean and STD over time
                     # Update the mean and std for ripple power at each of the tetrodes
@@ -172,27 +176,29 @@ class RippleDetector(ThreadExtension.StoppableThread):
                     # This is the accumulate sum of squares. The actual variance is <current-value>/(n_data_pts_seen-1)
                     """
                     n_data_pts_seen += 1
-
-                    power_to_baseline_ratio = np.divide(ripple_power - self._mean_ripple_power, self._std_ripple_power)
-                    logging.debug(MODULE_IDENTIFIER + "Frame filtered, mean ripple strength %.2f"%np.mean(power_to_baseline_ratio))
+                    print("Read %d frames so far."%n_data_pts_seen)
+        
+                    # TODO: Right now, we are not using average power in the smoothing window, but the current power.
+                    power_to_baseline_ratio = np.divide(current_ripple_power - self._mean_ripple_power, self._std_ripple_power)
 
                     # Timestamp has both trodes and system timestamps!
                     curr_time = float(timestamp.trodes_timestamp)/RiD.LFP_FREQUENCY
+                    logging.debug(MODULE_IDENTIFIER + "Frame filtered, mean ripple strength %.2f"%np.mean(power_to_baseline_ratio))
                     if ((curr_time - prev_ripple) > RiD.RIPPLE_REFRACTORY_PERIOD):
                         # TODO: Consider switching to all, or atleast a majority of tetrodes for ripple detection.
                         if (power_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD).any():
+                            logging.info(MODULE_IDENTIFIER + "Detected ripple at %.2f. Peak Strength: %.2f"% \
+                                    (curr_wall_time-start_wall_time, np.max(power_to_baseline_ratio)))
                             prev_ripple = curr_time
                             with self._trigger_condition:
                                 # First trigger interruption and all time critical operations
                                 # Nothing to do right now
 
                                 # Copy data over for visualization
-                                np.asarray(self._local_lfp_buffer, out=self._raw_lfp_buffer)
-                                np.asarray(self._local_ripple_power_buffer, out=self._ripple_power_buffer)
-                                self._trigger_condition.notifyAll()
+                                self._raw_lfp_buffer = np.asarray(self._local_lfp_buffer)
+                                self._ripple_power_buffer = np.asarray(self._local_ripple_power_buffer)
+                                self._trigger_condition.notify(2)
                             curr_wall_time = time.time()
-                            logging.debug(MODULE_IDENTIFIER + "Detected ripple at %.2f. Strength: %.2f"% \
-                                    (curr_wall_time-start_wall_time, power_to_baseline_ratio))
 
 """
 Code below here is from the previous iterations where we were using a single
