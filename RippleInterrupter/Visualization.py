@@ -195,8 +195,8 @@ class GraphicsManager(Process):
 
         # Large arrays that are shared across processes
         self._new_ripple_frame_availale = threading.Event()
-        self._shared_raw_lfp_buffer = np.reshape(np.frombuffer(ripple_buffers[0]), (self._n_tetrodes, RiD.LFP_BUFFER_LENGTH))
-        self._shared_ripple_power_buffer = np.reshape(np.frombuffer(ripple_buffers[1]), (self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH))
+        self._shared_raw_lfp_buffer = np.reshape(np.frombuffer(ripple_buffers[0], dtype='double'), (self._n_tetrodes, RiD.LFP_BUFFER_LENGTH))
+        self._shared_ripple_power_buffer = np.reshape(np.frombuffer(ripple_buffers[1], dtype='double'), (self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH))
         self._shared_place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), (self._n_clusters, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
 
         # Local copies of the shared data that can be used at a leisurely pace
@@ -309,6 +309,7 @@ class GraphicsManager(Process):
                 self._ripple_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
                 np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
                 np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
+                # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
 
     def fetch_place_fields(self):
         """
@@ -437,16 +438,16 @@ class GraphicsManager(Process):
                 target=self.fetch_spikes_and_update_frames)
         place_field_fetcher = threading.Thread(name="PlaceFieldFetched", daemon=True, \
                 target=self.fetch_place_fields)
-        # ripple_frame_fetcher = threading.Thread(name="RippleFrameFetcher", daemon=True, \
-        #         target=self.fetch_incident_ripple)
+        ripple_frame_fetcher = threading.Thread(name="RippleFrameFetcher", daemon=True, \
+                target=self.fetch_incident_ripple)
 
         position_fetcher.start()
         spike_fetcher.start()
         place_field_fetcher.start()
-        # ripple_frame_fetcher.start()
+        ripple_frame_fetcher.start()
 
         # Start the animation for Spike-Position figure, place field figure
-        # self.initialize_ripple_detection_fig()
+        self.initialize_ripple_detection_fig()
         self.initialize_spike_pos_fig()
         self.initialize_place_field_fig()
         plt.show()
@@ -458,4 +459,4 @@ class GraphicsManager(Process):
         position_fetcher.join()
         spike_fetcher.join()
         place_field_fetcher.join()
-        # ripple_frame_fetcher.join()
+        ripple_frame_fetcher.join()

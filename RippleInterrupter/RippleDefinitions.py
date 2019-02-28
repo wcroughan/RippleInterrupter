@@ -10,7 +10,7 @@ SPIKE_SAMPLING_FREQ = 30000.0
 LFP_FREQUENCY     = 1500.0
 LFP_FILTER_LENGTH = 0.002     # 1ms long window for filtering ripples
 LFP_FILTER_ORDER  = int(LFP_FILTER_LENGTH * LFP_FREQUENCY)
-LFP_BUFFER_TIME   = 1.0
+LFP_BUFFER_TIME   = 0.5
 LFP_BUFFER_LENGTH = int(LFP_FREQUENCY * LFP_BUFFER_TIME) # 1.0s long display window
 
 # Frequency range for Ripple. Keep in mind that a high range completely gets
@@ -22,7 +22,7 @@ RIPPLE_HI_FREQ    = 250
 # Refractory period for a ripple (in seconds)
 RIPPLE_SMOOTHING_WINDOW  = int(0.01 * LFP_FREQUENCY) # 10ms smoothing window
 RIPPLE_REFRACTORY_PERIOD = 0.2
-RIPPLE_POWER_BUFFER_LENGTH = int(LFP_BUFFER_LENGTH / LFP_FILTER_LENGTH)
+RIPPLE_POWER_BUFFER_LENGTH = int(LFP_BUFFER_LENGTH / LFP_FILTER_ORDER)
 INTERRUPT_REFRACTORY_PERIOD = 1.0
 
 # Custom constants

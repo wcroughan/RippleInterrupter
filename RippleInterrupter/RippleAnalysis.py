@@ -137,8 +137,8 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         # Shared variables
         self._local_lfp_buffer = collections.deque(maxlen=RiD.LFP_BUFFER_LENGTH)
         self._local_ripple_power_buffer = collections.deque(maxlen=RiD.RIPPLE_POWER_BUFFER_LENGTH)
-        self._raw_lfp_buffer = np.reshape(np.frombuffer(shared_buffers[0]), (self._n_tetrodes, RiD.LFP_BUFFER_LENGTH))
-        self._ripple_power_buffer = np.reshape(np.frombuffer(shared_buffers[1]), (self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH))
+        self._raw_lfp_buffer = np.reshape(np.frombuffer(shared_buffers[0], dtype='double'), (self._n_tetrodes, RiD.LFP_BUFFER_LENGTH))
+        self._ripple_power_buffer = np.reshape(np.frombuffer(shared_buffers[1], dtype='double'), (self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH))
 
         # TODO: Check that initialization worked!
         self._ripple_filter = signal.butter(RiD.LFP_FILTER_ORDER, \
@@ -188,8 +188,9 @@ class RippleDetector(ThreadExtension.StoppableProcess):
             # Acquire buffered LFP frames and fill them in a filter buffer
             if self._lfp_consumer.poll():
                 # print(MODULE_IDENTIFIER + "LFP Frame received for filtering.")
-                (timestamp, raw_lfp_window[:, lfp_window_ptr]) = self._lfp_consumer.recv()
-                self._local_lfp_buffer.append(raw_lfp_window[:, lfp_window_ptr])
+                (timestamp, current_lfp_frame) = self._lfp_consumer.recv()
+                raw_lfp_window[:, lfp_window_ptr] = current_lfp_frame
+                self._local_lfp_buffer.append(current_lfp_frame)
                 lfp_window_ptr += 1
 
                 # If the filter window is full, filter the data and record it in rippple power
@@ -213,7 +214,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                     # This is the accumulate sum of squares. The actual variance is <current-value>/(n_data_pts_seen-1)
                     """
                     n_data_pts_seen += 1
-                    print("Read %d frames so far."%n_data_pts_seen)
+                    # print("Read %d frames so far."%n_data_pts_seen)
         
                     # TODO: Right now, we are not using average power in the smoothing window, but the current power.
                     power_to_baseline_ratio = np.divide(current_ripple_power - self._mean_ripple_power, self._std_ripple_power)
@@ -231,10 +232,21 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                                 # First trigger interruption and all time critical operations
                                 # Nothing to do right now
 
-                                # Copy data over for visualization
+                                """
+                                # This gives the array a new memory location, making it lose the shared variable space
                                 self._raw_lfp_buffer = np.asarray(self._local_lfp_buffer)
                                 self._ripple_power_buffer = np.asarray(self._local_ripple_power_buffer)
                                 self._trigger_condition.notify(2)
+                                # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._ripple_power_buffer))
+                                # print("Current buffer size (%d, %d)"%np.shape(self._local_lfp_buffer))
+                                """
+
+                                # Copy data over for visualization
+                                if len(self._local_lfp_buffer) == RiD.LFP_BUFFER_LENGTH:
+                                    np.copyto(self._raw_lfp_buffer, np.asarray(self._local_lfp_buffer).T)
+                                    np.copyto(self._ripple_power_buffer, np.asarray(self._local_ripple_power_buffer).T)
+                                    # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._ripple_power_buffer))
+                                    self._trigger_condition.notify(2)
                             curr_wall_time = time.time()
             else:
                 logging.debug(MODULE_IDENTIFIER + "No LFP Frames to process. Sleeping")
