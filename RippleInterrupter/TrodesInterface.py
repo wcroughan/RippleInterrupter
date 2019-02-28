@@ -6,7 +6,7 @@ from spikegadgets import trodesnetwork as tn
 
 # Constant declaration
 MODULE_IDENTIFIER = "[TrodesInterface] "
-LFP_SUBSCRIPTION_ATTRIBUTE = 1024
+LFP_SUBSCRIPTION_ATTRIBUTE = 2014
 SPIKE_SUBSCRIPTION_ATTRIBUTE = 1024
 
 class SGClient(tn.AbstractModuleClient):

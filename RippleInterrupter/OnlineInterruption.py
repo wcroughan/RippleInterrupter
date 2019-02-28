@@ -54,14 +54,18 @@ def main():
 
     # Start a thread for triggering analysis when ripple is triggered.
     trig_condition  = Condition()
-    # ripple_trigger  = RippleAnalysis.RippleSynchronizer(trig_condition)
-
     # Start threads for collecting spikes and LFP
     # Trodes needs strings!
     tetrode_argument = [str(tet) for tet in tetrodes_of_interest]
     ripple_detector = RippleAnalysis.RippleDetector(sg_client, tetrode_argument, \
             trigger_condition=trig_condition, \
             shared_buffers=(shared_raw_lfp_buffer, shared_ripple_buffer))
+    ripple_detector.start()
+    time.sleep(3)
+    ripple_detector.join()
+    return
+
+    # ripple_trigger  = RippleAnalysis.RippleSynchronizer(trig_condition)
 
     # Create a buffer for spikes to be accessed until they are taken out of the
     # queue by the Bayesian Estimator.
@@ -84,11 +88,10 @@ def main():
     # separate threads for separate fields too but that seems overkill at this
     # point.
 
-    graphical_interface.start()
     spike_listener.start()
     position_estimator.start()
     place_field_handler.start()
-    ripple_detector.start()
+    graphical_interface.start()
     """
     ripple_trigger.start()
     """

@@ -430,16 +430,16 @@ class GraphicsManager(Process):
                 target=self.fetch_spikes_and_update_frames)
         place_field_fetcher = threading.Thread(name="PlaceFieldFetched", daemon=True, \
                 target=self.fetch_place_fields)
-        ripple_frame_fetcher = threading.Thread(name="RippleFrameFetcher", daemon=True, \
-                target=self.fetch_incident_ripple)
+        # ripple_frame_fetcher = threading.Thread(name="RippleFrameFetcher", daemon=True, \
+        #         target=self.fetch_incident_ripple)
 
         position_fetcher.start()
         spike_fetcher.start()
         place_field_fetcher.start()
-        ripple_frame_fetcher.start()
+        # ripple_frame_fetcher.start()
 
         # Start the animation for Spike-Position figure, place field figure
-        self.initialize_ripple_detection_fig()
+        # self.initialize_ripple_detection_fig()
         self.initialize_spike_pos_fig()
         self.initialize_place_field_fig()
         plt.show()
@@ -451,4 +451,4 @@ class GraphicsManager(Process):
         position_fetcher.join()
         spike_fetcher.join()
         place_field_fetcher.join()
-        ripple_frame_fetcher.join()
+        # ripple_frame_fetcher.join()

@@ -183,7 +183,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
 
                     # Timestamp has both trodes and system timestamps!
                     curr_time = float(timestamp.trodes_timestamp)/RiD.LFP_FREQUENCY
-                    logging.debug(MODULE_IDENTIFIER + "Frame filtered, mean ripple strength %.2f"%np.mean(power_to_baseline_ratio))
+                    logging.debug(MODULE_IDENTIFIER + "Frame @ %d filtered, mean ripple strength %.2f"%(timestamp.trodes_timestamp, np.mean(power_to_baseline_ratio)))
                     if ((curr_time - prev_ripple) > RiD.RIPPLE_REFRACTORY_PERIOD):
                         # TODO: Consider switching to all, or atleast a majority of tetrodes for ripple detection.
                         if (power_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD).any():
