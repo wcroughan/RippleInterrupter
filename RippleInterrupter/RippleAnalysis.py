@@ -49,7 +49,7 @@ class RippleSynchronizer(ThreadExtension.StoppableThread):
                 self._sync_event.wait()
             logging.debug(MODULE_IDENTIFIER + "Ripple tiggered.")
 
-class RippleDetector(ThreadExtension.StoppableProcess):
+class RippleDetector(ThreadExtension.StoppableThread):
     """
     Thread for ripple detection on a set of channels [ONLINE]
     """
@@ -67,7 +67,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
             threading.Condition()) to communicate synchronization with other threads.
         """
 
-        ThreadExtension.StoppableProcess.__init__(self)
+        ThreadExtension.StoppableThread.__init__(self)
         # TODO: Error handling if baseline stats are not provided - Get them by
         # looking at the data for some time.
         self._target_tetrodes = target_tetrodes
@@ -204,13 +204,6 @@ class RippleDetector(ThreadExtension.StoppableProcess):
 Code below here is from the previous iterations where we were using a single
 file to detect and disrupt all ripples based on the LFP on a single tetrode.
 """
-def normalizeData(in_data):
-    # TODO: Might need tiling of data if there are multiple dimensions
-    data_mean = np.mean(in_data, axis=0)
-    data_std  = np.std(in_data, axis=0)
-    norm_data = np.divide((in_data - data_mean), data_std)
-    return (norm_data, data_mean, data_std)
-
 def writeLogFile(trodes_timestamps, ripple_events, wall_ripple_times, interrupt_events):
     outf = open(os.getcwd() + "/ripple_interruption_out__" +str(time.time()) + ".txt", "w")
 
