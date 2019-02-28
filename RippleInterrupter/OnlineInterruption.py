@@ -60,7 +60,8 @@ def main():
     # ripple_detector = RippleAnalysis.RippleDetector(sg_client, tetrode_argument, \
     #         trigger_condition=trig_condition, \
     #         shared_buffers=(shared_raw_lfp_buffer, shared_ripple_buffer))
-    ripple_detector = RippleAnalysis.RippleDetector(sg_client, tetrode_argument, \
+    lfp_listener = RippleAnalysis.LFPListener(sg_client, tetrode_argument)
+    ripple_detector = RippleAnalysis.RippleDetector(lfp_listener, \
             trigger_condition=trig_condition, \
             shared_buffers=(shared_raw_lfp_buffer, shared_ripple_buffer))
 
@@ -87,6 +88,7 @@ def main():
     # separate threads for separate fields too but that seems overkill at this
     # point.
 
+    lfp_listener.start()
     ripple_detector.start()
     spike_listener.start()
     position_estimator.start()
@@ -108,6 +110,8 @@ def main():
         logging.info(MODULE_IDENTIFIER + "Position data collection Stopped")
         place_field_handler.join()
         logging.info(MODULE_IDENTIFIER + "Place field builder Stopped")
+        lfp_listener.join()
+        logging.info(MODULE_IDENTIFIER + "LFP listener Stopped")
         ripple_detector.join()
         logging.info(MODULE_IDENTIFIER + "Ripple detector Stopped")
         # ripple_trigger.join()

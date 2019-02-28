@@ -49,34 +49,77 @@ class RippleSynchronizer(ThreadExtension.StoppableThread):
                 self._sync_event.wait()
             logging.debug(MODULE_IDENTIFIER + "Ripple tiggered.")
 
-class RippleDetector(ThreadExtension.StoppableThread):
+class LFPListener(ThreadExtension.StoppableThread):
+    """
+    Thread that listens to the LFP stream and continuously fetches LFP timestamps and data
+    """
+    
+    CLASS_IDENTIFIER  = "[LFPListener] "
+    def __init__(self, sg_client, target_tetrodes):
+        """
+        Class constructor
+        Subsribe to LFP stream on a given client and start listening
+        to LFP data for a set of target tetrode channels.
+        :sg_client: SpikeGadgets client for subscribing LFP steam
+        :target_tetrodes: Set of tetrodes to listen to for ripples
+        """
+        ThreadExtension.StoppableThread.__init__(self)
+        self._target_tetrodes = target_tetrodes
+        self._n_tetrodes = len(self._target_tetrodes)
+        self._lfp_producer = None
+
+        # Data streams
+        self._lfp_stream = sg_client.subscribeLFPData(TrodesInterface.LFP_SUBSCRIPTION_ATTRIBUTE, \
+                self._target_tetrodes)
+        self._lfp_stream.initialize()
+        self._lfp_buffer = self._lfp_stream.create_numpy_array()
+        logging.debug(self.CLASS_IDENTIFIER + "Started LFP listener thread.")
+
+    def get_n_tetrodes(self):
+        return self._n_tetrodes
+
+    def get_lfp_listener_connection(self):
+        self._lfp_producer, lfp_consumer = Pipe()
+        return lfp_consumer
+
+    def run(self):
+        """
+        Start fetching LFP frames.
+        """
+        while not self.req_stop():
+            n_lfp_frames = self._lfp_stream.available(0)
+            if n_lfp_frames == 0:
+                logging.debug(self.CLASS_IDENTIFIER + "No LFP Frames to read... Sleeping.")
+                time.sleep(0.005)
+            for frame_idx in range(n_lfp_frames):
+                timestamp = self._lfp_stream.getData()
+                if self._lfp_producer is not None:
+                    self._lfp_producer.send((timestamp.trodes_timestamp, self._lfp_buffer[:]))
+                    logging.debug(self.CLASS_IDENTIFIER + "LFP Frame at %d sent out for ripple analysis."%timestamp.trodes_timestamp)
+
+class RippleDetector(ThreadExtension.StoppableProcess):
     """
     Thread for ripple detection on a set of channels [ONLINE]
     """
 
-    def __init__(self, sg_client, target_tetrodes, baseline_stats=None, \
+    def __init__(self, lfp_listener, baseline_stats=None, \
             trigger_condition=None, shared_buffers=None):
         """
-        Subsribe to LFP stream on a given client and start listening
-        to/filtering data for a set of target tetrode channels.
 
-        :sg_client: SpikeGadgets client for subscribing LFP steam
-        :target_tetrodes: Set of tetrodes to listen to for ripples
         :baseline_stats: Ripple power mean and std to detect/trigger interruption
         :trigger_condition: Instance of multiprocessing.Event() (or
             threading.Condition()) to communicate synchronization with other threads.
         """
 
-        ThreadExtension.StoppableThread.__init__(self)
+        ThreadExtension.StoppableProcess.__init__(self)
         # TODO: Error handling if baseline stats are not provided - Get them by
         # looking at the data for some time.
-        self._target_tetrodes = target_tetrodes
-        self._n_tetrodes = len(self._target_tetrodes)
 
         # Mean and standard deviation could either be provided, or estimated in
         # real time. Since the animal spends most of his time running, we can
         # probably get away by not looking at running speed to turn the
         # computation of mean and standard deviation on/off 
+        self._n_tetrodes = lfp_listener.get_n_tetrodes()
         if baseline_stats is None:
             self._mean_ripple_power = np.full(self._n_tetrodes, D_MEAN_RIPPLE_POWER, dtype='float')
             self._std_ripple_power = np.full(self._n_tetrodes, D_STD_RIPPLE_POWER, dtype='float')
@@ -88,22 +131,20 @@ class RippleDetector(ThreadExtension.StoppableThread):
         # Output connections
         self._ripple_buffer_connections = []
 
+        # Input pipe for accessing LFP stream
+        self._lfp_consumer = lfp_listener.get_lfp_listener_connection()
+
         # Shared variables
         self._local_lfp_buffer = collections.deque(maxlen=RiD.LFP_BUFFER_LENGTH)
         self._local_ripple_power_buffer = collections.deque(maxlen=RiD.RIPPLE_POWER_BUFFER_LENGTH)
         self._raw_lfp_buffer = np.reshape(np.frombuffer(shared_buffers[0]), (self._n_tetrodes, RiD.LFP_BUFFER_LENGTH))
         self._ripple_power_buffer = np.reshape(np.frombuffer(shared_buffers[1]), (self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH))
 
-        # Data streams
-        self._lfp_stream = sg_client.subscribeLFPData(TrodesInterface.LFP_SUBSCRIPTION_ATTRIBUTE, \
-                self._target_tetrodes)
-        self._lfp_stream.initialize()
         # TODO: Check that initialization worked!
         self._ripple_filter = signal.butter(RiD.LFP_FILTER_ORDER, \
                 (RiD.RIPPLE_LO_FREQ, RiD.RIPPLE_HI_FREQ), btype='bandpass', \
                 analog=False, output='sos', fs=RiD.LFP_FREQUENCY)
 
-        self._lfp_buffer = self._lfp_stream.create_numpy_array()
         logging.debug(MODULE_IDENTIFIER + "Started Ripple detection thread.")
 
     def get_ripple_buffer_connections(self):
@@ -145,16 +186,12 @@ class RippleDetector(ThreadExtension.StoppableThread):
         curr_wall_time = start_wall_time
         while not self.req_stop():
             # Acquire buffered LFP frames and fill them in a filter buffer
-            n_lfp_frames = self._lfp_stream.available(0)
-            if n_lfp_frames == 0:
-                logging.debug(MODULE_IDENTIFIER + "No LFP Frames to read... Sleeping.")
-                time.sleep(0.005)
-            for frame_idx in range(n_lfp_frames):
-                timestamp = self._lfp_stream.getData()
-                raw_lfp_window[:, lfp_window_ptr] = self._lfp_buffer[:]
+            if self._lfp_consumer.poll():
+                # print(MODULE_IDENTIFIER + "LFP Frame received for filtering.")
+                (timestamp, raw_lfp_window[:, lfp_window_ptr]) = self._lfp_consumer.recv()
                 self._local_lfp_buffer.append(raw_lfp_window[:, lfp_window_ptr])
-
                 lfp_window_ptr += 1
+
                 # If the filter window is full, filter the data and record it in rippple power
                 if (lfp_window_ptr == RiD.LFP_FILTER_ORDER):
                     lfp_window_ptr = 0
@@ -182,8 +219,8 @@ class RippleDetector(ThreadExtension.StoppableThread):
                     power_to_baseline_ratio = np.divide(current_ripple_power - self._mean_ripple_power, self._std_ripple_power)
 
                     # Timestamp has both trodes and system timestamps!
-                    curr_time = float(timestamp.trodes_timestamp)/RiD.LFP_FREQUENCY
-                    logging.debug(MODULE_IDENTIFIER + "Frame @ %d filtered, mean ripple strength %.2f"%(timestamp.trodes_timestamp, np.mean(power_to_baseline_ratio)))
+                    curr_time = float(timestamp)/RiD.LFP_FREQUENCY
+                    logging.debug(MODULE_IDENTIFIER + "Frame @ %d filtered, mean ripple strength %.2f"%(timestamp, np.mean(power_to_baseline_ratio)))
                     if ((curr_time - prev_ripple) > RiD.RIPPLE_REFRACTORY_PERIOD):
                         # TODO: Consider switching to all, or atleast a majority of tetrodes for ripple detection.
                         if (power_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD).any():
@@ -199,7 +236,9 @@ class RippleDetector(ThreadExtension.StoppableThread):
                                 self._ripple_power_buffer = np.asarray(self._local_ripple_power_buffer)
                                 self._trigger_condition.notify(2)
                             curr_wall_time = time.time()
-
+            else:
+                logging.debug(MODULE_IDENTIFIER + "No LFP Frames to process. Sleeping")
+                time.sleep(0.005)
 """
 Code below here is from the previous iterations where we were using a single
 file to detect and disrupt all ripples based on the LFP on a single tetrode.
