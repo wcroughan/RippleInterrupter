@@ -53,10 +53,10 @@ class PositionEstimator(ThreadExtension.StoppableThread):
         # spikes are not synchronized.
         if (self._position_consumer is None):
             # Failed to open connection to camera module
-            logging.debug("Failed to open Camera Module")
+            logging.warning("Failed to open Camera Module")
             raise Exception("Could not connect to camera, aborting.")
         self._position_consumer.initialize()
-        logging.debug(MODULE_IDENTIFIER + datetime.now().strftime("Starting Position tracking thread at %H:%M:%S.%f"))
+        logging.info(MODULE_IDENTIFIER + "Starting Position tracking thread")
 
         self._position_buffer_connections = []
 
@@ -125,7 +125,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                         outp.send((self._data_field['timestamp'], curr_x_bin, curr_y_bin, 0.0))
                     prev_x_bin = curr_x_bin
                     prev_y_bin = curr_y_bin
-                    logging.debug(MODULE_IDENTIFIER + "Position Started (%d, %d)"%(curr_x_bin, curr_y_bin))
+                    logging.info(MODULE_IDENTIFIER + "Position Started (%d, %d)"%(curr_x_bin, curr_y_bin))
                     prev_step_timestamp = copy(self._data_field['timestamp'])
                 elif ((curr_x_bin != prev_x_bin) or (curr_y_bin != prev_y_bin)):
                     current_timestamp = self._data_field['timestamp']

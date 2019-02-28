@@ -253,7 +253,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                                     self._trigger_condition.notify(2)
                             curr_wall_time = time.time()
             else:
-                logging.debug(MODULE_IDENTIFIER + "No LFP Frames to process. Sleeping")
+                # logging.debug(MODULE_IDENTIFIER + "No LFP Frames to process. Sleeping")
                 time.sleep(0.005)
 """
 Code below here is from the previous iterations where we were using a single

@@ -243,7 +243,7 @@ class GraphicsManager(Process):
             plt.close(self._pf_fig)
             plt.close(self._rd_fig)
         except Exception as err:
-            logging.debug(MODULE_IDENTIFIER + "Error closing figure window")
+            logging.warning(MODULE_IDENTIFIER + "Error closing figure window")
             print(err)
         finally:
             # Clean up
@@ -280,9 +280,6 @@ class GraphicsManager(Process):
             self._spk_pos_frame[1].set_data((self._pos_x, self._pos_y))
             if len(self._speed) > 0:
                 self._spk_pos_frame[2].set_text('speed = %.2fcm/s'%self._speed[-1])
-
-            if step == self.__N_ANIMATION_FRAMES:
-                logging.debug(MODULE_IDENTIFIER + datetime.now().strftime("Animation Finished at %H:%M:%S.%f"))
             return self._spk_pos_frame
 
     def update_place_field_frame(self, step=0):
@@ -322,8 +319,8 @@ class GraphicsManager(Process):
             self._place_field_handler.submit_immediate_request()
             # np.copyto(self._most_recent_pf, self._shared_place_fields[self.__CLUSTERS_TO_PLOT[0], :, :])
             np.sum(self._shared_place_fields, out=self._most_recent_pf, axis=0)
-            logging.debug(MODULE_IDENTIFIER + "Fetched place fields. Peak FR: %.2f, Mean FR: %.2f"%\
-                    (np.max(self._shared_place_fields), np.mean(self._shared_place_fields)))
+            # logging.debug(MODULE_IDENTIFIER + "Fetched place fields. Peak FR: %.2f, Mean FR: %.2f"%\
+            #         (np.max(self._shared_place_fields), np.mean(self._shared_place_fields)))
             # Release the request that paused place field computation
             self._place_field_handler.end_immediate_request()
 
@@ -336,7 +333,7 @@ class GraphicsManager(Process):
                     self._spk_pos_x.append(spike_data[1])
                     self._spk_pos_y.append(spike_data[2])
                     self._spk_timestamps.append(spike_data[3])
-                logging.debug(MODULE_IDENTIFIER + "Fetched spike from cluster: %d, in bin (%d, %d). TS: %d"%spike_data)
+                # logging.debug(MODULE_IDENTIFIER + "Fetched spike from cluster: %d, in bin (%d, %d). TS: %d"%spike_data)
 
     def fetch_position_and_update_frames(self):
         while self._keep_running:
@@ -346,8 +343,8 @@ class GraphicsManager(Process):
                 self._pos_x.append(position_data[1])
                 self._pos_y.append(position_data[2])
                 self._speed.append(position_data[3])
-                logging.debug(MODULE_IDENTIFIER + "Fetched Position data... (%d, %d), v: %.2fcm/s"% \
-                        (position_data[1],position_data[2], position_data[3]))
+                # logging.debug(MODULE_IDENTIFIER + "Fetched Position data... (%d, %d), v: %.2fcm/s"% \
+                #       (position_data[1],position_data[2], position_data[3]))
 
     def process_command(self, key_in):
         print(self._key_entry.get())
@@ -454,7 +451,7 @@ class GraphicsManager(Process):
 
         # This is a blocking command... After you exit this, everything will end.
         self._command_window.mainloop()
-        logging.debug(MODULE_IDENTIFIER + datetime.now().strftime("Closing GUI and display pipes at %H:%M:%S.%f"))
+        logging.info(MODULE_IDENTIFIER + datetime.now().strftime("Closing GUI and display pipes at %H:%M:%S.%f"))
         self._keep_running = False
         position_fetcher.join()
         spike_fetcher.join()

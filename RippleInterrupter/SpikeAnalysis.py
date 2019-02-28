@@ -330,10 +330,7 @@ class SpikeDetector(ThreadExtension.StoppableThread):
         """
         while not self.req_stop():
             n_available_spikes = self._spike_stream.available(0)
-            if n_available_spikes > 0:
-                logging.debug(MODULE_IDENTIFIER + "%d spikes available for reading!"%n_available_spikes)
-            else:
-                # logging.debug(MODULE_IDENTIFIER + "Spike buffer empty... Sleeping.")
+            if n_available_spikes == 0:
                 time.sleep(0.02)
 
             for spk_idx in range(n_available_spikes):
@@ -370,4 +367,4 @@ class SpikeDetector(ThreadExtension.StoppableThread):
                     outp.send((unique_cluster_identity, spike_timestamp))
                 logging.debug(MODULE_IDENTIFIER + "Spike at %d sent to listeners."%spike_timestamp)
 
-        logging.debug(MODULE_IDENTIFIER + "Spike processing loop exitted!")
+        logging.info(MODULE_IDENTIFIER + "Spike processing loop exitted!")
