@@ -69,6 +69,7 @@ class LFPListener(ThreadExtension.StoppableThread):
         self._lfp_producer = None
 
         # Data streams
+        # Try opening a new connection
         self._lfp_stream = sg_client.subscribeLFPData(TrodesInterface.LFP_SUBSCRIPTION_ATTRIBUTE, \
                 self._target_tetrodes)
         self._lfp_stream.initialize()
@@ -86,16 +87,19 @@ class LFPListener(ThreadExtension.StoppableThread):
         """
         Start fetching LFP frames.
         """
+        n_frames_fetched = 0
         while not self.req_stop():
             n_lfp_frames = self._lfp_stream.available(0)
             if n_lfp_frames == 0:
-                logging.debug(self.CLASS_IDENTIFIER + "No LFP Frames to read... Sleeping.")
+                # logging.debug(self.CLASS_IDENTIFIER + "No LFP Frames to read... Sleeping.")
                 time.sleep(0.005)
             for frame_idx in range(n_lfp_frames):
                 timestamp = self._lfp_stream.getData()
+                n_frames_fetched += 1
+                # print(self.CLASS_IDENTIFIER + "Fetched %d frames"%n_frames_fetched)
                 if self._lfp_producer is not None:
                     self._lfp_producer.send((timestamp.trodes_timestamp, self._lfp_buffer[:]))
-                    logging.debug(self.CLASS_IDENTIFIER + "LFP Frame at %d sent out for ripple analysis."%timestamp.trodes_timestamp)
+                    # logging.debug(self.CLASS_IDENTIFIER + "LFP Frame at %d sent out for ripple analysis."%timestamp.trodes_timestamp)
 
 class RippleDetector(ThreadExtension.StoppableProcess):
     """

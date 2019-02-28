@@ -5,6 +5,7 @@ import time
 import ctypes
 import numpy as np
 import logging
+import cProfile
 from multiprocessing import Queue, RawArray, Condition
 
 # Local imports
@@ -26,8 +27,13 @@ def main():
     # self._filename = os.getcwd() + "/" + time.strftime(file_prefix + "_%Y%m%d_%H%M%S.log")
     log_filename = time.strftime(log_file_prefix + "_%Y%m%d_%H%M%S.log")
     logging.basicConfig(filename=log_filename, format="%(asctime)s.%(msecs)03d:%(message)s", \
-            level=logging.DEBUG, datefmt="%H:%M:%S")
+            level=logging.INFO, datefmt="%H:%M:%S")
     logging.debug(MODULE_IDENTIFIER + "Starting Log file at " + time.ctime())
+
+    # Create code profiler
+    code_profiler = cProfile.Profile()
+    profile_prefix = "replay_disruption_profile"
+    profile_filename = time.strftime(log_file_prefix + "_%Y%m%d_%H%M%S.pr")
 
     # Not necessary to add a filename here. Can be read using a dialog box now
     tetrodes_of_interest = [33, 24]
@@ -88,12 +94,15 @@ def main():
     # separate threads for separate fields too but that seems overkill at this
     # point.
 
+    graphical_interface.start()
+
+    # Start code profiler... Be sure to comment this out when not profiling the code
+    # code_profiler.enable()
     lfp_listener.start()
     ripple_detector.start()
     spike_listener.start()
     position_estimator.start()
     place_field_handler.start()
-    graphical_interface.start()
     """
     ripple_trigger.start()
     """
@@ -118,12 +127,20 @@ def main():
     except (KeyboardInterrupt, SystemExit):
         logging.debug(MODULE_IDENTIFIER + "Caught Keyboard Interrupt from user...")
     finally:
+        # code_profiler.disable()
+        # code_profiler.dump_stats(profile_filename)
         # TODO: Delete all the threads
         del shared_place_fields
         del shared_ripple_buffer
         del shared_raw_lfp_buffer
-        logging.debug(MODULE_IDENTIFIER + "Program finished. Exiting.")
-
+        del lfp_listener
+        del spike_listener
+        del position_estimator
+        del place_field_handler
+        del graphical_interface
+        sg_client.closeConnections()
+        print(MODULE_IDENTIFIER + "Program finished. Exiting.")
+        del sg_client
 
 if (__name__ == "__main__"):
     main()

@@ -1,2 +1,4 @@
+*.pr
+*.log
 *.swp
 ripple_interruption_out__*.txt
