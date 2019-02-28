@@ -43,8 +43,8 @@ def main():
 
     # NOTE: Using all the tetrodes that have clusters marked on them for ripple analysis
     n_tetrodes = len(cluster_identity_map)
-    shared_ripple_buffer = RawArray(ctypes.c_double, n_tetrodes * RiD.LFP_BUFFER_LENGTH)
     shared_raw_lfp_buffer = RawArray(ctypes.c_double, n_tetrodes * RiD.LFP_BUFFER_LENGTH)
+    shared_ripple_buffer = RawArray(ctypes.c_double, n_tetrodes * RiD.RIPPLE_POWER_BUFFER_LENGTH)
     shared_place_fields = RawArray(ctypes.c_double, n_units * PositionAnalysis.N_POSITION_BINS[0] * \
             PositionAnalysis.N_POSITION_BINS[1])
 
@@ -56,7 +56,7 @@ def main():
 
     # Start a thread for triggering analysis when ripple is triggered.
     trig_condition  = threading.Condition()
-    ripple_trigger  = RippleAnalysis.RippleSynchronizer(trig_condition)
+    # ripple_trigger  = RippleAnalysis.RippleSynchronizer(trig_condition)
 
     # Start threads for collecting spikes and LFP
     ripple_detector = RippleAnalysis.RippleDetector(sg_client, tetrode_argument, \
@@ -77,8 +77,8 @@ def main():
     # Optionally, launch a graphics thread for continuously monitoring
     # different threads for spikes, position data and ripples and show them to
     # the user in real time.
-    graphical_interface = Visualization.GraphicsManager(ripple_detector, spike_listener, position_estimator, \
-            place_field_handler, trig_condition, shared_place_fields)
+    graphical_interface = Visualization.GraphicsManager((shared_raw_lfp_buffer, shared_ripple_buffer), spike_listener, \
+            position_estimator, place_field_handler, trig_condition, shared_place_fields)
 
     # Spawn threads for handling all the place fields. We can convert this into
     # separate threads for separate fields too but that seems overkill at this
@@ -105,14 +105,16 @@ def main():
         logging.info(MODULE_IDENTIFIER + "Position data collection Stopped")
         place_field_handler.join()
         logging.info(MODULE_IDENTIFIER + "Place field builder Stopped")
-        """
         ripple_detector.join()
-        ripple_trigger.join()
-        """
+        logging.info(MODULE_IDENTIFIER + "Ripple detector Stopped")
+        # ripple_trigger.join()
     except (KeyboardInterrupt, SystemExit):
         logging.debug(MODULE_IDENTIFIER + "Caught Keyboard Interrupt from user...")
     finally:
         # TODO: Delete all the threads
+        del shared_place_fields
+        del shared_ripple_buffer
+        del shared_raw_lfp_buffer
         logging.debug(MODULE_IDENTIFIER + "Program finished. Exiting.")
 
 

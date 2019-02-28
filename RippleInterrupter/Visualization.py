@@ -18,6 +18,7 @@ import numpy as np
 
 # Local Imports
 import PositionAnalysis
+import RippleDefinitions as RiD
 
 MODULE_IDENTIFIER = "[GraphicsHandler] "
 
@@ -146,7 +147,7 @@ class GraphicsManager(Process):
     __CLUSTERS_TO_PLOT = [6]
     __MAX_FIRING_RATE = 100
     __RIPPLE_DETECTION_TIMEOUT = 0.1
-    def __init__(self, ripple_analyzer, spike_listener, position_estimator, \
+    def __init__(self, ripple_buffers, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_condition, shared_place_fields, clusters=None):
         """TODO: to be defined1.
 
@@ -169,7 +170,6 @@ class GraphicsManager(Process):
         exit_button.pack()
 
         self._keep_running = True
-        self._ripple_analyzer = ripple_analyzer
         self._spike_listener = spike_listener
         self._position_estimator = position_estimator
         self._place_field_handler = place_field_handler
@@ -177,19 +177,30 @@ class GraphicsManager(Process):
         if clusters is None:
             self._n_clusters = self._spike_listener.get_n_clusters()
             self._clusters = range(self._n_clusters)
+            self._tetrodes = self._spike_listener.get_tetrodes()
+            self._n_tetrodes = len(self._tetrodes)
         else:
             # TODO: Fetch indices for these clusters
             self._n_clusters = 0
             self._clusters = None
             pass
         self._cluster_colormap = colormap.magma(np.linspace(0, 1, self._n_clusters))
-        
-        # Automatically keep only a fixed number of entries in this buffer... Useful for plotting
-        # TODO: All of this will need some tweaking if/when we move on to
-        # visuzliaing multiple clusters and their place fields.
+
+        # Large arrays that are shared across processes
+        self._new_ripple_frame_availale = threading.Event()
+        self._shared_raw_lfp_buffer = np.reshape(np.frombuffer(ripple_buffers[0]), (self._n_tetrodes, RiD.LFP_BUFFER_LENGTH))
+        self._shared_ripple_power_buffer = np.reshape(np.frombuffer(ripple_buffers[1]), (self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH))
         self._shared_place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), (self._n_clusters, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
+
+        # Local copies of the shared data that can be used at a leisurely pace
+        self._lfp_tpts = np.linspace(0, RiD.LFP_BUFFER_TIME, RiD.LFP_BUFFER_LENGTH)
+        self._ripple_power_tpts = np.linspace(0, RiD.LFP_BUFFER_TIME, RiD.RIPPLE_POWER_BUFFER_LENGTH)
+        self._local_lfp_buffer = np.zeros((self._n_tetrodes, RiD.LFP_BUFFER_LENGTH), dtype='double')
+        self._local_ripple_power_buffer = np.zeros((self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH), dtype='double')
         self._most_recent_pf = np.zeros((PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]), \
                 dtype='float')
+
+        # Automatically keep only a fixed number of entries in this buffer... Useful for plotting
         self._pos_timestamps = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._pos_x = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._pos_y = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
@@ -244,8 +255,9 @@ class GraphicsManager(Process):
         # __RIPPLE_DETECTION_TIMEOUT, which could be a long while. Don't let
         # this block any important functionality.
         if self._rd_ax is not None:
-            self._rd_frame[0].set_data(self._lfp_tstamps, self._raw_lfp)
-            self._rd_frame[1].set_data(self._lfp_tstamps, self._ripple_power)
+            self._new_ripple_frame_availale.wait()
+            self._rd_frame[0].set_data(self._lfp_tpts, self._local_lfp_buffer)
+            self._rd_frame[1].set_data(self._ripple_power_tpts, self._local_ripple_power_buffer)
             return self._rd_frame
 
     def update_position_and_spike_frame(self, step=0):
@@ -282,10 +294,13 @@ class GraphicsManager(Process):
             return self._pf_frame
 
     def fetch_incident_ripple(self):
+        """
+        Fetch raw LFP data and ripple power data.
+        """
         while self._keep_running:
-            self._ripple_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
-            if self._ripple_trigger_condition.is_set():
-                # Move the shared LFP buffer into a local copy
+            with self._ripple_trigger_condition:
+                self._ripple_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
+                # self._new_ripple_frame_availale.set()
 
     def fetch_place_fields(self):
         """
@@ -329,6 +344,27 @@ class GraphicsManager(Process):
         print(self._key_entry.get())
         self._key_entry.delete(0, tkinter.END)
         pass
+
+    def initialize_ripple_detection_fig(self):
+        """
+        Initialize figure window for showing raw LFP and ripple power.
+        :returns: TODO
+        """
+        self._rd_fig = plt.figure()
+        self._rd_ax = plt.axes()
+        self._rd_ax.set_xlabel("Time (s)")
+        self._rd_ax.set_ylabel("EEG (uV)")
+        self._rd_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
+        self._rd_ax.grid(True)
+
+        lfp_frame, = plt.plot([], [], animated=True)
+        ripple_power_frame = plt.plot([], [], animated=True)
+        self._rd_frame.append(lfp_frame)
+        self._rd_frame.append(ripple_power_frame)
+
+        # Create animation object for showing the EEG
+        anim_obj = animation.FuncAnimation(self._rd_fig, self.update_ripple_detection_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
+        self._anim_objs.append(anim_obj)
 
     def initialize_spike_pos_fig(self):
         """
@@ -392,12 +428,16 @@ class GraphicsManager(Process):
                 target=self.fetch_spikes_and_update_frames)
         place_field_fetcher = threading.Thread(name="PlaceFieldFetched", daemon=True, \
                 target=self.fetch_place_fields)
+        ripple_frame_fetcher = threading.Thread(name="RippleFrameFetcher", daemon=True, \
+                target=self.fetch_incident_ripple)
 
         position_fetcher.start()
         spike_fetcher.start()
         place_field_fetcher.start()
+        ripple_frame_fetcher.start()
 
         # Start the animation for Spike-Position figure, place field figure
+        # self.initialize_ripple_detection_fig()
         self.initialize_spike_pos_fig()
         self.initialize_place_field_fig()
         plt.show()
@@ -408,3 +448,5 @@ class GraphicsManager(Process):
         self._keep_running = False
         position_fetcher.join()
         spike_fetcher.join()
+        place_field_fetcher.join()
+        ripple_frame_fetcher.join()

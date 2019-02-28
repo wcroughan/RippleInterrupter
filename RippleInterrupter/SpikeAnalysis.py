@@ -293,6 +293,7 @@ class SpikeDetector(ThreadExtension.StoppableThread):
         ThreadExtension.StoppableThread.__init__(self)
         tetrode_argument = []
         self._n_clusters = 0
+        self._tetrodes = list(cluster_identity_map.keys())
         for ntrode in cluster_identity_map:
             for cluster in cluster_identity_map[ntrode]:
                 tetrode_argument.append(str(ntrode) + "," + str(cluster))
@@ -313,6 +314,9 @@ class SpikeDetector(ThreadExtension.StoppableThread):
 
     def get_n_clusters(self):
         return self._n_clusters
+
+    def get_tetrodes(self):
+        return self._tetrodes
 
     def get_spike_buffer_connection(self):
         my_end, your_end = Pipe()
