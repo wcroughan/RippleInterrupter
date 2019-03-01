@@ -92,7 +92,7 @@ class LFPListener(ThreadExtension.StoppableThread):
             n_lfp_frames = self._lfp_stream.available(0)
             if n_lfp_frames == 0:
                 # logging.debug(self.CLASS_IDENTIFIER + "No LFP Frames to read... Sleeping.")
-                time.sleep(0.005)
+                time.sleep(0.001)
             for frame_idx in range(n_lfp_frames):
                 timestamp = self._lfp_stream.getData()
                 n_frames_fetched += 1

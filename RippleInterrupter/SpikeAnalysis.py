@@ -18,6 +18,8 @@ import PositionAnalysis
 import TrodesInterface
 import ThreadExtension
 
+# Profiling specific code
+import cProfile
 MODULE_IDENTIFIER = "[SpikeAnalysis] "
 
 def readClusterFile(filename=None, tetrodes=None):
@@ -132,11 +134,12 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
             # data because of an outside access to the data
             if self._has_pf_request:
                 logging.debug(self.CLASS_IDENTIFIER + "Waiting for Place field request to complete.")
-                time.sleep(0.005) #5ms
+                time.sleep(0.001) #5ms
 
             if not self._spike_buffer.poll():
                 # logging.debug(self.CLASS_IDENTIFIER + "Spike buffer empty, sleeping")
-                time.sleep(0.005)
+                time.sleep(0.001)
+                continue
 
             # BUG: If position thread is lagging, it will send the position at
             # a later time but we will keep filling the spikes at the oldest
@@ -328,10 +331,16 @@ class SpikeDetector(ThreadExtension.StoppableThread):
         Start collecting all spikes from trodes and allocate them to differnet
         place fields!
         """
+        if __debug__:
+            code_profiler = cProfile.Profile()
+            profile_prefix = "spike_fetcher_profile"
+            profile_filename = time.strftime(profile_prefix + "_%Y%m%d_%H%M%S.pr")
+            code_profiler.enable()
+
         while not self.req_stop():
             n_available_spikes = self._spike_stream.available(0)
             if n_available_spikes == 0:
-                time.sleep(0.02)
+                time.sleep(0.001)
 
             for spk_idx in range(n_available_spikes):
                 # Populate the spike record
@@ -347,12 +356,14 @@ class SpikeDetector(ThreadExtension.StoppableThread):
                 #         spike_timestamp, tetrode_id, cluster_id))
 
                 # Put this spike in the spike buffer queue
-                # TODO: Can remove this if it is never a problem
+                """
                 if cluster_id not in self._cluster_identity_map[tetrode_id]:
                     # Spike from an unclustered region... Ignore
                     logging.debug(MODULE_IDENTIFIER + "Warning: Spike Ignored!")
                     continue
+                """
                 unique_cluster_identity = self._cluster_identity_map[tetrode_id][cluster_id]
+                """
                 cluster_timestamp_jump = float(spike_timestamp) - self._last_recorded_tstamp[unique_cluster_identity]
                 timestamp_jump = float(spike_timestamp) - self._most_recent_timestamp
                 if cluster_timestamp_jump < 0:
@@ -361,10 +372,14 @@ class SpikeDetector(ThreadExtension.StoppableThread):
                     logging.warning(MODULE_IDENTIFIER + "Backward timestamp jump across uClusterIDs, jump %d"%timestamp_jump)
                 self._last_recorded_tstamp[unique_cluster_identity] = float(spike_timestamp)
                 self._most_recent_timestamp = self._last_recorded_tstamp[unique_cluster_identity]
+                """
 
                 logging.debug(MODULE_IDENTIFIER + "Spike Timestamp %d, from uClusterID %d"%(spike_timestamp,unique_cluster_identity))
                 for outp in self._spike_buffer_connections:
                     outp.send((unique_cluster_identity, spike_timestamp))
                 logging.debug(MODULE_IDENTIFIER + "Spike at %d sent to listeners."%spike_timestamp)
 
+        if __debug__:
+            code_profiler.disable()
+            code_profiler.dump_stats(profile_filename)
         logging.info(MODULE_IDENTIFIER + "Spike processing loop exitted!")

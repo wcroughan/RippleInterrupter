@@ -30,10 +30,11 @@ def main():
             level=logging.INFO, datefmt="%H:%M:%S")
     logging.debug(MODULE_IDENTIFIER + "Starting Log file at " + time.ctime())
 
-    # Create code profiler
-    code_profiler = cProfile.Profile()
-    profile_prefix = "replay_disruption_profile"
-    profile_filename = time.strftime(log_file_prefix + "_%Y%m%d_%H%M%S.pr")
+    if __debug__:
+        # Create code profiler
+        code_profiler = cProfile.Profile()
+        profile_prefix = "replay_disruption_profile"
+        profile_filename = time.strftime(profile_prefix + "_%Y%m%d_%H%M%S.pr")
 
     # Not necessary to add a filename here. Can be read using a dialog box now
     tetrodes_of_interest = [33, 24]
@@ -101,7 +102,8 @@ def main():
     spike_listener.start()
     position_estimator.start()
     place_field_handler.start()
-    code_profiler.enable()
+    if __debug__:
+        code_profiler.enable()
     """
     ripple_trigger.start()
     """
@@ -109,8 +111,10 @@ def main():
     try:
         # Join all the threads to wait for their execution to  finish
         # Run cleanup here
-        # graphical_interface.terminate()
         graphical_interface.join()
+        if __debug__:
+            code_profiler.disable()
+            code_profiler.dump_stats(profile_filename)
         logging.info(MODULE_IDENTIFIER + "GUI terminated")
         spike_listener.join()
         logging.info(MODULE_IDENTIFIER  + "Spike Listener Stopped")
@@ -126,8 +130,6 @@ def main():
     except (KeyboardInterrupt, SystemExit):
         logging.debug(MODULE_IDENTIFIER + "Caught Keyboard Interrupt from user...")
     finally:
-        code_profiler.disable()
-        code_profiler.dump_stats(profile_filename)
         # TODO: Delete all the threads
         del shared_place_fields
         del shared_ripple_buffer
