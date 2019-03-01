@@ -95,14 +95,13 @@ def main():
     # point.
 
     graphical_interface.start()
-
     # Start code profiler... Be sure to comment this out when not profiling the code
-    # code_profiler.enable()
     lfp_listener.start()
     ripple_detector.start()
     spike_listener.start()
     position_estimator.start()
     place_field_handler.start()
+    code_profiler.enable()
     """
     ripple_trigger.start()
     """
@@ -127,8 +126,8 @@ def main():
     except (KeyboardInterrupt, SystemExit):
         logging.debug(MODULE_IDENTIFIER + "Caught Keyboard Interrupt from user...")
     finally:
-        # code_profiler.disable()
-        # code_profiler.dump_stats(profile_filename)
+        code_profiler.disable()
+        code_profiler.dump_stats(profile_filename)
         # TODO: Delete all the threads
         del shared_place_fields
         del shared_ripple_buffer
