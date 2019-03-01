@@ -363,16 +363,17 @@ class SpikeDetector(ThreadExtension.StoppableThread):
                     continue
                 """
                 unique_cluster_identity = self._cluster_identity_map[tetrode_id][cluster_id]
-                """
-                cluster_timestamp_jump = float(spike_timestamp) - self._last_recorded_tstamp[unique_cluster_identity]
-                timestamp_jump = float(spike_timestamp) - self._most_recent_timestamp
-                if cluster_timestamp_jump < 0:
-                    logging.warning(MODULE_IDENTIFIER + "Backward timestamp jump in uClusterID %d, jump %d"%(unique_cluster_identity, cluster_timestamp_jump))
-                elif timestamp_jump < 0:
-                    logging.warning(MODULE_IDENTIFIER + "Backward timestamp jump across uClusterIDs, jump %d"%timestamp_jump)
-                self._last_recorded_tstamp[unique_cluster_identity] = float(spike_timestamp)
-                self._most_recent_timestamp = self._last_recorded_tstamp[unique_cluster_identity]
-                """
+                if __debug__:
+                    """
+                    cluster_timestamp_jump = float(spike_timestamp) - self._last_recorded_tstamp[unique_cluster_identity]
+                    timestamp_jump = float(spike_timestamp) - self._most_recent_timestamp
+                    if cluster_timestamp_jump < 0:
+                        logging.warning(MODULE_IDENTIFIER + "Backward timestamp jump in uClusterID %d, jump %d"%(unique_cluster_identity, cluster_timestamp_jump))
+                    elif timestamp_jump < 0:
+                        logging.warning(MODULE_IDENTIFIER + "Backward timestamp jump across uClusterIDs, jump %d"%timestamp_jump)
+                    self._last_recorded_tstamp[unique_cluster_identity] = float(spike_timestamp)
+                    self._most_recent_timestamp = self._last_recorded_tstamp[unique_cluster_identity]
+                    """
 
                 logging.debug(MODULE_IDENTIFIER + "Spike Timestamp %d, from uClusterID %d"%(spike_timestamp,unique_cluster_identity))
                 for outp in self._spike_buffer_connections:

@@ -13,6 +13,9 @@ from multiprocessing import Pipe
 import RippleDefinitions as RiD
 import ThreadExtension
 
+# Profiling
+import cProfile
+
 MODULE_IDENTIFIER = "[PositionAnalysis] "
 N_POSITION_BINS = (60, 60)
 FIELD_SIZE = (100, 100) # Actual size of the field in cms
@@ -93,6 +96,13 @@ class PositionEstimator(ThreadExtension.StoppableThread):
         Collect position data continuously and update the amount of time spent
         in each position bin
         """
+        # Create and run profiler
+        if __debug__:
+            code_profiler = cProfile.Profile()
+            profile_prefix = "position_fetcher_profile"
+            profile_filename = time.strftime(profile_prefix + "_%Y%m%d_%H%M%S.pr")
+            code_profiler.enable()
+
         # Keep track of current and previous BIN ID, and also the time at which last jump happened
         curr_x_bin = -1
         curr_y_bin = -1
@@ -105,8 +115,14 @@ class PositionEstimator(ThreadExtension.StoppableThread):
         # stamp, we will have to ignore the first data entry obtained here.
         # Otherwise it will skew the occupancy!
         prev_step_timestamp = 0
+
+        # NOTE: For this thread, data is not streaming in quite as fast and as
+        # a result, most of the time is spent in self.req_stop(). Maybe adding
+        # a sleep to this will help.
         while not self.req_stop():
             n_available_frames = self._position_consumer.available(0)
+            if n_available_frames == 0:
+                time.sleep(0.02)
             for frame_idx in range(n_available_frames):
                 self._position_consumer.readData(self._data_field)
                 (curr_x_bin, curr_y_bin) = self.getXYBin()
@@ -163,3 +179,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                     prev_step_timestamp = copy(current_timestamp)
                     prev_x_bin = curr_x_bin
                     prev_y_bin = curr_y_bin
+
+        if __debug__:
+            code_profiler.disable()
+            code_profiler.dump_stats(profile_filename)

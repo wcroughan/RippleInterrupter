@@ -21,6 +21,9 @@ import ThreadExtension
 import RippleDefinitions as RiD
 import Visualization
 
+# Profiling
+import cProfile
+
 MODULE_IDENTIFIER = "[RippleAnalysis] "
 D_MEAN_RIPPLE_POWER = 60.0
 D_STD_RIPPLE_POWER = 30.0
@@ -87,6 +90,12 @@ class LFPListener(ThreadExtension.StoppableThread):
         """
         Start fetching LFP frames.
         """
+        if __debug__:
+            code_profiler = cProfile.Profile()
+            profile_prefix = "lfp_listener_profile"
+            profile_filename = time.strftime(profile_prefix + "_%Y%m%d_%H%M%S.pr")
+            code_profiler.enable()
+
         n_frames_fetched = 0
         while not self.req_stop():
             n_lfp_frames = self._lfp_stream.available(0)
@@ -100,6 +109,10 @@ class LFPListener(ThreadExtension.StoppableThread):
                 if self._lfp_producer is not None:
                     self._lfp_producer.send((timestamp.trodes_timestamp, self._lfp_buffer[:]))
                     # logging.debug(self.CLASS_IDENTIFIER + "LFP Frame at %d sent out for ripple analysis."%timestamp.trodes_timestamp)
+
+        if __debug__:
+            code_profiler.disable()
+            code_profiler.dump_stats(profile_filename)
 
 class RippleDetector(ThreadExtension.StoppableProcess):
     """
