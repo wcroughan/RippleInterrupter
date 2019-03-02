@@ -4,7 +4,7 @@ import time
 import threading
 from datetime import datetime
 from scipy import signal, stats
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter, center_of_mass
 import matplotlib.pyplot as plt
 import xml.etree.ElementTree as ET
 from multiprocessing import Queue, Pipe, Condition
@@ -93,6 +93,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         self._position_buffer = position_processor.get_position_buffer_connection()
         self._spike_buffer = spike_processor.get_spike_buffer_connection()
         n_units = spike_processor.get_n_clusters()
+        self._field_shape = (PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1])
         self._place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), (n_units, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
         self._log_place_fields = np.zeros_like(self._place_fields)
         self._nspks_in_bin = np.zeros(np.shape(self._place_fields))
@@ -100,8 +101,32 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         self._has_pf_request = False
         self._place_field_lock = Condition()
         self._spike_place_buffer_connections = []
+        self._field_statistics_connection = None
         self._requested_clusters = []
         logging.debug(self.CLASS_IDENTIFIER + time.strftime("Started thread for building place fields at %H:%M:%S"))
+
+    def get_field_CoM(self, cluster_idx=None):
+        """
+        Get the CoM for a particular place field
+        """
+        with self._place_field_lock:
+            if cluster_idx is None:
+                # TODO: Implement returning the CoMs for all the clusters here.
+                raise NotImplementedError()
+            else:
+                return center_of_mass(self._place_fields[cluster_idx, :, :])
+
+    def get_peak_firing_location(self, cluster_idx=None):
+        """
+        Get the location on the map for which the firing rate is the highest
+        for a paricular field
+        """
+        with self._place_field_lock:
+            if cluster_idx is None:
+                raise NotImplementedError(0
+            else:
+                return np.unravel_indices(np.argmax(self._place_fields[cluster_idx, :, :]), \
+                        self._field_shape)
 
     def get_spike_place_buffer_connection(self, cluster_idx):
         my_end, your_end = Pipe()

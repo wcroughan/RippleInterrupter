@@ -28,7 +28,7 @@ MODULE_IDENTIFIER = "[RippleAnalysis] "
 D_MEAN_RIPPLE_POWER = 60.0
 D_STD_RIPPLE_POWER = 30.0
 
-class RippleSynchronizer(ThreadExtension.StoppableThread):
+class RippleSynchronizer(ThreadExtension.StoppableProcess):
     """
     Waits for a ripple to be detected and processes downstream changes for
     analyzing spike contents.
@@ -36,14 +36,17 @@ class RippleSynchronizer(ThreadExtension.StoppableThread):
 
     # Wait for 10ms while checking if the event flag is set.
     _EVENT_TIMEOUT = 0.01
+    _SPIKE_BUFFER_SIZE = 200
 
     def __init__(self, sync_event):
         """TODO: to be defined1. """
-        ThreadExtension.StoppableThread.__init__(self)
+        ThreadExtension.StoppableProcess.__init__(self)
         self._sync_event = sync_event
+	    self._spike_buffer = collections.deque(maxlen=self._SPIKE_BUFFER_SIZE)
         logging.debug(MODULE_IDENTIFIER + datetime.now().strftime("Started Ripple Synchronization thread at %H:%M:%S.3%f"))
 
     def run(self):
+        # Create a thread that fetches and keeps track of the last few spikes.
         while not self.req_stop():
             # TODO: EVENT TIMEOUT will act as a timeout between successive
             # ripple detections (maybe too hacky)
