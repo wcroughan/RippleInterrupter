@@ -153,7 +153,7 @@ class GraphicsManager(Process):
     __PLACE_FIELD_REFRESH_RATE = 1
     __CLUSTERS_TO_PLOT = [6]
     __MAX_FIRING_RATE = 100
-    __RIPPLE_DETECTION_TIMEOUT = 0.1
+    __RIPPLE_DETECTION_TIMEOUT = 10.0
     def __init__(self, ripple_buffers, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_condition, shared_place_fields, clusters=None):
         """TODO: to be defined1.
@@ -304,9 +304,9 @@ class GraphicsManager(Process):
         while self._keep_running:
             with self._ripple_trigger_condition:
                 self._ripple_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
-                np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
-                np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
-                # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
+            np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
+            np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
+            # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
 
     def fetch_place_fields(self):
         """
@@ -361,7 +361,7 @@ class GraphicsManager(Process):
         self._rd_ax.set_xlabel("Time (s)")
         self._rd_ax.set_ylabel("EEG (uV)")
         self._rd_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
-        self._rd_ax.set_ylim((-3000.0, 3000.0))
+        self._rd_ax.set_ylim((-5000.0, 5000.0))
         self._rd_ax.grid(True)
 
         lfp_frame, = plt.plot([], [], animated=True)

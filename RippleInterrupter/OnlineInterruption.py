@@ -64,6 +64,8 @@ def main():
     # Start threads for collecting spikes and LFP
     # Trodes needs strings!
     tetrode_argument = [str(tet) for tet in tetrodes_of_interest]
+
+    # ripple_trigger  = RippleAnalysis.RippleSynchronizer(trig_condition)
     # ripple_detector = RippleAnalysis.RippleDetector(sg_client, tetrode_argument, \
     #         trigger_condition=trig_condition, \
     #         shared_buffers=(shared_raw_lfp_buffer, shared_ripple_buffer))
@@ -71,8 +73,6 @@ def main():
     ripple_detector = RippleAnalysis.RippleDetector(lfp_listener, \
             trigger_condition=trig_condition, \
             shared_buffers=(shared_raw_lfp_buffer, shared_ripple_buffer))
-
-    # ripple_trigger  = RippleAnalysis.RippleSynchronizer(trig_condition)
 
     # Create a buffer for spikes to be accessed until they are taken out of the
     # queue by the Bayesian Estimator.
@@ -83,6 +83,7 @@ def main():
     spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, cluster_identity_map)
     position_estimator  = PositionAnalysis.PositionEstimator(sg_client)
     place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, shared_place_fields)
+    ripple_trigger      = RippleAnalysis.RippleSynchronizer(trig_condition, spike_listener, place_field_handler)
     # bayesian_estimator  = PositionDecoding.BayesianEstimator(spike_listener, place_fields)
 
     # Optionally, launch a graphics thread for continuously monitoring
@@ -102,12 +103,10 @@ def main():
     spike_listener.start()
     position_estimator.start()
     place_field_handler.start()
+    ripple_trigger.start()
+
     if __debug__:
         code_profiler.enable()
-    """
-    ripple_trigger.start()
-    """
-
     try:
         # Join all the threads to wait for their execution to  finish
         # Run cleanup here
@@ -126,7 +125,8 @@ def main():
         logging.info(MODULE_IDENTIFIER + "LFP listener Stopped")
         ripple_detector.join()
         logging.info(MODULE_IDENTIFIER + "Ripple detector Stopped")
-        # ripple_trigger.join()
+        ripple_trigger.join()
+        logging.info(MODULE_IDENTIFIER + "Ripple event synchronizer Stopped")
     except (KeyboardInterrupt, SystemExit):
         logging.debug(MODULE_IDENTIFIER + "Caught Keyboard Interrupt from user...")
     finally:
@@ -138,6 +138,7 @@ def main():
         del spike_listener
         del position_estimator
         del place_field_handler
+        del ripple_trigger
         del graphical_interface
         sg_client.closeConnections()
         print(MODULE_IDENTIFIER + "Program finished. Exiting.")

@@ -35,25 +35,46 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
     """
 
     # Wait for 10ms while checking if the event flag is set.
-    _EVENT_TIMEOUT = 0.01
+    _EVENT_TIMEOUT = 10.0
     _SPIKE_BUFFER_SIZE = 200
 
-    def __init__(self, sync_event):
+    def __init__(self, sync_event, spike_listener, place_field_handler):
         """TODO: to be defined1. """
         ThreadExtension.StoppableProcess.__init__(self)
         self._sync_event = sync_event
-	    self._spike_buffer = collections.deque(maxlen=self._SPIKE_BUFFER_SIZE)
-        logging.debug(MODULE_IDENTIFIER + datetime.now().strftime("Started Ripple Synchronization thread at %H:%M:%S.3%f"))
+        self._spike_buffer = collections.deque(maxlen=self._SPIKE_BUFFER_SIZE)
+        self._spike_buffer_connection = spike_listener.get_spike_buffer_connection()
+        self._place_field_handler = place_field_handler
+        logging.info(MODULE_IDENTIFIER + "Started Ripple Synchronization thread.")
+
+    def fetch_most_recent_spike(self):
+        """
+        Get the most recent spike and put it in the rotating spike buffer
+        (keeps track of the last self._SPIKE_BUFFER_SIZE spikes.)
+        """
+        while not self.req_stop():
+            if self._spike_buffer_connection.poll():
+                # NOTE: spike_data received here is a tuple (cluster identity, trodes timestamp)
+                spike_data = self._spike_buffer_connection.recv()
+                self._spike_buffer.append(spike_data)
 
     def run(self):
         # Create a thread that fetches and keeps track of the last few spikes.
+        spike_fetcher = threading.Thread(name="SpikeFetcher", daemon=True, \
+                target=self.fetch_most_recent_spike)
+        spike_fetcher.start()
+
         while not self.req_stop():
             # TODO: EVENT TIMEOUT will act as a timeout between successive
             # ripple detections (maybe too hacky)
             logging.debug(MODULE_IDENTIFIER + "Waiting for ripple trigger...")
             with self._sync_event:
-                self._sync_event.wait()
+                self._sync_event.wait(self._EVENT_TIMEOUT)
             logging.debug(MODULE_IDENTIFIER + "Ripple tiggered.")
+            # DEBUGGING: Print spike count from each of the clusters
+            # TODO: Only include spikes that occurred a specific amount of time before now.
+            print(self._place_field_handler.get_peak_firing_location(0))
+        spike_fetcher.join()
 
 class LFPListener(ThreadExtension.StoppableThread):
     """
@@ -80,7 +101,7 @@ class LFPListener(ThreadExtension.StoppableThread):
                 self._target_tetrodes)
         self._lfp_stream.initialize()
         self._lfp_buffer = self._lfp_stream.create_numpy_array()
-        logging.debug(self.CLASS_IDENTIFIER + "Started LFP listener thread.")
+        logging.info(self.CLASS_IDENTIFIER + "Started LFP listener thread.")
 
     def get_n_tetrodes(self):
         return self._n_tetrodes
@@ -165,7 +186,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                 (RiD.RIPPLE_LO_FREQ, RiD.RIPPLE_HI_FREQ), btype='bandpass', \
                 analog=False, output='sos', fs=RiD.LFP_FREQUENCY)
 
-        logging.debug(MODULE_IDENTIFIER + "Started Ripple detection thread.")
+        logging.info(MODULE_IDENTIFIER + "Started Ripple detection thread.")
 
     def get_ripple_buffer_connections(self):
         """
@@ -246,7 +267,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                         # TODO: Consider switching to all, or atleast a majority of tetrodes for ripple detection.
                         if (power_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD).any():
                             logging.info(MODULE_IDENTIFIER + "Detected ripple at %.2f. Peak Strength: %.2f"% \
-                                    (curr_wall_time-start_wall_time, np.max(power_to_baseline_ratio)))
+                                    (curr_time, np.max(power_to_baseline_ratio)))
                             prev_ripple = curr_time
                             with self._trigger_condition:
                                 # First trigger interruption and all time critical operations

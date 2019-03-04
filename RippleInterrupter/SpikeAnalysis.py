@@ -103,7 +103,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         self._spike_place_buffer_connections = []
         self._field_statistics_connection = None
         self._requested_clusters = []
-        logging.debug(self.CLASS_IDENTIFIER + time.strftime("Started thread for building place fields at %H:%M:%S"))
+        logging.info(self.CLASS_IDENTIFIER + "Started thread for building place fields.")
 
     def get_field_CoM(self, cluster_idx=None):
         """
@@ -123,9 +123,9 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         """
         with self._place_field_lock:
             if cluster_idx is None:
-                raise NotImplementedError(0
+                raise NotImplementedError()
             else:
-                return np.unravel_indices(np.argmax(self._place_fields[cluster_idx, :, :]), \
+                return np.unravel_index(np.argmax(self._place_fields[cluster_idx, :, :]), \
                         self._field_shape)
 
     def get_spike_place_buffer_connection(self, cluster_idx):
@@ -178,14 +178,14 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
 
                 #get the next spike
                 (spk_cl, spk_time) = self._spike_buffer.recv()
-                logging.info(self.CLASS_IDENTIFIER + "Received spike from %d at %d"%(spk_cl, spk_time))
+                logging.debug(self.CLASS_IDENTIFIER + "Received spike from %d at %d"%(spk_cl, spk_time))
 
                 #if it's after our most recent position update, try and read the next position
                 #keep reading positions until our position data is ahead of our spike data
                 while self._position_buffer.poll() and (spk_time >= curr_postime):
                     (curr_postime, curr_posbin_x, curr_posbin_y, curr_speed) = self._position_buffer.recv()
 
-                    logging.info(self.CLASS_IDENTIFIER + "Received new position (%d, %d) at %d"%(curr_posbin_x, curr_posbin_y, curr_postime))
+                    logging.debug(self.CLASS_IDENTIFIER + "Received new position (%d, %d) at %d"%(curr_posbin_x, curr_posbin_y, curr_postime))
                     
                     # NOTE: We have to do some repeated computation here but
                     # passing occupancy from PositionAnalysis to this process
@@ -200,7 +200,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                     # stationary.. Since we are not counting spikes during this
                     # period, this penalizes bins where the animal stops.
                     if (timestamps_in_prev_bin > 0) and (curr_speed > RiD.MOVE_VELOCITY_THRESOLD):
-                        logging.info(self.CLASS_IDENTIFIER + "Updating occupancy in bin (%d, %d), time spent %.2fs"%\
+                        logging.debug(self.CLASS_IDENTIFIER + "Updating occupancy in bin (%d, %d), time spent %.2fs"%\
                                 (prev_posbin_x,prev_posbin_y,real_time_spent_in_prev_bin))
                         self._bin_occupancy[prev_posbin_x, prev_posbin_y] += real_time_spent_in_prev_bin
 
@@ -220,7 +220,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                             pipe_in.send((spk_cl, curr_posbin_x, curr_posbin_y, spk_time))
                         logging.debug(self.CLASS_IDENTIFIER + "Spike at %d sent out to listeners"%spk_time)
                 else:
-                    logging.info(self.CLASS_IDENTIFIER + "Spike at %d skipped, speed %.2fcm/s below threshold"%(spk_time, curr_speed))
+                    logging.debug(self.CLASS_IDENTIFIER + "Spike at %d skipped, speed %.2fcm/s below threshold"%(spk_time, curr_speed))
                 pf_update_spk_iter += 1
 
                 # If spike timestamp starts leading position timestamps by too
@@ -244,8 +244,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                     # Apply gaussian smoothing to the computed place fields`
                     gaussian_filter(self._place_fields, sigma=3, output=self._place_fields)
                     np.log(self._place_fields, out=self._log_place_fields, where=self._place_fields!=0)
-                    logging.info(self.CLASS_IDENTIFIER + "Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._place_fields), np.mean(self._place_fields)))
-                logging.debug(self.CLASS_IDENTIFIER + "Fields updated.")
+                    logging.info(self.CLASS_IDENTIFIER + "Fields updated. Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._place_fields), np.mean(self._place_fields)))
 
     def submit_immediate_request(self):
         """
