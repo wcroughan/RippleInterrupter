@@ -25,8 +25,8 @@ import Visualization
 import cProfile
 
 MODULE_IDENTIFIER = "[RippleAnalysis] "
-D_MEAN_RIPPLE_POWER = 60.0
-D_STD_RIPPLE_POWER = 30.0
+D_MEAN_RIPPLE_POWER = 80.0
+D_STD_RIPPLE_POWER = 55.0
 
 class RippleSynchronizer(ThreadExtension.StoppableProcess):
     """
@@ -63,7 +63,6 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
         spike_fetcher = threading.Thread(name="SpikeFetcher", daemon=True, \
                 target=self.fetch_most_recent_spike)
         spike_fetcher.start()
-
         while not self.req_stop():
             # TODO: EVENT TIMEOUT will act as a timeout between successive
             # ripple detections (maybe too hacky)
@@ -73,7 +72,7 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
             logging.debug(MODULE_IDENTIFIER + "Ripple tiggered.")
             # DEBUGGING: Print spike count from each of the clusters
             # TODO: Only include spikes that occurred a specific amount of time before now.
-            print(self._place_field_handler.get_peak_firing_location(0))
+            # print(self._place_field_handler.get_peak_firing_location(0))
         spike_fetcher.join()
 
 class LFPListener(ThreadExtension.StoppableThread):
@@ -476,11 +475,11 @@ def main():
     tetrodes_to_be_analyzed = [24,33]
     if len(sys.argv) == 1:
         (power_mean, power_std) = getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
-                analysis_time=10.0)
+                analysis_time=100.0)
     elif (int(sys.argv[1][0]) == 1):
         getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
                 ripple_statistics=[60.0, 30.0], show_ripples=True, \
-                analysis_time=20)
+                analysis_time=100.0)
 
 if (__name__ == "__main__"):
     main()
