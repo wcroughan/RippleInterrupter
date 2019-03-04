@@ -303,10 +303,13 @@ class GraphicsManager(Process):
         """
         while self._keep_running:
             with self._ripple_trigger_condition:
-                self._ripple_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
-                np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
-                np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
+                # self._ripple_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
+                # np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
+                # np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
+                self._ripple_trigger_condition.wait()
                 # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
+            np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
+            np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
 
     def fetch_place_fields(self):
         """
