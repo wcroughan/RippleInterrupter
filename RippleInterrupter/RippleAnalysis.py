@@ -35,7 +35,7 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
     """
 
     # Wait for 10ms while checking if the event flag is set.
-    _EVENT_TIMEOUT = 10.0
+    _EVENT_TIMEOUT = 1.0
     _SPIKE_BUFFER_SIZE = 200
 
     def __init__(self, sync_event, spike_listener, position_estimator, place_field_handler):
@@ -230,7 +230,8 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         else:
             self._mean_ripple_power = baseline_stats[0]
             self._std_ripple_power  = baseline_stats[1]
-        self._trigger_condition = trigger_condition
+        self._trigger_condition = trigger_condition[0]
+        self._show_trigger = trigger_condition[1]
 
         # Output connections
         self._ripple_buffer_connections = []
@@ -284,6 +285,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         n_data_pts_seen = 0
 
         # Delay measures for ripple detection (and trigger)
+        ripple_unseen = False
         prev_ripple = -np.Inf
         curr_time   = 0
         start_wall_time = time.time()
@@ -334,15 +336,19 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                             prev_ripple = curr_time
                             with self._trigger_condition:
                                 # First trigger interruption and all time critical operations
-                                # TODO: This will need a little bit of effort!
-
-                                # Copy data over for visualization
-                                if len(self._local_lfp_buffer) == RiD.LFP_BUFFER_LENGTH:
-                                    np.copyto(self._raw_lfp_buffer, np.asarray(self._local_lfp_buffer).T)
-                                    np.copyto(self._ripple_power_buffer, np.asarray(self._local_ripple_power_buffer).T)
-                                    # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._ripple_power_buffer))
-                                    self._trigger_condition.notify(2)
-                            curr_wall_time = time.time()
+                                self._trigger_condition.notify(1)
+                                curr_wall_time = time.time()
+                                ripple_unseen = True
+                    if ((curr_time - prev_ripple) > RiD.LFP_BUFFER_TIME/2) and ripple_unseen:
+                        ripple_unseen = False
+                        # Copy data over for visualization
+                        if len(self._local_lfp_buffer) == RiD.LFP_BUFFER_LENGTH:
+                            np.copyto(self._raw_lfp_buffer, np.asarray(self._local_lfp_buffer).T)
+                            np.copyto(self._ripple_power_buffer, np.asarray(self._local_ripple_power_buffer).T)
+                            # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._ripple_power_buffer))
+                            with self._show_trigger:
+                                # First trigger interruption and all time critical operations
+                                self._show_trigger.notify(1)
             else:
                 # logging.debug(MODULE_IDENTIFIER + "No LFP Frames to process. Sleeping")
                 time.sleep(0.005)

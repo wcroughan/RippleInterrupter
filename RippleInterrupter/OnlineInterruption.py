@@ -60,15 +60,18 @@ def main():
     # Open connection to trodes.
     sg_client = TrodesInterface.SGClient("ReplayInterruption")
 
-    # Start a thread for triggering analysis when ripple is triggered.
+    # Start a thread for triggering analysis when ripple is triggered. Use a
+    # separate condition to SHOW the detected ripple so that we can space the
+    # visualization out from the actual detection/analysis 
     trig_condition  = Condition()
+    show_trigger    = Condition()
 
     # Start threads for collecting spikes and LFP
     # Trodes needs strings!
     tetrode_argument = [str(tet) for tet in tetrodes_of_interest]
     lfp_listener = RippleAnalysis.LFPListener(sg_client, tetrode_argument)
     ripple_detector = RippleAnalysis.RippleDetector(lfp_listener, \
-            trigger_condition=trig_condition, \
+            trigger_condition=(trig_condition, show_trigger), \
             shared_buffers=(shared_raw_lfp_buffer, shared_ripple_buffer))
 
     # Initialize threads for looking at the actual/decoded position
@@ -81,7 +84,7 @@ def main():
     # different threads for spikes, position data and ripples and show them to
     # the user in real time.
     graphical_interface = Visualization.GraphicsManager((shared_raw_lfp_buffer, shared_ripple_buffer), spike_listener, \
-            position_estimator, place_field_handler, trig_condition, shared_place_fields)
+            position_estimator, place_field_handler, show_trigger, shared_place_fields)
 
     # Spawn threads for handling all the place fields. We can convert this into
     # separate threads for separate fields too but that seems overkill at this
