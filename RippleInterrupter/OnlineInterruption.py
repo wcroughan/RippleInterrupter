@@ -10,6 +10,7 @@ from multiprocessing import Queue, RawArray, Condition
 
 # Local imports
 import Logger
+import Configuration
 import Visualization
 import SpikeAnalysis
 import RippleAnalysis
@@ -42,7 +43,7 @@ def main():
     # Uncomment to use a hardcoded file
     # cluster_filename = "./test_clusters.trodesClusters"
     cluster_filename = "open_field_full_config20190220_172702.trodesClusters"
-    n_units, cluster_identity_map = SpikeAnalysis.readClusterFile(cluster_filename, tetrodes_of_interest)
+    n_units, cluster_identity_map = Configuration.readClusterFile(cluster_filename, tetrodes_of_interest)
 
     # Uncomment to let the user select a file
     # n_units, cluster_identity_map = SpikeAnalysis.readClusterFile(tetrodes=tetrodes_of_interest)
