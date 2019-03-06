@@ -37,6 +37,7 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
     # Wait for 10ms while checking if the event flag is set.
     _EVENT_TIMEOUT = 1.0
     _SPIKE_BUFFER_SIZE = 200
+    CLASS_IDENTIFIER = "[RippleSynchronizer] "
 
     def __init__(self, sync_event, spike_listener, position_estimator, place_field_handler):
         """TODO: to be defined1. """
@@ -50,18 +51,26 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
         self._position_access = Lock()
         self._spike_access = Lock()
         self._enable_synchrnoizer = Lock()
-        self._is_disabled = True
+        self._is_disabled = False
+
+        # Position data at the time ripple is triggered
+        self._pos_x = -1
+        self._pos_y = -1
         self._most_recent_speed = 0
         self._most_recent_pos_timestamp = 0
-        logging.info(MODULE_IDENTIFIER + "Started Ripple Synchronization thread.")
+        logging.info(self.CLASS_IDENTIFIER + "Started Ripple Synchronization thread.")
 
     def enable(self):
-        with self._enable_synchrnoizer:
-            self._is_disabled = False
+        self._enable_synchrnoizer.acquire()
+        self._is_disabled = False
+        logging.info(self.CLASS_IDENTIFIER + "Ripple disruption ENABLED.")
+        self._enable_synchrnoizer.release()
 
     def disable(self):
-        with self._enable_synchrnoizer:
-            self._is_disabled = True
+        self._enable_synchrnoizer.acquire()
+        self._is_disabled = True
+        logging.info(self.CLASS_IDENTIFIER + "Ripple disruption DISABLED.")
+        self._enable_synchrnoizer.release()
 
     def fetch_current_velocity(self):
         """
@@ -74,8 +83,8 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
                 with self._position_access:
                     self._most_recent_pos_timestamp = position_data[0]
                     self._most_recent_speed = position_data[3]
-                    # pos_x = position_data[1]
-                    # pos_y = position_data[2]
+                    self._pos_x = position_data[1]
+                    self._pos_y = position_data[2]
             else:
                 time.sleep(0.005)
 
@@ -111,33 +120,39 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
         velocity_fetcher.start()
         while not self.req_stop():
             # Check if the process has been enabled
-            with self._enable_synchrnoizer:
-                if self._is_disabled:
-                    time.sleep(0.1)
-                    continue
+            self._enable_synchrnoizer.acquire()
+            current_state = self._is_disabled
+            self._enable_synchrnoizer.release()
+            if current_state:
+                print("Process sleeping")
+                time.sleep(0.1)
+                continue
 
-            logging.debug(MODULE_IDENTIFIER + "Waiting for ripple trigger...")
+            logging.debug(self.CLASS_IDENTIFIER + "Waiting for ripple trigger...")
             with self._sync_event:
                 thread_notified = self._sync_event.wait(self._EVENT_TIMEOUT)
 
             if thread_notified:
-                print("Ripple detected.")
-                logging.debug(MODULE_IDENTIFIER + "Ripple tiggered.")
-
                 # TODO: Only include spikes that occurred a specific amount of time before now.
                 with self._position_access:
                     # If the animal is running faster than our speed threshold, ignore the ripple
-                    if self._most_recent_speed > RiD.MOVE_VELOCITY_THRESOLD:
-                        continue
+                    if self._most_recent_speed < RiD.MOVE_VELOCITY_THRESOLD:
+                        print(self.CLASS_IDENTIFIER + "Ripple tiggered. Loc (%d, %d), V %.2fcm/s" \
+                                %(self._pos_x, self._pos_y, self._most_recent_speed))
+                        logging.info(self.CLASS_IDENTIFIER + "Ripple tiggered. Loc (%d, %d), V %.2fcm/s" \
+                                %(self._pos_x, self._pos_y, self._most_recent_speed))
 
                 with self._spike_access:
                     # By default, returns 10 most frequent entries
                     most_spiking_unit = self._spike_histogram.most_common()[0][0]
 
                 # DEBUGGING: Print spike count from each of the clusters
-                print(self._place_field_handler.get_peak_firing_location(most_spiking_unit))
+                # print(self._place_field_handler.get_peak_firing_location(most_spiking_unit))
+
+        logging.info(self.CLASS_IDENTIFIER + "Main process exited.")
         spike_fetcher.join()
         velocity_fetcher.join()
+        logging.info(self.CLASS_IDENTIFIER + "Helper threads exited.")
 
 class LFPListener(ThreadExtension.StoppableThread):
     """

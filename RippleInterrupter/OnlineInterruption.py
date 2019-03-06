@@ -99,6 +99,9 @@ def main():
     place_field_handler.start()
     ripple_trigger.start()
 
+    # By default, enable the ripple trigerring 
+    ripple_trigger.enable()
+
     if __debug__:
         code_profiler.enable()
     try:

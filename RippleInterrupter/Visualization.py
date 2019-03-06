@@ -361,7 +361,7 @@ class GraphicsManager(Process):
         self._rd_ax.set_xlabel("Time (s)")
         self._rd_ax.set_ylabel("EEG (uV)")
         self._rd_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
-        self._rd_ax.set_ylim((-10000.0, 10000.0))
+        self._rd_ax.set_ylim((-3000.0, 3000.0))
         self._rd_ax.grid(True)
 
         lfp_frame, = plt.plot([], [], animated=True)
