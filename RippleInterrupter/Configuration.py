@@ -10,11 +10,14 @@ Create configuration structure for different environments with the following fie
     TODO: These haven't been added yet.
     - SPEED_THRESHOLD
 """
+import os
+import logging
 import configparser
 from tkinter import Tk, filedialog
 import xml.etree.ElementTree as ET
 
 DEFAULT_CONFIG_FILE='config/default.ini'
+MODULE_IDENTIFIER="[CONFIGURATION] "
 
 def readClusterFile(filename=None, tetrodes=None):
     """

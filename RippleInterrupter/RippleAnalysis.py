@@ -89,7 +89,7 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
                 # NOTE: spike_data received here is a tuple (cluster identity, trodes timestamp)
                 spike_data = self._spike_buffer_connection.recv()
                 with self._spike_access:
-                    if len(self._spike_access) == self._SPIKE_BUFFER_SIZE:
+                    if len(self._spike_buffer) == self._SPIKE_BUFFER_SIZE:
                         removed_spike = self._spike_buffer.popleft()
                         self._spike_histogram[removed_spike[0]] -= 1
                     # NOTE: If this starts taking too long, can switch to default dictionary
@@ -121,6 +121,7 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
                 thread_notified = self._sync_event.wait(self._EVENT_TIMEOUT)
 
             if thread_notified:
+                print("Ripple detected.")
                 logging.debug(MODULE_IDENTIFIER + "Ripple tiggered.")
 
                 # TODO: Only include spikes that occurred a specific amount of time before now.

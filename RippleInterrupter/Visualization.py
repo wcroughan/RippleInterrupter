@@ -151,7 +151,7 @@ class GraphicsManager(Process):
     __N_SPIKES_TO_PLOT = 2000
     __N_ANIMATION_FRAMES = 5000
     __PLACE_FIELD_REFRESH_RATE = 1
-    __CLUSTERS_TO_PLOT = [6]
+    __CLUSTERS_TO_PLOT = [1]
     __MAX_FIRING_RATE = 100
     __RIPPLE_DETECTION_TIMEOUT = 10.0
     def __init__(self, ripple_buffers, spike_listener, position_estimator, \

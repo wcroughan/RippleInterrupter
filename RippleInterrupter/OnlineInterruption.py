@@ -25,7 +25,6 @@ def main():
     # TODO: None of the thread classes have any clean up at the end... TBD
     # Start logging before anything else
     log_file_prefix = "replay_disruption_log"
-    # self._filename = os.getcwd() + "/" + time.strftime(file_prefix + "_%Y%m%d_%H%M%S.log")
     log_filename = time.strftime(log_file_prefix + "_%Y%m%d_%H%M%S.log")
     logging.basicConfig(filename=log_filename, format="%(asctime)s.%(msecs)03d:%(message)s", \
             level=logging.INFO, datefmt="%H:%M:%S")
@@ -38,11 +37,12 @@ def main():
         profile_filename = time.strftime(profile_prefix + "_%Y%m%d_%H%M%S.pr")
 
     # Not necessary to add a filename here. Can be read using a dialog box now
-    tetrodes_of_interest = [33, 24]
+    tetrodes_of_interest = [2, 14]
 
     # Uncomment to use a hardcoded file
     # cluster_filename = "./test_clusters.trodesClusters"
-    cluster_filename = "open_field_full_config20190220_172702.trodesClusters"
+    # cluster_filename = "open_field_full_config20190220_172702.trodesClusters"
+    cluster_filename = None
     n_units, cluster_identity_map = Configuration.readClusterFile(cluster_filename, tetrodes_of_interest)
 
     # Uncomment to let the user select a file
@@ -62,30 +62,20 @@ def main():
 
     # Start a thread for triggering analysis when ripple is triggered.
     trig_condition  = Condition()
+
     # Start threads for collecting spikes and LFP
     # Trodes needs strings!
     tetrode_argument = [str(tet) for tet in tetrodes_of_interest]
-
-    # ripple_trigger  = RippleAnalysis.RippleSynchronizer(trig_condition)
-    # ripple_detector = RippleAnalysis.RippleDetector(sg_client, tetrode_argument, \
-    #         trigger_condition=trig_condition, \
-    #         shared_buffers=(shared_raw_lfp_buffer, shared_ripple_buffer))
     lfp_listener = RippleAnalysis.LFPListener(sg_client, tetrode_argument)
     ripple_detector = RippleAnalysis.RippleDetector(lfp_listener, \
             trigger_condition=trig_condition, \
             shared_buffers=(shared_raw_lfp_buffer, shared_ripple_buffer))
-
-    # Create a buffer for spikes to be accessed until they are taken out of the
-    # queue by the Bayesian Estimator.
-    #spike_buffer = Queue()
-    #position_buffer = Queue()
 
     # Initialize threads for looking at the actual/decoded position
     spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, cluster_identity_map)
     position_estimator  = PositionAnalysis.PositionEstimator(sg_client)
     place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, shared_place_fields)
     ripple_trigger      = RippleAnalysis.RippleSynchronizer(trig_condition, spike_listener, position_estimator, place_field_handler)
-    # bayesian_estimator  = PositionDecoding.BayesianEstimator(spike_listener, place_fields)
 
     # Optionally, launch a graphics thread for continuously monitoring
     # different threads for spikes, position data and ripples and show them to
