@@ -83,7 +83,7 @@ def main():
     spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, cluster_identity_map)
     position_estimator  = PositionAnalysis.PositionEstimator(sg_client)
     place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, shared_place_fields)
-    ripple_trigger      = RippleAnalysis.RippleSynchronizer(trig_condition, spike_listener, place_field_handler)
+    ripple_trigger      = RippleAnalysis.RippleSynchronizer(trig_condition, spike_listener, position_estimator, place_field_handler)
     # bayesian_estimator  = PositionDecoding.BayesianEstimator(spike_listener, place_fields)
 
     # Optionally, launch a graphics thread for continuously monitoring
