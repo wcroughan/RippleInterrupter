@@ -8,7 +8,7 @@ import matplotlib.cm as colormap
 from matplotlib.ticker import PercentFormatter
 from mpl_toolkits.mplot3d import Axes3D
 from collections import deque
-from multiprocessing import Process
+from multiprocessing import Process, Event
 import tkinter
 import time
 from datetime import datetime
@@ -176,7 +176,7 @@ class GraphicsManager(Process):
         exit_button = tkinter.Button(self._command_window, text='Quit', command=self.kill_gui)
         exit_button.pack()
 
-        self._keep_running = True
+        self._keep_running = Event()
         self._spike_listener = spike_listener
         self._position_estimator = position_estimator
         self._place_field_handler = place_field_handler
@@ -235,7 +235,7 @@ class GraphicsManager(Process):
         # Communication buffers
         self._position_buffer = self._position_estimator.get_position_buffer_connection()
         self._spike_buffer = self._place_field_handler.get_spike_place_buffer_connection(self.__CLUSTERS_TO_PLOT)
-        logging.info("Graphics interface started.")
+        logging.info(MODULE_IDENTIFIER + "Graphics interface started.")
     
     def kill_gui(self):
         self._command_window.quit()
@@ -251,9 +251,8 @@ class GraphicsManager(Process):
             del self._pf_fig
             del self._pos_fig
             del self._anim_objs
-            self._command_window.destroy()
-            logging.info(MODULE_IDENTIFIER + "Closing GUI and display pipes")
-            self._keep_running = False
+        self._command_window.destroy()
+        self._keep_running.clear()
 
     def update_ripple_detection_frame(self, step=0):
         """
@@ -304,7 +303,7 @@ class GraphicsManager(Process):
         """
         Fetch raw LFP data and ripple power data.
         """
-        while self._keep_running:
+        while self._keep_running.is_set():
             with self._ripple_trigger_condition:
                 ripple_triggered = self._ripple_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
 
@@ -312,12 +311,13 @@ class GraphicsManager(Process):
                 np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
                 np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
                 # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
+        logging.info(MODULE_IDENTIFIER + "Ripple frame pipe closed.")
 
     def fetch_place_fields(self):
         """
         Fetch place field data from place field handler.
         """
-        while self._keep_running:
+        while self._keep_running.is_set():
             time.sleep(self.__PLACE_FIELD_REFRESH_RATE)
             # Request place field handler to pause place field calculation
             # while we fetch the data
@@ -328,9 +328,10 @@ class GraphicsManager(Process):
             #         (np.max(self._shared_place_fields), np.mean(self._shared_place_fields)))
             # Release the request that paused place field computation
             self._place_field_handler.end_immediate_request()
+        logging.info(MODULE_IDENTIFIER + "Place Field pipe closed.")
 
     def fetch_spikes_and_update_frames(self):
-        while self._keep_running:
+        while self._keep_running.is_set():
             if self._spike_buffer.poll():
                 spike_data = self._spike_buffer.recv()
                 # TODO: collect all spikes for a cluster
@@ -339,9 +340,10 @@ class GraphicsManager(Process):
                     self._spk_pos_y.append(spike_data[2])
                     self._spk_timestamps.append(spike_data[3])
                 # logging.debug(MODULE_IDENTIFIER + "Fetched spike from cluster: %d, in bin (%d, %d). TS: %d"%spike_data)
+        logging.info(MODULE_IDENTIFIER + "Spike pipe closed.")
 
     def fetch_position_and_update_frames(self):
-        while self._keep_running:
+        while self._keep_running.is_set():
             if self._position_buffer.poll():
                 position_data = self._position_buffer.recv()
                 self._pos_timestamps.append(position_data[0])
@@ -350,6 +352,7 @@ class GraphicsManager(Process):
                 self._speed.append(position_data[3])
                 # logging.debug(MODULE_IDENTIFIER + "Fetched Position data... (%d, %d), v: %.2fcm/s"% \
                 #       (position_data[1],position_data[2], position_data[3]))
+        logging.info(MODULE_IDENTIFIER + "Position pipe closed.")
 
     def process_command(self, key_in):
         print(self._key_entry.get())
@@ -428,6 +431,8 @@ class GraphicsManager(Process):
         in separate threads.
         """
 
+        self._keep_running.set()
+
         # Create a command window to take user inputs
         # gui_handler = threading.Thread(name="CommandWindow", daemon=True, \
         #         target=self._command_window.mainloop)
@@ -460,3 +465,4 @@ class GraphicsManager(Process):
         spike_fetcher.join()
         place_field_fetcher.join()
         ripple_frame_fetcher.join()
+        logging.info(MODULE_IDENTIFIER + "Closed GUI and display pipes")

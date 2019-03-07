@@ -6,7 +6,7 @@ from datetime import datetime
 from scipy import signal, stats
 from scipy.ndimage import gaussian_filter, center_of_mass
 import matplotlib.pyplot as plt
-from multiprocessing import Queue, Pipe, Condition
+from multiprocessing import Queue, Pipe, Condition, Event
 import numpy as np
 import logging
 

@@ -9,7 +9,7 @@ import logging
 from datetime import datetime
 import threading
 import collections
-from multiprocessing import Pipe, Lock
+from multiprocessing import Pipe, Lock, Event
 from scipy import signal
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -351,7 +351,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                             prev_ripple = curr_time
                             with self._trigger_condition:
                                 # First trigger interruption and all time critical operations
-                                self._trigger_condition.notify(1)
+                                self._trigger_condition.notify()
                                 curr_wall_time = time.time()
                                 ripple_unseen = True
                     if ((curr_time - prev_ripple) > RiD.LFP_BUFFER_TIME/2) and ripple_unseen:
@@ -363,7 +363,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                             # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._ripple_power_buffer))
                             with self._show_trigger:
                                 # First trigger interruption and all time critical operations
-                                self._show_trigger.notify(1)
+                                self._show_trigger.notify()
             else:
                 # logging.debug(MODULE_IDENTIFIER + "No LFP Frames to process. Sleeping")
                 time.sleep(0.005)
