@@ -154,7 +154,7 @@ class GraphicsManager(Process):
     __PLACE_FIELD_REFRESH_RATE = 1
     __PEAK_LFP_AMPLITUDE = 3000
     __CLUSTERS_TO_PLOT = [1]
-    __MAX_FIRING_RATE = 100
+    __MAX_FIRING_RATE = 40.0
     __RIPPLE_DETECTION_TIMEOUT = 1.0
     def __init__(self, ripple_buffers, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_thread, ripple_trigger_condition, \
@@ -327,8 +327,8 @@ class GraphicsManager(Process):
             # Request place field handler to pause place field calculation
             # while we fetch the data
             self._place_field_handler.submit_immediate_request()
-            # np.copyto(self._most_recent_pf, self._shared_place_fields[self.__CLUSTERS_TO_PLOT[0], :, :])
-            np.sum(self._shared_place_fields, out=self._most_recent_pf, axis=0)
+            np.copyto(self._most_recent_pf, self._shared_place_fields[self.__CLUSTERS_TO_PLOT[0], :, :])
+            # np.mean(self._shared_place_fields, out=self._most_recent_pf, axis=0)
             # logging.debug(MODULE_IDENTIFIER + "Fetched place fields. Peak FR: %.2f, Mean FR: %.2f"%\
             #         (np.max(self._shared_place_fields), np.mean(self._shared_place_fields)))
             # Release the request that paused place field computation

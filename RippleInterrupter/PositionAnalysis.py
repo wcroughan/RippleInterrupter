@@ -34,7 +34,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
     __REAL_BIN_SIZE_X = FIELD_SIZE[0]/__P_BIN_SIZE_X
     __REAL_BIN_SIZE_Y = FIELD_SIZE[1]/__P_BIN_SIZE_Y
     __SPEED_SMOOTHING_FACTOR = 0.2
-    __MAX_TIMESTAMP_JUMP = 12000
+    __MAX_TIMESTAMP_JUMP = 15000
     __MAX_REAL_TIME_JUMP = __MAX_TIMESTAMP_JUMP/RiD.SPIKE_SAMPLING_FREQ
 
     #def __init__(self, sg_client, n_bins, past_position_buffer, camera_number=1):
