@@ -17,7 +17,7 @@ from tkinter import Tk, filedialog
 import xml.etree.ElementTree as ET
 
 DEFAULT_CONFIG_FILE='config/default.ini'
-MODULE_IDENTIFIER="[CONFIGURATION] "
+MODULE_IDENTIFIER="[Configuration] "
 
 def readClusterFile(filename=None, tetrodes=None):
     """
@@ -74,7 +74,7 @@ def readClusterFile(filename=None, tetrodes=None):
         n_trode_to_cluster_idx_map[ti] = cluster_idx_to_id_map
 
     # Final value of raw_cluster_idx is a proxy for the total number of units we have
-    logging.debug(MODULE_IDENTIFIER + "Cluster map... \n", n_trode_to_cluster_idx_map)
+    logging.info(MODULE_IDENTIFIER + "Cluster map...\n%s"% n_trode_to_cluster_idx_map)
     return raw_cluster_idx, n_trode_to_cluster_idx_map
 
 def get_open_field_configuration(filename=None):
