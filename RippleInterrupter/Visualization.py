@@ -153,7 +153,9 @@ class GraphicsManager(Process):
     __N_ANIMATION_FRAMES = 5000
     __PLACE_FIELD_REFRESH_RATE = 1
     __PEAK_LFP_AMPLITUDE = 3000
-    __CLUSTERS_TO_PLOT = [1]
+    __CLUSTERS_TO_PLOT = [1,2,3]
+    __N_SUBPLOT_COLS = int(3)
+    __N_SUBPLOT_ROWS = int(1)
     __MAX_FIRING_RATE = 40.0
     __RIPPLE_DETECTION_TIMEOUT = 1.0
     def __init__(self, ripple_buffers, spike_listener, position_estimator, \
@@ -186,8 +188,10 @@ class GraphicsManager(Process):
         self._ripple_trigger_thread = ripple_trigger_thread
         self._ripple_trigger_condition = ripple_trigger_condition
         if clusters is None:
-            self._n_clusters = self._spike_listener.get_n_clusters()
-            self._clusters = range(self._n_clusters)
+            self._n_total_clusters = self._spike_listener.get_n_clusters()
+            # These are the clusters we are going to plot
+            self._n_clusters = len(self.__CLUSTERS_TO_PLOT)
+            self._clusters = self.__CLUSTERS_TO_PLOT
             self._tetrodes = self._spike_listener.get_tetrodes()
             self._n_tetrodes = len(self._tetrodes)
         else:
@@ -201,7 +205,7 @@ class GraphicsManager(Process):
         self._new_ripple_frame_availale = threading.Event()
         self._shared_raw_lfp_buffer = np.reshape(np.frombuffer(ripple_buffers[0], dtype='double'), (self._n_tetrodes, RiD.LFP_BUFFER_LENGTH))
         self._shared_ripple_power_buffer = np.reshape(np.frombuffer(ripple_buffers[1], dtype='double'), (self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH))
-        self._shared_place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), (self._n_clusters, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
+        self._shared_place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), (self._n_total_clusters, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
 
         # Local copies of the shared data that can be used at a leisurely pace
         self._lfp_tpts = np.linspace(0, RiD.LFP_BUFFER_TIME, RiD.LFP_BUFFER_LENGTH)
@@ -216,21 +220,25 @@ class GraphicsManager(Process):
         self._pos_x = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._pos_y = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._speed = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
-        self._spk_clusters = deque([], self.__N_SPIKES_TO_PLOT)
-        self._spk_timestamps = deque([], self.__N_SPIKES_TO_PLOT)
-        self._spk_pos_x = deque([], self.__N_SPIKES_TO_PLOT)
-        self._spk_pos_y = deque([], self.__N_SPIKES_TO_PLOT)
+
+        # Maintain a separate deque for each cluster to plot
+        self._spk_pos_x = []
+        self._spk_pos_y = []
+        for cl_idx in range(self._n_clusters):
+            self._spk_pos_x.append(deque([], self.__N_SPIKES_TO_PLOT))
+            self._spk_pos_y.append(deque([], self.__N_SPIKES_TO_PLOT))
 
         # Figure/Animation element. So far the following have been included
         # Ripple detection
         # Place Fields
         # Position/Spikes overalaid
+        self.__N_SUBPLOT_ROWS = int(np.ceil((self._n_clusters/self.__N_SUBPLOT_COLS)))
         self._rd_fig = None
         self._pf_fig = None
         self._pos_fig = None
         self._rd_ax = None
         self._pf_ax = None
-        self._spk_pos_ax = None
+        self._spk_pos_ax = []
         self._rd_frame = []
         self._spk_pos_frame = []
         self._pf_frame = []
@@ -269,7 +277,7 @@ class GraphicsManager(Process):
         # NOTE: This call blocks access to ripple_trigger_condition for
         # __RIPPLE_DETECTION_TIMEOUT, which could be a long while. Don't let
         # this block any important functionality.
-        if self._rd_ax is not None:
+        if self._rd_ax:
             self._rd_frame[0].set_data(self._lfp_tpts, self._local_lfp_buffer[0,:]/self.__PEAK_LFP_AMPLITUDE)
             self._rd_frame[1].set_data(self._ripple_power_tpts, -0.5 + (self._local_ripple_power_buffer[0,:] - RippleAnalysis.D_MEAN_RIPPLE_POWER)/(2 * RippleAnalysis.D_STD_RIPPLE_POWER * RiD.RIPPLE_POWER_THRESHOLD))
             return self._rd_frame
@@ -282,12 +290,12 @@ class GraphicsManager(Process):
             # print(self._pos_x)
             # print(self._pos_y)
             # TODO: Add colors based on which cluster the spikes are coming from
-            self._spk_pos_frame[0].set_data((self._spk_pos_x, self._spk_pos_y))
-            # self._spk_pos_frame[0].set_color(self._spk_clusters)
-            self._spk_pos_frame[1].set_data((self._pos_x, self._pos_y))
+            for cl_idx in range(self._n_clusters):
+                self._spk_pos_frame[cl_idx].set_data((self._spk_pos_x[cl_idx], self._spk_pos_y[cl_idx]))
+            self._spk_pos_frame[-2].set_data((self._pos_x, self._pos_y))
             if len(self._speed) > 0:
-                self._spk_pos_frame[2].set_text('speed = %.2fcm/s'%self._speed[-1])
-            return self._spk_pos_frame
+                self._spk_pos_frame[-1].set_text('speed = %.2fcm/s'%self._speed[-1])
+        return self._spk_pos_frame
 
     def update_place_field_frame(self, step=0):
         """
@@ -297,7 +305,7 @@ class GraphicsManager(Process):
         :step: Animation iteration
         :returns: Animation frames to be plotted.
         """
-        if self._pf_ax is not None:
+        if self._pf_ax:
             # print("Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._most_recent_pf), np.mean(self._most_recent_pf)))
             # min_fr = np.min(self._most_recent_pf)
             # max_fr = np.max(self._most_recent_pf)
@@ -339,11 +347,13 @@ class GraphicsManager(Process):
         while self._keep_running.is_set():
             if self._spike_buffer.poll():
                 spike_data = self._spike_buffer.recv()
-                # TODO: collect all spikes for a cluster
-                if spike_data[0] in self.__CLUSTERS_TO_PLOT:
-                    self._spk_pos_x.append(spike_data[1])
-                    self._spk_pos_y.append(spike_data[2])
-                    self._spk_timestamps.append(spike_data[3])
+                # TODO: This is a little inefficient. For every spike we get,
+                # we check to see if it is in the clusters of interest and then
+                # find its  
+                if spike_data[0] in self._clusters:
+                    data_idx = self._clusters.index(spike_data[0])
+                    self._spk_pos_x[data_idx].append(spike_data[1])
+                    self._spk_pos_y[data_idx].append(spike_data[2])
                 # logging.debug(MODULE_IDENTIFIER + "Fetched spike from cluster: %d, in bin (%d, %d). TS: %d"%spike_data)
         logging.info(MODULE_IDENTIFIER + "Spike pipe closed.")
 
@@ -396,22 +406,37 @@ class GraphicsManager(Process):
         """
         Initialize figure window for showing spikes overlaid on position
         """
-        self._pos_fig = plt.figure()
-        self._spk_pos_ax  = plt.axes()
-        self._spk_pos_ax.set_xlabel("x (bin)")
-        self._spk_pos_ax.set_ylabel("y (bin)")
-        self._spk_pos_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
-        self._spk_pos_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
-        self._spk_pos_ax.grid(True)
-
+        self._pos_fig, cluster_axes = plt.subplots(self.__N_SUBPLOT_ROWS, self.__N_SUBPLOT_COLS)
         # Create graphics entries for the actual position and also each of the spike clusters
-        pos_frame, = plt.plot([], [], animated=True)
-        spk_frame, = plt.plot([], [], linestyle='None', marker='o', alpha=0.4, animated=True)
-        # vel_frame  = plt.text(30.0, 10.0, 'speed = 0 cm/s', transform=self._spk_pos_ax.transAxes)
-        vel_frame  = plt.text(40.0, 2.0, 'speed = 0cm/s')
-        self._spk_pos_frame.append(spk_frame)
-        self._spk_pos_frame.append(pos_frame)
-        self._spk_pos_frame.append(vel_frame)
+        if (self.__N_SUBPLOT_ROWS == 1) or (self.__N_SUBPLOT_COLS == 1):
+            # Matplotlib returns a 1D array in this case, a 2D array otherwise
+            for cl_idx in range(self._n_clusters): 
+                cluster_axes[cl_idx].set_xlabel("x (bin)")
+                cluster_axes[cl_idx].set_ylabel("y (bin)")
+                cluster_axes[cl_idx].set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
+                cluster_axes[cl_idx].set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
+                cluster_axes[cl_idx].grid(True)
+                spk_frame, = cluster_axes[cl_idx].plot([], [], linestyle='None', marker='o', alpha=0.4, animated=True)
+                self._spk_pos_frame.append(spk_frame)
+            pos_frame, = cluster_axes[0].plot([], [], animated=True)
+            vel_frame  = cluster_axes[0].text(40.0, 2.0, 'speed = 0cm/s')
+            self._spk_pos_frame.append(pos_frame)
+            self._spk_pos_frame.append(vel_frame)
+        else:
+            for cl_idx in range(self._n_clusters): 
+                grid_idx = np.unravel_index(cl_idx, (self.__N_SUBPLOT_ROWS, self.__N_SUBPLOT_COLS))
+                cluster_axes[grid_idx[0]][grid_idx[1]].set_xlabel("x (bin)")
+                cluster_axes[grid_idx[0]][grid_idx[1]].set_ylabel("y (bin)")
+                cluster_axes[grid_idx[0]][grid_idx[1]].set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
+                cluster_axes[grid_idx[0]][grid_idx[1]].set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
+                cluster_axes[grid_idx[0]][grid_idx[1]].grid(True)
+                spk_frame, = cluster_axes[grid_idx[0]][grid_idx[1]].plot([], [], linestyle='None', marker='o', alpha=0.4, animated=True)
+                self._spk_pos_frame.append(spk_frame)
+            # TODO: Change this to make it the center plot?
+            pos_frame, = cluster_axes[0][0].plot([], [], animated=True)
+            vel_frame  = cluster_axes[0].text(40.0, 2.0, 'speed = 0cm/s')
+            self._spk_pos_frame.append(pos_frame)
+            self._spk_pos_frame.append(vel_frame)
 
         anim_obj = animation.FuncAnimation(self._pos_fig, self.update_position_and_spike_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
         self._anim_objs.append(anim_obj)
