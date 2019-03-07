@@ -26,7 +26,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
     Class for creating and updating place fields online
     """
     CLASS_IDENTIFIER = "[PlaceFieldHandler] "
-    _ALLOWED_TIMESTAMPS_LAG = 10000
+    _ALLOWED_TIMESTAMPS_LAG = 12000
 
     def __init__(self, position_processor, spike_processor, shared_place_fields):
     # def __init__(self, position_processor, spike_processor, place_fields):

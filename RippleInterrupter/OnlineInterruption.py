@@ -39,13 +39,16 @@ def main():
         profile_filename = time.strftime(profile_prefix + "_%Y%m%d_%H%M%S.pr")
 
     # Not necessary to add a filename here. Can be read using a dialog box now
-    tetrodes_of_interest = [2, 14]
+    # tetrodes_of_interest = [2, 14]
+    tetrodes_of_interest = None
 
     # Uncomment to use a hardcoded file
     # cluster_filename = "./test_clusters.trodesClusters"
     # cluster_filename = "open_field_full_config20190220_172702.trodesClusters"
     cluster_filename = None
     n_units, cluster_identity_map = Configuration.readClusterFile(cluster_filename, tetrodes_of_interest)
+    if tetrodes_of_interest is None:
+        tetrodes_of_interest = list(cluster_identity_map.keys())
 
     # Uncomment to let the user select a file
     # n_units, cluster_identity_map = SpikeAnalysis.readClusterFile(tetrodes=tetrodes_of_interest)
