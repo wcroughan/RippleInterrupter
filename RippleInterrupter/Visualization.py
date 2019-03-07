@@ -153,7 +153,7 @@ class GraphicsManager(Process):
     __PLACE_FIELD_REFRESH_RATE = 1
     __CLUSTERS_TO_PLOT = [1]
     __MAX_FIRING_RATE = 100
-    __RIPPLE_DETECTION_TIMEOUT = 10.0
+    __RIPPLE_DETECTION_TIMEOUT = 1.0
     def __init__(self, ripple_buffers, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_condition, shared_place_fields, clusters=None):
         """TODO: to be defined1.
@@ -235,6 +235,7 @@ class GraphicsManager(Process):
         # Communication buffers
         self._position_buffer = self._position_estimator.get_position_buffer_connection()
         self._spike_buffer = self._place_field_handler.get_spike_place_buffer_connection(self.__CLUSTERS_TO_PLOT)
+        logging.info("Graphics interface started.")
     
     def kill_gui(self):
         self._command_window.quit()
@@ -251,6 +252,8 @@ class GraphicsManager(Process):
             del self._pos_fig
             del self._anim_objs
             self._command_window.destroy()
+            logging.info(MODULE_IDENTIFIER + "Closing GUI and display pipes")
+            self._keep_running = False
 
     def update_ripple_detection_frame(self, step=0):
         """
@@ -303,10 +306,12 @@ class GraphicsManager(Process):
         """
         while self._keep_running:
             with self._ripple_trigger_condition:
-                self._ripple_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
-            np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
-            np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
-            # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
+                ripple_triggered = self._ripple_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
+
+            if ripple_triggered:
+                np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
+                np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
+                # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
 
     def fetch_place_fields(self):
         """
@@ -451,8 +456,6 @@ class GraphicsManager(Process):
 
         # This is a blocking command... After you exit this, everything will end.
         self._command_window.mainloop()
-        logging.info(MODULE_IDENTIFIER + datetime.now().strftime("Closing GUI and display pipes at %H:%M:%S.%f"))
-        self._keep_running = False
         position_fetcher.join()
         spike_fetcher.join()
         place_field_fetcher.join()

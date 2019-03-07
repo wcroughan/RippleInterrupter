@@ -33,7 +33,9 @@ class PositionEstimator(ThreadExtension.StoppableThread):
     __P_BIN_SIZE_Y = (__P_MAX_Y - __P_MIN_Y)
     __REAL_BIN_SIZE_X = FIELD_SIZE[0]/__P_BIN_SIZE_X
     __REAL_BIN_SIZE_Y = FIELD_SIZE[1]/__P_BIN_SIZE_Y
-    __SPEED_SMOOTHING_FACTOR = 0.1
+    __SPEED_SMOOTHING_FACTOR = 0.2
+    __MAX_TIMESTAMP_JUMP = 12000
+    __MAX_REAL_TIME_JUMP = __MAX_TIMESTAMP_JUMP/RiD.SPIKE_SAMPLING_FREQ
 
     #def __init__(self, sg_client, n_bins, past_position_buffer, camera_number=1):
     def __init__(self, sg_client, n_bins=N_POSITION_BINS, camera_number=1):
@@ -115,6 +117,8 @@ class PositionEstimator(ThreadExtension.StoppableThread):
         # stamp, we will have to ignore the first data entry obtained here.
         # Otherwise it will skew the occupancy!
         prev_step_timestamp = 0
+        real_time_spent_in_prev_bin = 0.0
+        real_distance_moved = 0.0
 
         # NOTE: For this thread, data is not streaming in quite as fast and as
         # a result, most of the time is spent in self.req_stop(). Maybe adding
@@ -125,6 +129,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                 time.sleep(0.02)
             for frame_idx in range(n_available_frames):
                 self._position_consumer.readData(self._data_field)
+                current_timestamp = self._data_field['timestamp']
                 (curr_x_bin, curr_y_bin) = self.getXYBin()
                 # DEBUG - Desparate
                 """
@@ -138,13 +143,12 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                     # First recorded bin!
                     #self._past_position_buffer.put((self._data_field['timestamp'], curr_bin_id))
                     for outp in self._position_buffer_connections:
-                        outp.send((self._data_field['timestamp'], curr_x_bin, curr_y_bin, 0.0))
+                        outp.send((current_timestamp, curr_x_bin, curr_y_bin, 0.0))
                     prev_x_bin = curr_x_bin
                     prev_y_bin = curr_y_bin
                     logging.info(MODULE_IDENTIFIER + "Position Started (%d, %d)"%(curr_x_bin, curr_y_bin))
-                    prev_step_timestamp = copy(self._data_field['timestamp'])
+                    prev_step_timestamp = copy(current_timestamp)
                 elif ((curr_x_bin != prev_x_bin) or (curr_y_bin != prev_y_bin)):
-                    current_timestamp = self._data_field['timestamp']
                     time_spent_in_prev_bin = current_timestamp - prev_step_timestamp
 
                     # This is some serious overkill.. Most of the times, we
@@ -179,6 +183,14 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                     prev_step_timestamp = copy(current_timestamp)
                     prev_x_bin = curr_x_bin
                     prev_y_bin = curr_y_bin
+                elif (current_timestamp - prev_step_timestamp) > self.__MAX_TIMESTAMP_JUMP:
+                    # We know the animal is in the same position as before!
+                    # TODO: Make speed half of its
+                    real_time_spent_in_prev_bin += self.__MAX_REAL_TIME_JUMP
+                    last_velocity = (1 - self.__SPEED_SMOOTHING_FACTOR) * real_distance_moved/real_time_spent_in_prev_bin + \
+                            self.__SPEED_SMOOTHING_FACTOR * last_velocity
+                    for outp in self._position_buffer_connections:
+                        outp.send((current_timestamp, curr_x_bin, curr_y_bin, last_velocity))
 
         if __debug__:
             code_profiler.disable()
