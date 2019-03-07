@@ -32,6 +32,7 @@ def readClusterFile(filename=None, tetrodes=None):
         gui_root = Tk()
         gui_root.wm_withdraw()
         filename = filedialog.askopenfilename(initialdir = os.getcwd(), title = "Select Cluster file",filetypes = (("cluster files","*.trodesClusters"),("all files","*.*")))
+        gui_root.destroy()
 
     try:
         cluster_tree = ET.parse(filename)
