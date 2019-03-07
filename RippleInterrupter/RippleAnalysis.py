@@ -16,6 +16,7 @@ import matplotlib.animation as animation
 import numpy as np
 
 # Local file imports
+import SerialPort
 import TrodesInterface
 import ThreadExtension
 import RippleDefinitions as RiD
@@ -59,6 +60,12 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
         self._pos_y = -1
         self._most_recent_speed = 0
         self._most_recent_pos_timestamp = 0
+        self._serial_port = None
+        try:
+            self._serial_port = SerialPort.BiphasicPort()
+        except Exception as err:
+            logging.warning("Unable to open Serial port.")
+            print(err)
         logging.info(self.CLASS_IDENTIFIER + "Started Ripple Synchronization thread.")
 
     def enable(self):
