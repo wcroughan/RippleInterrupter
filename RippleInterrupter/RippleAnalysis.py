@@ -341,7 +341,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                     power_to_baseline_ratio = np.divide(current_ripple_power - self._mean_ripple_power, self._std_ripple_power)
 
                     # Timestamp has both trodes and system timestamps!
-                    curr_time = float(timestamp)/RiD.LFP_FREQUENCY
+                    curr_time = float(timestamp)/RiD.SPIKE_SAMPLING_FREQ
                     logging.debug(MODULE_IDENTIFIER + "Frame @ %d filtered, mean ripple strength %.2f"%(timestamp, np.mean(power_to_baseline_ratio)))
                     if ((curr_time - prev_ripple) > RiD.RIPPLE_REFRACTORY_PERIOD):
                         # TODO: Consider switching to all, or atleast a majority of tetrodes for ripple detection.
@@ -360,7 +360,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                         if len(self._local_lfp_buffer) == RiD.LFP_BUFFER_LENGTH:
                             np.copyto(self._raw_lfp_buffer, np.asarray(self._local_lfp_buffer).T)
                             np.copyto(self._ripple_power_buffer, np.asarray(self._local_ripple_power_buffer).T)
-                            # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._ripple_power_buffer))
+                            print(MODULE_IDENTIFIER + "%.2fs: Peak ripple power in frame %.2f"%(curr_time, np.max(self._ripple_power_buffer)))
                             with self._show_trigger:
                                 # First trigger interruption and all time critical operations
                                 self._show_trigger.notify()
