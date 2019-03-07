@@ -45,6 +45,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         self._spike_place_buffer_connections = []
         self._field_statistics_connection = None
         self._requested_clusters = []
+        self._place_field_filename = time.strftime("place_field_log" + "_%Y%m%d_%H%M%S")
         csv_filename = time.strftime("spike_data_log" + "_%Y%m%d_%H%M%S.csv")
         try:
             self._csv_file = open(csv_filename, mode='w')
@@ -200,6 +201,8 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                     np.log(self._place_fields, out=self._log_place_fields, where=self._place_fields!=0)
                     logging.info(self.CLASS_IDENTIFIER + "Fields updated. Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._place_fields), np.mean(self._place_fields)))
         self._csv_file.close()
+        # Dump all the calculated place fields in a file
+        np.save(self._place_field_filename, self._place_fields)
 
     def submit_immediate_request(self):
         """
