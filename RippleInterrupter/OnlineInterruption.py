@@ -84,7 +84,7 @@ def main():
     # different threads for spikes, position data and ripples and show them to
     # the user in real time.
     graphical_interface = Visualization.GraphicsManager((shared_raw_lfp_buffer, shared_ripple_buffer), spike_listener, \
-            position_estimator, place_field_handler, show_trigger, shared_place_fields)
+            position_estimator, place_field_handler, ripple_trigger, show_trigger, shared_place_fields)
 
     # Spawn threads for handling all the place fields. We can convert this into
     # separate threads for separate fields too but that seems overkill at this

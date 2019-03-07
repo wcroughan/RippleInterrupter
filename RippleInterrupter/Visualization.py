@@ -17,6 +17,7 @@ import logging
 import numpy as np
 
 # Local Imports
+import RippleAnalysis
 import PositionAnalysis
 import RippleDefinitions as RiD
 
@@ -151,13 +152,15 @@ class GraphicsManager(Process):
     __N_SPIKES_TO_PLOT = 2000
     __N_ANIMATION_FRAMES = 5000
     __PLACE_FIELD_REFRESH_RATE = 1
+    __PEAK_LFP_AMPLITUDE = 3000
     __CLUSTERS_TO_PLOT = [1]
     __MAX_FIRING_RATE = 100
     __RIPPLE_DETECTION_TIMEOUT = 1.0
     def __init__(self, ripple_buffers, spike_listener, position_estimator, \
-            place_field_handler, ripple_trigger_condition, shared_place_fields, clusters=None):
-        """TODO: to be defined1.
-
+            place_field_handler, ripple_trigger_thread, ripple_trigger_condition, \
+            shared_place_fields, clusters=None):
+        """
+        Graphical Manager for all the processes
         :ripple_analyzer: Process/Thread listening to LFP and detecting ripples
         :spike_listener: Thread listening to incoming raw spike stream from trodes.
         :position_estimator: Thread listening to position data from camera stream
@@ -180,6 +183,7 @@ class GraphicsManager(Process):
         self._spike_listener = spike_listener
         self._position_estimator = position_estimator
         self._place_field_handler = place_field_handler
+        self._ripple_trigger_thread = ripple_trigger_thread
         self._ripple_trigger_condition = ripple_trigger_condition
         if clusters is None:
             self._n_clusters = self._spike_listener.get_n_clusters()
@@ -231,6 +235,7 @@ class GraphicsManager(Process):
         self._spk_pos_frame = []
         self._pf_frame = []
         self._anim_objs = []
+        self._thread_list = []
 
         # Communication buffers
         self._position_buffer = self._position_estimator.get_position_buffer_connection()
@@ -265,8 +270,8 @@ class GraphicsManager(Process):
         # __RIPPLE_DETECTION_TIMEOUT, which could be a long while. Don't let
         # this block any important functionality.
         if self._rd_ax is not None:
-            self._rd_frame[0].set_data(self._lfp_tpts, self._local_lfp_buffer[0,:])
-            self._rd_frame[1].set_data(self._ripple_power_tpts, self._local_ripple_power_buffer[0,:])
+            self._rd_frame[0].set_data(self._lfp_tpts, self._local_lfp_buffer[0,:]/self.__PEAK_LFP_AMPLITUDE)
+            self._rd_frame[1].set_data(self._ripple_power_tpts, -0.5 + (self._local_ripple_power_buffer[0,:] - RippleAnalysis.D_MEAN_RIPPLE_POWER)/(2 * RippleAnalysis.D_STD_RIPPLE_POWER * RiD.RIPPLE_POWER_THRESHOLD))
             return self._rd_frame
 
     def update_position_and_spike_frame(self, step=0):
@@ -355,7 +360,13 @@ class GraphicsManager(Process):
         logging.info(MODULE_IDENTIFIER + "Position pipe closed.")
 
     def process_command(self, key_in):
-        print(self._key_entry.get())
+        user_input = self._key_entry.get()
+        if user_input == 's':
+            print('Pausing ripple interruption.')
+            self._ripple_trigger_thread.disable()
+        elif user_input == 'r':
+            print('Resuming ripple interruption.')
+            self._ripple_trigger_thread.enable()
         self._key_entry.delete(0, tkinter.END)
         pass
 
@@ -369,7 +380,7 @@ class GraphicsManager(Process):
         self._rd_ax.set_xlabel("Time (s)")
         self._rd_ax.set_ylabel("EEG (uV)")
         self._rd_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
-        self._rd_ax.set_ylim((-3000.0, 3000.0))
+        self._rd_ax.set_ylim((-1.0, 1.0))
         self._rd_ax.grid(True)
 
         lfp_frame, = plt.plot([], [], animated=True)

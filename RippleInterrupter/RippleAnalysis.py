@@ -9,7 +9,7 @@ import logging
 from datetime import datetime
 import threading
 import collections
-from multiprocessing import Pipe, Lock, Event
+from multiprocessing import Pipe, Lock, Event, Value
 from scipy import signal
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -50,8 +50,9 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
         self._place_field_handler = place_field_handler
         self._position_access = Lock()
         self._spike_access = Lock()
+        # TODO: This functionality should be moved to the parent class
         self._enable_synchrnoizer = Lock()
-        self._is_disabled = False
+        self._is_disabled = Value("b", False)
 
         # Position data at the time ripple is triggered
         self._pos_x = -1
@@ -62,13 +63,13 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
 
     def enable(self):
         self._enable_synchrnoizer.acquire()
-        self._is_disabled = False
+        self._is_disabled.value = False
         logging.info(self.CLASS_IDENTIFIER + "Ripple disruption ENABLED.")
         self._enable_synchrnoizer.release()
 
     def disable(self):
         self._enable_synchrnoizer.acquire()
-        self._is_disabled = True
+        self._is_disabled.value = True
         logging.info(self.CLASS_IDENTIFIER + "Ripple disruption DISABLED.")
         self._enable_synchrnoizer.release()
 
@@ -121,10 +122,10 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
         while not self.req_stop():
             # Check if the process has been enabled
             self._enable_synchrnoizer.acquire()
-            current_state = self._is_disabled
+            current_state = self._is_disabled.value
             self._enable_synchrnoizer.release()
             if current_state:
-                print("Process sleeping")
+                logging.debug(self.CLASS_IDENTIFIER + "Process sleeping")
                 time.sleep(0.1)
                 continue
 
@@ -143,8 +144,11 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
                                 %(self._pos_x, self._pos_y, self._most_recent_speed))
 
                 with self._spike_access:
-                    # By default, returns 10 most frequent entries
-                    most_spiking_unit = self._spike_histogram.most_common()[0][0]
+                    if len(self._spike_buffer) > 0:
+                        # By default, returns 10 most frequent entries
+                        most_spiking_unit = self._spike_histogram.most_common()[0][0]
+                        most_recent_spike_time = self._spike_buffer[-1][1]
+                        logging.info(self.CLASS_IDENTIFIER + "Most recent spike at %d"%most_recent_spike_time)
 
                 # DEBUGGING: Print spike count from each of the clusters
                 # print(self._place_field_handler.get_peak_firing_location(most_spiking_unit))
@@ -360,7 +364,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                         if len(self._local_lfp_buffer) == RiD.LFP_BUFFER_LENGTH:
                             np.copyto(self._raw_lfp_buffer, np.asarray(self._local_lfp_buffer).T)
                             np.copyto(self._ripple_power_buffer, np.asarray(self._local_ripple_power_buffer).T)
-                            print(MODULE_IDENTIFIER + "%.2fs: Peak ripple power in frame %.2f"%(curr_time, np.max(self._ripple_power_buffer)))
+                            logging.info(MODULE_IDENTIFIER + "%.2fs: Peak ripple power in frame %.2f"%(curr_time, np.max(self._ripple_power_buffer)))
                             with self._show_trigger:
                                 # First trigger interruption and all time critical operations
                                 self._show_trigger.notify()
