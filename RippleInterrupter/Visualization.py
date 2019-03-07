@@ -286,7 +286,7 @@ class GraphicsManager(Process):
         """
         Function used for animating the current position of the animal.
         """
-        if  self._spk_pos_ax:
+        if  self._pos_fig:
             # print(self._pos_x)
             # print(self._pos_y)
             # TODO: Add colors based on which cluster the spikes are coming from
