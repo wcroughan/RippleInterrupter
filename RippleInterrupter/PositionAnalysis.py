@@ -26,10 +26,10 @@ class PositionEstimator(ThreadExtension.StoppableThread):
     """
 
     # Min/Max position values in x and y to be used for binning
-    __P_MIN_X = 200
+    __P_MIN_X = 100
     __P_MIN_Y = -100
-    __P_MAX_X = 1200
-    __P_MAX_Y = 1000
+    __P_MAX_X = 1300
+    __P_MAX_Y = 1100
     __P_BIN_SIZE_X = (__P_MAX_X - __P_MIN_X)
     __P_BIN_SIZE_Y = (__P_MAX_Y - __P_MIN_Y)
     __REAL_BIN_SIZE_X = FIELD_SIZE[0]/__P_BIN_SIZE_X
@@ -91,6 +91,16 @@ class PositionEstimator(ThreadExtension.StoppableThread):
         x_bin = np.floor_divide(self._n_bins_x * (px - self.__P_MIN_X),self.__P_BIN_SIZE_X)
         # Camera data coming in has flipped Y-coordinates!
         y_bin = np.floor_divide(self._n_bins_y * (self.__P_MAX_Y - py),self.__P_BIN_SIZE_Y)
+
+        if x_bin < 0:
+            x_bin = 0
+        elif x_bin > self._n_bins_x:
+            x_bin = self._n_bins_x-1
+
+        if y_bin < 0:
+            y_bin = 0
+        elif y_bin > self._n_bins_y:
+            y_bin = self._n_bins_y-1
         return (x_bin, y_bin)
 
     """
