@@ -1,5 +1,6 @@
 #System imports
 import os
+import csv
 import time
 import threading
 from datetime import datetime
@@ -44,6 +45,15 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         self._spike_place_buffer_connections = []
         self._field_statistics_connection = None
         self._requested_clusters = []
+        csv_filename = time.strftime("spike_data_log" + "_%Y%m%d_%H%M%S.csv")
+        try:
+            self._csv_file = open(csv_filename, mode='w')
+            self._csv_writer = csv.writer(self._csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            self._csv_writer.writerow(['CLUSTER_ID', 'TIMESTAMP', 'POS_X', 'POS_Y', 'SPEED'])
+        except Exception as err:
+            self._csv_writer = None
+            logging.critical(MODULE_IDENTIFIER + "Unable to open log file.")
+            print(err)
         logging.info(self.CLASS_IDENTIFIER + "Started thread for building place fields.")
 
     def get_field_CoM(self, cluster_idx=None):
@@ -174,6 +184,9 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                     curr_speed = 0
                     break
 
+                if self._csv_writer:
+                    self._csv_writer.writerow([spk_cl, spk_time, curr_posbin_x, curr_posbin_y, curr_speed])
+
             if pf_update_spk_iter >= update_pf_every_n_spks and not self._has_pf_request:
                 logging.info(MODULE_IDENTIFIER + "Updating place fields. Last spike at %d"%spk_time)
                 with self._place_field_lock:
@@ -186,6 +199,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                     gaussian_filter(self._place_fields, sigma=3, output=self._place_fields)
                     np.log(self._place_fields, out=self._log_place_fields, where=self._place_fields!=0)
                     logging.info(self.CLASS_IDENTIFIER + "Fields updated. Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._place_fields), np.mean(self._place_fields)))
+        self._csv_file.close()
 
     def submit_immediate_request(self):
         """

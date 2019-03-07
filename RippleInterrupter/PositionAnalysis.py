@@ -1,6 +1,7 @@
 """
 Collect position data from trodes
 """
+import csv
 import threading
 import time
 from copy import copy
@@ -61,8 +62,17 @@ class PositionEstimator(ThreadExtension.StoppableThread):
             logging.warning("Failed to open Camera Module")
             raise Exception("Could not connect to camera, aborting.")
         self._position_consumer.initialize()
-        logging.info(MODULE_IDENTIFIER + "Starting Position tracking thread")
+        csv_filename = time.strftime("position_data_log" + "_%Y%m%d_%H%M%S.csv")
+        try:
+            self._csv_file = open(csv_filename, mode='w')
+            self._csv_writer = csv.writer(self._csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            self._csv_writer.writerow(['TIMESTAMP', 'POS_X', 'POS_Y'])
+        except Exception as err:
+            self._csv_writer = None
+            logging.critical(MODULE_IDENTIFIER + "Unable to open log file.")
+            print(err)
 
+        logging.info(MODULE_IDENTIFIER + "Starting Position tracking thread")
         self._position_buffer_connections = []
 
     def getPositionBin(self):
@@ -191,6 +201,10 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                             self.__SPEED_SMOOTHING_FACTOR * last_velocity
                     for outp in self._position_buffer_connections:
                         outp.send((current_timestamp, curr_x_bin, curr_y_bin, last_velocity))
+                if self._csv_writer:
+                    self._csv_writer.writerow([current_timestamp, self._data_field['position_x'], self._data_field['position_y']])
+
+        self._csv_file.close()
 
         if __debug__:
             code_profiler.disable()
