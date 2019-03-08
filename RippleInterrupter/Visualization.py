@@ -17,6 +17,7 @@ import logging
 import numpy as np
 
 # Local Imports
+import Configuration
 import RippleAnalysis
 import PositionAnalysis
 import RippleDefinitions as RiD
@@ -153,7 +154,7 @@ class GraphicsManager(Process):
     __N_ANIMATION_FRAMES = 5000
     __PLACE_FIELD_REFRESH_RATE = 1
     __PEAK_LFP_AMPLITUDE = 3000
-    __CLUSTERS_TO_PLOT = [1,4,5]
+    __CLUSTERS_TO_PLOT = Configuration.EXPERIMENT_DAY_20190307__ALL_INTERESTING_CLUSTERS
     __N_SUBPLOT_COLS = int(3)
     __N_SUBPLOT_ROWS = int(1)
     __MAX_FIRING_RATE = 40.0
@@ -435,7 +436,7 @@ class GraphicsManager(Process):
                 self._spk_pos_frame.append(spk_frame)
             # TODO: Change this to make it the center plot?
             pos_frame, = self._spk_pos_ax[0][0].plot([], [], animated=True)
-            vel_frame  = self._spk_pos_ax[0].text(40.0, 2.0, 'speed = 0cm/s')
+            vel_frame  = self._spk_pos_ax[0][0].text(40.0, 2.0, 'speed = 0cm/s')
             self._spk_pos_frame.append(pos_frame)
             self._spk_pos_frame.append(vel_frame)
 

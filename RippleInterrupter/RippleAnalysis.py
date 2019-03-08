@@ -115,7 +115,7 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
                         self._spike_histogram[removed_spike[0]] -= 1
                     spike_cluster = spike_data[0]
                     if (spike_cluster in self._clusters_of_interest[0]) or \
-                            (spike_cluster in self._clusters_of_interest[1])
+                            (spike_cluster in self._clusters_of_interest[1]):
                         # NOTE: If this starts taking too long, can switch to default dictionary
                         self._spike_buffer.append(spike_data)
                         self._spike_histogram[spike_cluster] += 1
@@ -152,6 +152,7 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
                 with self._position_access:
                     # If the animal is running faster than our speed threshold, ignore the ripple
                     if self._most_recent_speed < RiD.MOVE_VELOCITY_THRESOLD:
+                        self._serial_port.sendBiphasicPulse()
                         print(self.CLASS_IDENTIFIER + "Ripple tiggered. Loc (%d, %d), V %.2fcm/s" \
                                 %(self._pos_x, self._pos_y, self._most_recent_speed))
                         logging.info(self.CLASS_IDENTIFIER + "Ripple tiggered. Loc (%d, %d), V %.2fcm/s" \
