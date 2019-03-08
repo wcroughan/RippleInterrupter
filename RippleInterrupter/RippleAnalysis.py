@@ -210,12 +210,19 @@ class LFPListener(ThreadExtension.StoppableThread):
             profile_filename = time.strftime(profile_prefix + "_%Y%m%d_%H%M%S.pr")
             code_profiler.enable()
 
+        down_time = 0.0
         n_frames_fetched = 0
         while not self.req_stop():
             n_lfp_frames = self._lfp_stream.available(0)
             if n_lfp_frames == 0:
                 # logging.debug(self.CLASS_IDENTIFIER + "No LFP Frames to read... Sleeping.")
+                down_time += 0.001
                 time.sleep(0.001)
+                if down_time > 1.0:
+                    down_time = 0.0
+                    print(self.CLASS_IDENTIFIER + "Warning: Not receiving LFP data.")
+            else:
+                down_time = 0.0
             for frame_idx in range(n_lfp_frames):
                 timestamp = self._lfp_stream.getData()
                 n_frames_fetched += 1
@@ -314,9 +321,12 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         # Delay measures for ripple detection (and trigger)
         ripple_unseen = False
         prev_ripple = -np.Inf
-        curr_time   = 0
+        curr_time   = 0.0
         start_wall_time = time.time()
         curr_wall_time = start_wall_time
+
+        # Keep track of the total time for which nothing was received
+        down_time = 0.0
         while not self.req_stop():
             # Acquire buffered LFP frames and fill them in a filter buffer
             if self._lfp_consumer.poll():
@@ -325,6 +335,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                 raw_lfp_window[:, lfp_window_ptr] = current_lfp_frame
                 self._local_lfp_buffer.append(current_lfp_frame)
                 lfp_window_ptr += 1
+                down_time = 0.0
 
                 # If the filter window is full, filter the data and record it in rippple power
                 if (lfp_window_ptr == RiD.LFP_FILTER_ORDER):
@@ -358,14 +369,14 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                     if ((curr_time - prev_ripple) > RiD.RIPPLE_REFRACTORY_PERIOD):
                         # TODO: Consider switching to all, or atleast a majority of tetrodes for ripple detection.
                         if (power_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD).any():
-                            logging.info(MODULE_IDENTIFIER + "Detected ripple at %.2f. Peak Strength: %.2f"% \
-                                    (curr_time, np.max(power_to_baseline_ratio)))
                             prev_ripple = curr_time
                             with self._trigger_condition:
                                 # First trigger interruption and all time critical operations
                                 self._trigger_condition.notify()
                                 curr_wall_time = time.time()
                                 ripple_unseen = True
+                            logging.info(MODULE_IDENTIFIER + "Detected ripple at %.2f, TS: %d. Peak Strength: %.2f"% \
+                                    (curr_time, timestamp, np.max(power_to_baseline_ratio)))
                     if ((curr_time - prev_ripple) > RiD.LFP_BUFFER_TIME/2) and ripple_unseen:
                         ripple_unseen = False
                         # Copy data over for visualization
@@ -379,6 +390,10 @@ class RippleDetector(ThreadExtension.StoppableProcess):
             else:
                 # logging.debug(MODULE_IDENTIFIER + "No LFP Frames to process. Sleeping")
                 time.sleep(0.005)
+                down_time += 0.005
+                if down_time > 1.0:
+                    print(MODULE_IDENTIFIER + "Warning: Not receiving LFP data.")
+                    down_time = 0.0
 """
 Code below here is from the previous iterations where we were using a single
 file to detect and disrupt all ripples based on the LFP on a single tetrode.

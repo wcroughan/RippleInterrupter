@@ -43,7 +43,17 @@ def main():
     # cluster_filename = "./test_clusters.trodesClusters"
     # cluster_filename = "open_field_full_config20190220_172702.trodesClusters"
     cluster_filename = None
-    n_units, cluster_identity_map = Configuration.readClusterFile(cluster_filename, tetrodes_of_interest)
+    cluster_config = Configuration.readClusterFile(cluster_filename, tetrodes_of_interest)
+    if cluster_config is not None:
+        n_units = cluster_config[0]
+        cluster_identity_map = cluster_config[1]
+    else:
+        print("Warning: Unable to read cluster file. Using default map.")
+        n_units = 1
+        cluster_identity_map = dict()
+        cluster_identity_map[2] = {1: 0}
+        cluster_identity_map[14] = {}
+    print(cluster_identity_map)
 
     # Uncomment to let the user select a file
     # n_units, cluster_identity_map = SpikeAnalysis.readClusterFile(tetrodes=tetrodes_of_interest)
@@ -69,16 +79,20 @@ def main():
     # Start threads for collecting spikes and LFP
     # Trodes needs strings!
     tetrode_argument = [str(tet) for tet in tetrodes_of_interest]
-    lfp_listener = RippleAnalysis.LFPListener(sg_client, tetrode_argument)
-    ripple_detector = RippleAnalysis.RippleDetector(lfp_listener, \
-            trigger_condition=(trig_condition, show_trigger), \
-            shared_buffers=(shared_raw_lfp_buffer, shared_ripple_buffer))
+    try:
+        lfp_listener = RippleAnalysis.LFPListener(sg_client, tetrode_argument)
+        ripple_detector = RippleAnalysis.RippleDetector(lfp_listener, \
+                trigger_condition=(trig_condition, show_trigger), \
+                shared_buffers=(shared_raw_lfp_buffer, shared_ripple_buffer))
 
-    # Initialize threads for looking at the actual/decoded position
-    spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, cluster_identity_map)
-    position_estimator  = PositionAnalysis.PositionEstimator(sg_client)
-    place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, shared_place_fields)
-    ripple_trigger      = RippleAnalysis.RippleSynchronizer(trig_condition, spike_listener, position_estimator, place_field_handler)
+        # Initialize threads for looking at the actual/decoded position
+        spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, cluster_identity_map)
+        position_estimator  = PositionAnalysis.PositionEstimator(sg_client)
+        place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, shared_place_fields)
+        ripple_trigger      = RippleAnalysis.RippleSynchronizer(trig_condition, spike_listener, position_estimator, place_field_handler)
+    except Exception as err:
+        print(err)
+        return
 
     # Optionally, launch a graphics thread for continuously monitoring
     # different threads for spikes, position data and ripples and show them to

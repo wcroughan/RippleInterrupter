@@ -328,7 +328,7 @@ class GraphicsManager(Process):
             # while we fetch the data
             self._place_field_handler.submit_immediate_request()
             # np.copyto(self._most_recent_pf, self._shared_place_fields[self.__CLUSTERS_TO_PLOT[0], :, :])
-            np.sum(self._shared_place_fields, out=self._most_recent_pf, axis=0)
+            np.mean(self._shared_place_fields, out=self._most_recent_pf, axis=0)
             # logging.debug(MODULE_IDENTIFIER + "Fetched place fields. Peak FR: %.2f, Mean FR: %.2f"%\
             #         (np.max(self._shared_place_fields), np.mean(self._shared_place_fields)))
             # Release the request that paused place field computation
