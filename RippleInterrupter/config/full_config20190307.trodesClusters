@@ -1,0 +1,689 @@
+<?xml version="1.0"?>
+<SpikeSortingInfo>
+ <PolygonClusters uV_conversion_denominator="65536" Timepoint="98714844" uV_conversion_numerator="12780" Method="Manually drawn polygons">
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="0" nTrodeID="1"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="1" nTrodeID="2">
+   <Cluster clusterIndex="1">
+    <Polygon xAxis="0" yAxis="1">
+     <Vertex y="1922" x="1273"/>
+     <Vertex y="4513" x="2833"/>
+     <Vertex y="4112" x="3682"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="2">
+    <Polygon xAxis="0" yAxis="1">
+     <Vertex y="2777" x="1644"/>
+     <Vertex y="1721" x="1084"/>
+     <Vertex y="1911" x="548"/>
+     <Vertex y="3015" x="1400"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="3">
+    <Polygon xAxis="0" yAxis="1">
+     <Vertex y="1720" x="812"/>
+     <Vertex y="1497" x="1094"/>
+     <Vertex y="869" x="432"/>
+     <Vertex y="894" x="176"/>
+     <Vertex y="1634" x="609"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="4">
+    <Polygon xAxis="0" yAxis="1">
+     <Vertex y="1454" x="2048"/>
+     <Vertex y="1092" x="2101"/>
+     <Vertex y="1359" x="3019"/>
+     <Vertex y="1910" x="2560"/>
+     <Vertex y="1910" x="2507"/>
+     <Vertex y="1789" x="2330"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="5">
+    <Polygon xAxis="0" yAxis="1">
+     <Vertex y="671" x="997"/>
+     <Vertex y="352" x="662"/>
+     <Vertex y="232" x="723"/>
+     <Vertex y="688" x="1845"/>
+     <Vertex y="1187" x="2021"/>
+     <Vertex y="1342" x="1677"/>
+     <Vertex y="972" x="1200"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="6">
+    <Polygon xAxis="0" yAxis="3">
+     <Vertex y="1669" x="423"/>
+     <Vertex y="2632" x="1651"/>
+     <Vertex y="3011" x="653"/>
+     <Vertex y="2340" x="194"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="7">
+    <Polygon xAxis="0" yAxis="2">
+     <Vertex y="655" x="277"/>
+     <Vertex y="887" x="783"/>
+     <Vertex y="1635" x="1211"/>
+     <Vertex y="1566" x="546"/>
+     <Vertex y="732" x="245"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="8">
+    <Polygon xAxis="1" yAxis="3">
+     <Vertex y="541" x="1145"/>
+     <Vertex y="130" x="395"/>
+     <Vertex y="84" x="643"/>
+     <Vertex y="372" x="1346"/>
+    </Polygon>
+   </Cluster>
+  </nTrode>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="2" nTrodeID="3">
+   <Cluster clusterIndex="1">
+    <Polygon xAxis="0" yAxis="2">
+     <Vertex y="766" x="315"/>
+     <Vertex y="1064" x="750"/>
+     <Vertex y="1967" x="973"/>
+     <Vertex y="1624" x="310"/>
+     <Vertex y="1205" x="227"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="2">
+    <Polygon xAxis="1" yAxis="2">
+     <Vertex y="815" x="957"/>
+     <Vertex y="498" x="438"/>
+     <Vertex y="256" x="442"/>
+     <Vertex y="313" x="990"/>
+     <Vertex y="882" x="1169"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="3">
+    <Polygon xAxis="1" yAxis="2">
+     <Vertex y="523" x="438"/>
+     <Vertex y="865" x="1044"/>
+     <Vertex y="1342" x="1143"/>
+     <Vertex y="1352" x="924"/>
+     <Vertex y="598" x="452"/>
+    </Polygon>
+   </Cluster>
+  </nTrode>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="3" nTrodeID="4"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="4" nTrodeID="5">
+   <Cluster clusterIndex="1">
+    <Polygon xAxis="1" yAxis="2">
+     <Vertex y="817" x="1216"/>
+     <Vertex y="1689" x="1946"/>
+     <Vertex y="1735" x="1500"/>
+     <Vertex y="761" x="936"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="2">
+    <Polygon xAxis="1" yAxis="2">
+     <Vertex y="509" x="450"/>
+     <Vertex y="706" x="771"/>
+     <Vertex y="1689" x="1407"/>
+     <Vertex y="1891" x="1014"/>
+     <Vertex y="1054" x="408"/>
+     <Vertex y="635" x="383"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="3">
+    <Polygon xAxis="1" yAxis="2">
+     <Vertex y="340" x="605"/>
+     <Vertex y="622" x="1069"/>
+     <Vertex y="851" x="1555"/>
+     <Vertex y="116" x="1146"/>
+     <Vertex y="116" x="609"/>
+    </Polygon>
+   </Cluster>
+  </nTrode>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="5" nTrodeID="6"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="6" nTrodeID="7"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="7" nTrodeID="8"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="8" nTrodeID="9"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="9" nTrodeID="10"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="10" nTrodeID="11"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="11" nTrodeID="12"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="12" nTrodeID="13"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="13" nTrodeID="14">
+   <Cluster clusterIndex="0"/>
+   <Cluster clusterIndex="1">
+    <Polygon xAxis="0" yAxis="2">
+     <Vertex y="1802" x="3055"/>
+     <Vertex y="2497" x="3288"/>
+     <Vertex y="3071" x="4700"/>
+     <Vertex y="2417" x="5248"/>
+     <Vertex y="1335" x="3453"/>
+     <Vertex y="1482" x="2918"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="2">
+    <Polygon xAxis="0" yAxis="2">
+     <Vertex y="988" x="980"/>
+     <Vertex y="581" x="1074"/>
+     <Vertex y="872" x="2156"/>
+     <Vertex y="1370" x="2207"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="3">
+    <Polygon xAxis="0" yAxis="1">
+     <Vertex y="501" x="186"/>
+     <Vertex y="624" x="487"/>
+     <Vertex y="1538" x="1232"/>
+     <Vertex y="1735" x="931"/>
+     <Vertex y="1057" x="246"/>
+    </Polygon>
+    <Polygon xAxis="1" yAxis="2">
+     <Vertex y="977" x="1293"/>
+     <Vertex y="325" x="832"/>
+     <Vertex y="224" x="1326"/>
+     <Vertex y="726" x="1622"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="4">
+    <Polygon xAxis="0" yAxis="2">
+     <Vertex y="587" x="371"/>
+     <Vertex y="646" x="322"/>
+     <Vertex y="1038" x="590"/>
+     <Vertex y="1649" x="1047"/>
+     <Vertex y="1632" x="1425"/>
+     <Vertex y="1050" x="889"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="5">
+    <Polygon xAxis="0" yAxis="2">
+     <Vertex y="670" x="322"/>
+     <Vertex y="1762" x="1120"/>
+     <Vertex y="1905" x="639"/>
+     <Vertex y="961" x="182"/>
+     <Vertex y="480" x="121"/>
+    </Polygon>
+   </Cluster>
+  </nTrode>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="14" nTrodeID="15"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="15" nTrodeID="16">
+   <Cluster clusterIndex="1">
+    <Polygon xAxis="0" yAxis="1">
+     <Vertex y="1253" x="733"/>
+     <Vertex y="1439" x="1286"/>
+     <Vertex y="3720" x="1828"/>
+     <Vertex y="3848" x="1215"/>
+     <Vertex y="2741" x="462"/>
+    </Polygon>
+    <Polygon xAxis="1" yAxis="2">
+     <Vertex y="776" x="1304"/>
+     <Vertex y="1049" x="3571"/>
+     <Vertex y="564" x="3654"/>
+     <Vertex y="373" x="1397"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="2">
+    <Polygon xAxis="0" yAxis="3">
+     <Vertex y="4236" x="1076"/>
+     <Vertex y="4004" x="393"/>
+     <Vertex y="2289" x="621"/>
+     <Vertex y="2552" x="1252"/>
+     <Vertex y="3641" x="1521"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="3">
+    <Polygon xAxis="0" yAxis="2">
+     <Vertex y="1339" x="594"/>
+     <Vertex y="1159" x="735"/>
+     <Vertex y="510" x="217"/>
+     <Vertex y="392" x="38"/>
+     <Vertex y="1439" x="313"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="4">
+    <Polygon xAxis="0" yAxis="2">
+     <Vertex y="448" x="262"/>
+     <Vertex y="797" x="498"/>
+     <Vertex y="972" x="920"/>
+     <Vertex y="741" x="760"/>
+     <Vertex y="442" x="434"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="5">
+    <Polygon xAxis="2" yAxis="3">
+     <Vertex y="1573" x="1045"/>
+     <Vertex y="928" x="693"/>
+     <Vertex y="978" x="1273"/>
+     <Vertex y="1593" x="1625"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="6">
+    <Polygon xAxis="0" yAxis="1">
+     <Vertex y="697" x="189"/>
+     <Vertex y="961" x="460"/>
+     <Vertex y="1716" x="569"/>
+     <Vertex y="1701" x="270"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="7">
+    <Polygon xAxis="0" yAxis="1">
+     <Vertex y="534" x="202"/>
+     <Vertex y="507" x="394"/>
+     <Vertex y="790" x="663"/>
+     <Vertex y="1062" x="734"/>
+     <Vertex y="950" x="493"/>
+     <Vertex y="726" x="246"/>
+    </Polygon>
+   </Cluster>
+  </nTrode>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="16" nTrodeID="17">
+   <Cluster clusterIndex="1">
+    <Polygon xAxis="0" yAxis="1">
+     <Vertex y="195" x="593"/>
+     <Vertex y="890" x="1215"/>
+     <Vertex y="761" x="1425"/>
+     <Vertex y="413" x="1269"/>
+     <Vertex y="164" x="749"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="2">
+    <Polygon xAxis="0" yAxis="1">
+     <Vertex y="369" x="324"/>
+     <Vertex y="730" x="621"/>
+     <Vertex y="747" x="360"/>
+     <Vertex y="494" x="68"/>
+     <Vertex y="302" x="54"/>
+    </Polygon>
+    <Polygon xAxis="1" yAxis="2">
+     <Vertex y="794" x="810"/>
+     <Vertex y="234" x="270"/>
+     <Vertex y="355" x="94"/>
+     <Vertex y="972" x="499"/>
+    </Polygon>
+   </Cluster>
+  </nTrode>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="17" nTrodeID="18"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="18" nTrodeID="19"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="19" nTrodeID="20">
+   <Cluster clusterIndex="0"/>
+   <Cluster clusterIndex="1">
+    <Polygon xAxis="2" yAxis="3">
+     <Vertex y="488" x="270"/>
+     <Vertex y="873" x="676"/>
+     <Vertex y="964" x="391"/>
+     <Vertex y="670" x="130"/>
+     <Vertex y="517" x="131"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="2">
+    <Polygon xAxis="1" yAxis="2">
+     <Vertex y="394" x="60"/>
+     <Vertex y="473" x="237"/>
+     <Vertex y="744" x="351"/>
+     <Vertex y="786" x="200"/>
+     <Vertex y="613" x="30"/>
+    </Polygon>
+   </Cluster>
+  </nTrode>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="20" nTrodeID="21"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="21" nTrodeID="22"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="22" nTrodeID="23"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="23" nTrodeID="24">
+   <Cluster clusterIndex="1">
+    <Polygon xAxis="2" yAxis="3">
+     <Vertex y="920" x="547"/>
+     <Vertex y="645" x="262"/>
+     <Vertex y="507" x="386"/>
+     <Vertex y="547" x="558"/>
+     <Vertex y="771" x="775"/>
+     <Vertex y="904" x="794"/>
+    </Polygon>
+    <Polygon xAxis="0" yAxis="3">
+     <Vertex y="547" x="317"/>
+     <Vertex y="787" x="728"/>
+     <Vertex y="1008" x="490"/>
+     <Vertex y="659" x="205"/>
+    </Polygon>
+   </Cluster>
+  </nTrode>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="24" nTrodeID="25">
+   <Cluster clusterIndex="1">
+    <Polygon xAxis="0" yAxis="1">
+     <Vertex y="656" x="127"/>
+     <Vertex y="646" x="515"/>
+     <Vertex y="1246" x="629"/>
+     <Vertex y="1116" x="197"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="2">
+    <Polygon xAxis="2" yAxis="3">
+     <Vertex y="401" x="70"/>
+     <Vertex y="421" x="291"/>
+     <Vertex y="913" x="535"/>
+     <Vertex y="1050" x="301"/>
+     <Vertex y="864" x="154"/>
+    </Polygon>
+    <Polygon xAxis="1" yAxis="3">
+     <Vertex y="580" x="180"/>
+     <Vertex y="656" x="462"/>
+     <Vertex y="1207" x="750"/>
+     <Vertex y="1299" x="375"/>
+     <Vertex y="1018" x="204"/>
+    </Polygon>
+   </Cluster>
+  </nTrode>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="25" nTrodeID="26"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="26" nTrodeID="27">
+   <Cluster clusterIndex="0"/>
+   <Cluster clusterIndex="2">
+    <Polygon xAxis="2" yAxis="3">
+     <Vertex y="320" x="104"/>
+     <Vertex y="345" x="275"/>
+     <Vertex y="624" x="491"/>
+     <Vertex y="744" x="529"/>
+     <Vertex y="722" x="295"/>
+     <Vertex y="464" x="100"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="3">
+    <Polygon xAxis="0" yAxis="2">
+     <Vertex y="1746" x="783"/>
+     <Vertex y="1185" x="789"/>
+     <Vertex y="955" x="400"/>
+     <Vertex y="923" x="120"/>
+     <Vertex y="1532" x="180"/>
+     <Vertex y="1778" x="279"/>
+    </Polygon>
+   </Cluster>
+  </nTrode>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="27" nTrodeID="28"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="28" nTrodeID="29">
+   <Cluster clusterIndex="1">
+    <Polygon xAxis="0" yAxis="1">
+     <Vertex y="1578" x="740"/>
+     <Vertex y="1099" x="798"/>
+     <Vertex y="1448" x="1417"/>
+     <Vertex y="2130" x="1544"/>
+     <Vertex y="2136" x="1098"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="2">
+    <Polygon xAxis="0" yAxis="1">
+     <Vertex y="1084" x="970"/>
+     <Vertex y="633" x="999"/>
+     <Vertex y="830" x="1589"/>
+     <Vertex y="1332" x="1578"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="3">
+    <Polygon xAxis="0" yAxis="3">
+     <Vertex y="836" x="565"/>
+     <Vertex y="497" x="447"/>
+     <Vertex y="435" x="546"/>
+     <Vertex y="867" x="1001"/>
+     <Vertex y="1280" x="1246"/>
+     <Vertex y="1430" x="1032"/>
+     <Vertex y="1118" x="680"/>
+    </Polygon>
+    <Polygon xAxis="1" yAxis="3">
+     <Vertex y="512" x="193"/>
+     <Vertex y="856" x="645"/>
+     <Vertex y="1187" x="593"/>
+     <Vertex y="1307" x="379"/>
+     <Vertex y="890" x="154"/>
+     <Vertex y="555" x="106"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="4">
+    <Polygon xAxis="0" yAxis="1">
+     <Vertex y="443" x="150"/>
+     <Vertex y="674" x="565"/>
+     <Vertex y="1149" x="803"/>
+     <Vertex y="1388" x="696"/>
+     <Vertex y="1114" x="375"/>
+     <Vertex y="701" x="142"/>
+    </Polygon>
+    <Polygon xAxis="1" yAxis="3">
+     <Vertex y="759" x="1076"/>
+     <Vertex y="296" x="403"/>
+     <Vertex y="88" x="427"/>
+     <Vertex y="165" x="1096"/>
+     <Vertex y="366" x="1349"/>
+     <Vertex y="836" x="1333"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="5">
+    <Polygon xAxis="1" yAxis="3">
+     <Vertex y="443" x="538"/>
+     <Vertex y="701" x="973"/>
+     <Vertex y="929" x="929"/>
+     <Vertex y="701" x="478"/>
+     <Vertex y="470" x="399"/>
+    </Polygon>
+    <Polygon xAxis="0" yAxis="1">
+     <Vertex y="1110" x="1048"/>
+     <Vertex y="408" x="427"/>
+     <Vertex y="258" x="656"/>
+     <Vertex y="863" x="1543"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="6">
+    <Polygon xAxis="1" yAxis="3">
+     <Vertex y="1376" x="498"/>
+     <Vertex y="1372" x="985"/>
+     <Vertex y="1018" x="933"/>
+     <Vertex y="940" x="577"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="7">
+    <Polygon xAxis="0" yAxis="3">
+     <Vertex y="619" x="219"/>
+     <Vertex y="704" x="558"/>
+     <Vertex y="1260" x="772"/>
+     <Vertex y="1329" x="542"/>
+    </Polygon>
+   </Cluster>
+  </nTrode>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="29" nTrodeID="30"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="30" nTrodeID="31">
+   <Cluster clusterIndex="1">
+    <Polygon xAxis="1" yAxis="3">
+     <Vertex y="1116" x="915"/>
+     <Vertex y="1981" x="1682"/>
+     <Vertex y="2285" x="1293"/>
+     <Vertex y="1997" x="767"/>
+     <Vertex y="1265" x="641"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="2">
+    <Polygon xAxis="1" yAxis="3">
+     <Vertex y="475" x="980"/>
+     <Vertex y="534" x="1605"/>
+     <Vertex y="1201" x="1578"/>
+     <Vertex y="1126" x="953"/>
+     <Vertex y="496" x="789"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="3">
+    <Polygon xAxis="0" yAxis="1">
+     <Vertex y="758" x="537"/>
+     <Vertex y="528" x="690"/>
+     <Vertex y="598" x="1041"/>
+     <Vertex y="977" x="1101"/>
+     <Vertex y="993" x="871"/>
+    </Polygon>
+    <Polygon xAxis="0" yAxis="2">
+     <Vertex y="699" x="980"/>
+     <Vertex y="416" x="520"/>
+     <Vertex y="138" x="619"/>
+     <Vertex y="448" x="1265"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="4">
+    <Polygon xAxis="2" yAxis="3">
+     <Vertex y="619" x="794"/>
+     <Vertex y="165" x="454"/>
+     <Vertex y="101" x="893"/>
+     <Vertex y="427" x="1348"/>
+     <Vertex y="603" x="1304"/>
+    </Polygon>
+    <Polygon xAxis="1" yAxis="2">
+     <Vertex y="1199" x="470"/>
+     <Vertex y="466" x="201"/>
+     <Vertex y="509" x="51"/>
+     <Vertex y="1322" x="229"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="5">
+    <Polygon xAxis="1" yAxis="3">
+     <Vertex y="566" x="126"/>
+     <Vertex y="902" x="695"/>
+     <Vertex y="1254" x="591"/>
+     <Vertex y="1036" x="219"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="6">
+    <Polygon xAxis="1" yAxis="3">
+     <Vertex y="315" x="701"/>
+     <Vertex y="80" x="674"/>
+     <Vertex y="315" x="1846"/>
+     <Vertex y="608" x="1687"/>
+     <Vertex y="491" x="1079"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="7">
+    <Polygon xAxis="1" yAxis="3">
+     <Vertex y="667" x="361"/>
+     <Vertex y="833" x="515"/>
+     <Vertex y="875" x="767"/>
+     <Vertex y="662" x="761"/>
+     <Vertex y="523" x="482"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="8">
+    <Polygon xAxis="1" yAxis="2">
+     <Vertex y="629" x="274"/>
+     <Vertex y="1227" x="485"/>
+     <Vertex y="1256" x="957"/>
+     <Vertex y="776" x="589"/>
+     <Vertex y="616" x="438"/>
+    </Polygon>
+   </Cluster>
+  </nTrode>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="31" nTrodeID="32">
+   <Cluster clusterIndex="0"/>
+   <Cluster clusterIndex="1">
+    <Polygon xAxis="0" yAxis="3">
+     <Vertex y="655" x="957"/>
+     <Vertex y="370" x="935"/>
+     <Vertex y="341" x="1322"/>
+     <Vertex y="662" x="1768"/>
+     <Vertex y="897" x="1658"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="2">
+    <Polygon xAxis="0" yAxis="3">
+     <Vertex y="1262" x="1334"/>
+     <Vertex y="1158" x="988"/>
+     <Vertex y="835" x="701"/>
+     <Vertex y="664" x="677"/>
+     <Vertex y="593" x="735"/>
+     <Vertex y="802" x="1149"/>
+     <Vertex y="1006" x="1310"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="3">
+    <Polygon xAxis="0" yAxis="3">
+     <Vertex y="551" x="740"/>
+     <Vertex y="303" x="519"/>
+     <Vertex y="163" x="539"/>
+     <Vertex y="228" x="810"/>
+     <Vertex y="450" x="917"/>
+     <Vertex y="548" x="887"/>
+    </Polygon>
+    <Polygon xAxis="0" yAxis="2">
+     <Vertex y="532" x="790"/>
+     <Vertex y="391" x="549"/>
+     <Vertex y="192" x="492"/>
+     <Vertex y="117" x="589"/>
+     <Vertex y="225" x="847"/>
+     <Vertex y="473" x="887"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="4">
+    <Polygon xAxis="0" yAxis="3">
+     <Vertex y="1234" x="1076"/>
+     <Vertex y="769" x="623"/>
+     <Vertex y="816" x="389"/>
+     <Vertex y="1424" x="589"/>
+     <Vertex y="1533" x="1003"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="5">
+    <Polygon xAxis="2" yAxis="3">
+     <Vertex y="627" x="749"/>
+     <Vertex y="436" x="526"/>
+     <Vertex y="325" x="441"/>
+     <Vertex y="253" x="441"/>
+     <Vertex y="294" x="622"/>
+     <Vertex y="386" x="741"/>
+     <Vertex y="583" x="824"/>
+    </Polygon>
+   </Cluster>
+  </nTrode>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="32" nTrodeID="33"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="33" nTrodeID="34"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="34" nTrodeID="35">
+   <Cluster clusterIndex="1">
+    <Polygon xAxis="1" yAxis="2">
+     <Vertex y="1424" x="208"/>
+     <Vertex y="811" x="76"/>
+     <Vertex y="833" x="233"/>
+     <Vertex y="1502" x="372"/>
+    </Polygon>
+   </Cluster>
+  </nTrode>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="35" nTrodeID="36"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="36" nTrodeID="37">
+   <Cluster clusterIndex="1">
+    <Polygon xAxis="1" yAxis="2">
+     <Vertex y="222" x="819"/>
+     <Vertex y="50" x="822"/>
+     <Vertex y="130" x="1266"/>
+     <Vertex y="290" x="1272"/>
+    </Polygon>
+   </Cluster>
+  </nTrode>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="37" nTrodeID="38"/>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="38" nTrodeID="39">
+   <Cluster clusterIndex="1">
+    <Polygon xAxis="0" yAxis="3">
+     <Vertex y="756" x="597"/>
+     <Vertex y="1028" x="1120"/>
+     <Vertex y="1674" x="1353"/>
+     <Vertex y="2216" x="1047"/>
+     <Vertex y="1391" x="508"/>
+     <Vertex y="892" x="463"/>
+    </Polygon>
+    <Polygon xAxis="2" yAxis="3">
+     <Vertex y="2006" x="1234"/>
+     <Vertex y="853" x="505"/>
+     <Vertex y="716" x="127"/>
+     <Vertex y="1913" x="639"/>
+     <Vertex y="2243" x="882"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="2">
+    <Polygon xAxis="2" yAxis="3">
+     <Vertex y="1962" x="1227"/>
+     <Vertex y="859" x="498"/>
+     <Vertex y="691" x="613"/>
+     <Vertex y="1458" x="1381"/>
+     <Vertex y="2037" x="1572"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="3">
+    <Polygon xAxis="1" yAxis="2">
+     <Vertex y="754" x="594"/>
+     <Vertex y="541" x="423"/>
+     <Vertex y="413" x="643"/>
+     <Vertex y="987" x="1183"/>
+     <Vertex y="1196" x="1081"/>
+     <Vertex y="1272" x="935"/>
+    </Polygon>
+   </Cluster>
+  </nTrode>
+  <nTrode Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4" nTrodeIndex="39" nTrodeID="40"/>
+ </PolygonClusters>
+</SpikeSortingInfo>

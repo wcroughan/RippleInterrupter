@@ -22,11 +22,11 @@ class BiphasicPort(serial.Serial):
 
     def sendBiphasicPulse(self):
         self.setDTR(True)
-        time.sleep(0.0001)
+        time.sleep(0.0002)
         self.setDTR(False)
         time.sleep(0.0001)
         self.setRTS(True)
-        time.sleep(0.0001)
+        time.sleep(0.0002)
         self.setRTS(False)
         time.sleep(0.001)
         logging.info(MODULE_IDENTIFIER + "Biphasic pulse delivered.")

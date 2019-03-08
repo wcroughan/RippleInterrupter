@@ -53,7 +53,7 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
         self._spike_access = Lock()
         # TODO: This functionality should be moved to the parent class
         self._enable_synchrnoizer = Lock()
-        self._is_disabled = Value("b", False)
+        self._is_disabled = Value("b", True)
 
         # Position data at the time ripple is triggered
         self._pos_x = -1
@@ -149,6 +149,7 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
                                 %(self._pos_x, self._pos_y, self._most_recent_speed))
                         logging.info(self.CLASS_IDENTIFIER + "Ripple tiggered. Loc (%d, %d), V %.2fcm/s" \
                                 %(self._pos_x, self._pos_y, self._most_recent_speed))
+                        self._serial_port.sendBiphasicPulse()
 
                 with self._spike_access:
                     if len(self._spike_buffer) > 0:
@@ -401,7 +402,7 @@ def writeLogFile(trodes_timestamps, ripple_events, wall_ripple_times, interrupt_
     outf.close()
 
 def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
-        ripple_statistics=None):
+        ripple_statistics=None, interrupt_ripples=False):
     """
     Get ripple data statistics for a particular tetrode and a user defined time
     period.
@@ -421,6 +422,8 @@ def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
     if show_ripples:
         plt.ion()
 
+    if interrupt_ripples:
+        ser = SerialPort.BiphasicPort();
     n_tetrodes = len(tetrodes)
     report_ripples = (ripple_statistics is not None)
 
@@ -538,6 +541,8 @@ def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
                                 prev_ripple = current_time
                                 current_wall_time = time.time() - start_wall_time
                                 time_lag = (current_wall_time - current_time)
+                                if interrupt_ripples:
+                                    ser.sendBiphasicPulse()
                                 print("Ripple @ %.2f, Real Time %.2f [Lag: %.2f], strength: %.1f"%(current_time, current_wall_time, time_lag, ripple_to_baseline_ratio))
                                 trodes_timestamps.append(trodes_time_stamp)
                                 ripple_events.append(current_time)
@@ -559,14 +564,24 @@ def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
     return (power_mean, power_std)
 
 def main():
-    tetrodes_to_be_analyzed = [24,33]
+    tetrodes_to_be_analyzed = [2,14]
+    if len(sys.argv) > 2:
+        stim_time = float(sys.argv[2])
+    else:
+        stim_time = 10.0
+
     if len(sys.argv) == 1:
         (power_mean, power_std) = getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
                 analysis_time=100.0)
     elif (int(sys.argv[1][0]) == 1):
         getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
-                ripple_statistics=[60.0, 30.0], show_ripples=True, \
-                analysis_time=100.0)
+                ripple_statistics=[75.0, 45.0], show_ripples=True, \
+                analysis_time=stim_time)
+    elif (int(sys.argv[1][0]) == 2):
+        print("Running for %.2fs"%stim_time)
+        getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
+                ripple_statistics=[75.0, 45.0], show_ripples=True, \
+                analysis_time=stim_time, interrupt_ripples=True)
 
 if (__name__ == "__main__"):
     main()
