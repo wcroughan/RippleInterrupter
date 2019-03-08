@@ -17,6 +17,7 @@ import numpy as np
 
 # Local file imports
 import SerialPort
+import Configuration
 import TrodesInterface
 import ThreadExtension
 import RippleDefinitions as RiD
@@ -54,6 +55,9 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
         # TODO: This functionality should be moved to the parent class
         self._enable_synchrnoizer = Lock()
         self._is_disabled = Value("b", False)
+        self._clusters_of_interest = [Configuration.EXPERIMENT_DAY_20190307__INTERESTING_CLUSTERS_A[:], \
+                Configuration.EXPERIMENT_DAY_20190307__INTERESTING_CLUSTERS_B[:]]
+        print(self._clusters_of_interest)
 
         # Position data at the time ripple is triggered
         self._pos_x = -1
@@ -109,9 +113,12 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
                     if len(self._spike_buffer) == self._SPIKE_BUFFER_SIZE:
                         removed_spike = self._spike_buffer.popleft()
                         self._spike_histogram[removed_spike[0]] -= 1
-                    # NOTE: If this starts taking too long, can switch to default dictionary
-                    self._spike_buffer.append(spike_data)
-                    self._spike_histogram[spike_data[0]] += 1
+                    spike_cluster = spike_data[0]
+                    if (spike_cluster in self._clusters_of_interest[0]) or \
+                            (spike_cluster in self._clusters_of_interest[1])
+                        # NOTE: If this starts taking too long, can switch to default dictionary
+                        self._spike_buffer.append(spike_data)
+                        self._spike_histogram[spike_cluster] += 1
             else:
                 # NOTE: Making the thread sleep for 5ms might not hurt but we
                 # will have to find out.
@@ -150,12 +157,15 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
                         logging.info(self.CLASS_IDENTIFIER + "Ripple tiggered. Loc (%d, %d), V %.2fcm/s" \
                                 %(self._pos_x, self._pos_y, self._most_recent_speed))
 
-                with self._spike_access:
-                    if len(self._spike_buffer) > 0:
-                        # By default, returns 10 most frequent entries
-                        most_spiking_unit = self._spike_histogram.most_common()[0][0]
-                        most_recent_spike_time = self._spike_buffer[-1][1]
-                        logging.info(self.CLASS_IDENTIFIER + "Most recent spike at %d"%most_recent_spike_time)
+                    with self._spike_access:
+                        if len(self._spike_buffer) > 0:
+                            # By default, returns 10 most frequent entries
+                            most_spiking_unit = self._spike_histogram.most_common()[0][0]
+                            most_recent_spike_time = self._spike_buffer[-1][1]
+                            logging.info(self.CLASS_IDENTIFIER + "Most recent spike at %d"%most_recent_spike_time)
+                            print(self._spike_histogram)
+                        else:
+                            print("Spike buffer empty!")
 
                 # DEBUGGING: Print spike count from each of the clusters
                 # print(self._place_field_handler.get_peak_firing_location(most_spiking_unit))

@@ -18,6 +18,8 @@ import xml.etree.ElementTree as ET
 
 DEFAULT_CONFIG_FILE='config/default.ini'
 MODULE_IDENTIFIER="[Configuration] "
+EXPERIMENT_DAY_20190307__INTERESTING_CLUSTERS_A = [2, 3, 26, 31, 33, 60]
+EXPERIMENT_DAY_20190307__INTERESTING_CLUSTERS_B = [17, 35, 40, 44, 57]
 
 def readClusterFile(filename=None, tetrodes=None):
     """
