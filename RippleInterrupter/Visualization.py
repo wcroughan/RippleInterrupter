@@ -153,7 +153,7 @@ class GraphicsManager(Process):
     __N_ANIMATION_FRAMES = 5000
     __PLACE_FIELD_REFRESH_RATE = 1
     __PEAK_LFP_AMPLITUDE = 3000
-    __CLUSTERS_TO_PLOT = [1,2,3]
+    __CLUSTERS_TO_PLOT = [1,4,5]
     __N_SUBPLOT_COLS = int(3)
     __N_SUBPLOT_ROWS = int(1)
     __MAX_FIRING_RATE = 40.0
@@ -286,7 +286,7 @@ class GraphicsManager(Process):
         """
         Function used for animating the current position of the animal.
         """
-        if  self._pos_fig:
+        if len(self._spk_pos_ax) != 0:
             # print(self._pos_x)
             # print(self._pos_y)
             # TODO: Add colors based on which cluster the spikes are coming from
@@ -406,35 +406,36 @@ class GraphicsManager(Process):
         """
         Initialize figure window for showing spikes overlaid on position
         """
-        self._pos_fig, cluster_axes = plt.subplots(self.__N_SUBPLOT_ROWS, self.__N_SUBPLOT_COLS)
+        self._pos_fig, self._spk_pos_ax = plt.subplots(self.__N_SUBPLOT_ROWS, self.__N_SUBPLOT_COLS)
         # Create graphics entries for the actual position and also each of the spike clusters
         if (self.__N_SUBPLOT_ROWS == 1) or (self.__N_SUBPLOT_COLS == 1):
             # Matplotlib returns a 1D array in this case, a 2D array otherwise
+            center_frame = int(self.__N_SUBPLOT_COLS/2)
             for cl_idx in range(self._n_clusters): 
-                cluster_axes[cl_idx].set_xlabel("x (bin)")
-                cluster_axes[cl_idx].set_ylabel("y (bin)")
-                cluster_axes[cl_idx].set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
-                cluster_axes[cl_idx].set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
-                cluster_axes[cl_idx].grid(True)
-                spk_frame, = cluster_axes[cl_idx].plot([], [], linestyle='None', marker='o', alpha=0.4, animated=True)
+                self._spk_pos_ax[cl_idx].set_xlabel("x (bin)")
+                self._spk_pos_ax[cl_idx].set_ylabel("y (bin)")
+                self._spk_pos_ax[cl_idx].set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
+                self._spk_pos_ax[cl_idx].set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
+                self._spk_pos_ax[cl_idx].grid(True)
+                spk_frame, = self._spk_pos_ax[cl_idx].plot([], [], linestyle='None', marker='o', alpha=0.4, animated=True)
                 self._spk_pos_frame.append(spk_frame)
-            pos_frame, = cluster_axes[0].plot([], [], animated=True)
-            vel_frame  = cluster_axes[0].text(40.0, 2.0, 'speed = 0cm/s')
+            pos_frame, = self._spk_pos_ax[center_frame].plot([], [], animated=True)
+            vel_frame  = self._spk_pos_ax[center_frame].text(40.0, 2.0, 'speed = 0cm/s')
             self._spk_pos_frame.append(pos_frame)
             self._spk_pos_frame.append(vel_frame)
         else:
             for cl_idx in range(self._n_clusters): 
                 grid_idx = np.unravel_index(cl_idx, (self.__N_SUBPLOT_ROWS, self.__N_SUBPLOT_COLS))
-                cluster_axes[grid_idx[0]][grid_idx[1]].set_xlabel("x (bin)")
-                cluster_axes[grid_idx[0]][grid_idx[1]].set_ylabel("y (bin)")
-                cluster_axes[grid_idx[0]][grid_idx[1]].set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
-                cluster_axes[grid_idx[0]][grid_idx[1]].set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
-                cluster_axes[grid_idx[0]][grid_idx[1]].grid(True)
-                spk_frame, = cluster_axes[grid_idx[0]][grid_idx[1]].plot([], [], linestyle='None', marker='o', alpha=0.4, animated=True)
+                self._spk_pos_ax[grid_idx[0]][grid_idx[1]].set_xlabel("x (bin)")
+                self._spk_pos_ax[grid_idx[0]][grid_idx[1]].set_ylabel("y (bin)")
+                self._spk_pos_ax[grid_idx[0]][grid_idx[1]].set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
+                self._spk_pos_ax[grid_idx[0]][grid_idx[1]].set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
+                self._spk_pos_ax[grid_idx[0]][grid_idx[1]].grid(True)
+                spk_frame, = self._spk_pos_ax[grid_idx[0]][grid_idx[1]].plot([], [], linestyle='None', marker='o', alpha=0.4, animated=True)
                 self._spk_pos_frame.append(spk_frame)
             # TODO: Change this to make it the center plot?
-            pos_frame, = cluster_axes[0][0].plot([], [], animated=True)
-            vel_frame  = cluster_axes[0].text(40.0, 2.0, 'speed = 0cm/s')
+            pos_frame, = self._spk_pos_ax[0][0].plot([], [], animated=True)
+            vel_frame  = self._spk_pos_ax[0].text(40.0, 2.0, 'speed = 0cm/s')
             self._spk_pos_frame.append(pos_frame)
             self._spk_pos_frame.append(vel_frame)
 
