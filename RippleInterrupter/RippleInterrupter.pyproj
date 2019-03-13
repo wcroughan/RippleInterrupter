@@ -21,7 +21,17 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Logger.py" />
+    <Compile Include="OnlineInterruption.py" />
+    <Compile Include="PositionAnalysis.py" />
+    <Compile Include="PositionDecoding.py" />
+    <Compile Include="RippleAnalysis.py" />
+    <Compile Include="RippleDefinitions.py" />
     <Compile Include="RippleInterrupter.py" />
+    <Compile Include="SpikeAnalysis.py" />
+    <Compile Include="StimHardware.py" />
+    <Compile Include="TrodesInterface.py" />
+    <Compile Include="Visualization.py" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in

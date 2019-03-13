@@ -1,26 +1,403 @@
+"""
+Module for analysis of ripples in streaming or offline LFP data.
+"""
 # System imports
-from scipy import signal, stats
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-from matplotlib.ticker import PercentFormatter
-from mpl_toolkits.mplot3d import Axes3D
-import numpy as np
 import os
 import sys
 import time
-import serial
+import logging
+from datetime import datetime
+import threading
+import collections
+from multiprocessing import Pipe, Lock, Event, Value
+from scipy import signal
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+import numpy as np
 
 # Local file imports
+import SerialPort
 import TrodesInterface
+import ThreadExtension
 import RippleDefinitions as RiD
+import Visualization
 
-def normalizeData(in_data):
-    # TODO: Might need tiling of data if there are multiple dimensions
-    data_mean = np.mean(in_data, axis=0)
-    data_std  = np.std(in_data, axis=0)
-    norm_data = np.divide((in_data - data_mean), data_std)
-    return norm_data, data_mean, data_std
+# Profiling
+import cProfile
 
+MODULE_IDENTIFIER = "[RippleAnalysis] "
+D_MEAN_RIPPLE_POWER = 80.0
+D_STD_RIPPLE_POWER = 55.0
+
+class RippleSynchronizer(ThreadExtension.StoppableProcess):
+    """
+    Waits for a ripple to be detected and processes downstream changes for
+    analyzing spike contents.
+    """
+
+    # Wait for 10ms while checking if the event flag is set.
+    _EVENT_TIMEOUT = 1.0
+    _SPIKE_BUFFER_SIZE = 200
+    CLASS_IDENTIFIER = "[RippleSynchronizer] "
+
+    def __init__(self, sync_event, spike_listener, position_estimator, place_field_handler):
+        """TODO: to be defined1. """
+        ThreadExtension.StoppableProcess.__init__(self)
+        self._sync_event = sync_event
+        self._spike_buffer = collections.deque(maxlen=self._SPIKE_BUFFER_SIZE)
+        self._spike_histogram = collections.Counter()
+        self._spike_buffer_connection = spike_listener.get_spike_buffer_connection()
+        self._position_buffer_connection = position_estimator.get_position_buffer_connection()
+        self._place_field_handler = place_field_handler
+        self._position_access = Lock()
+        self._spike_access = Lock()
+        # TODO: This functionality should be moved to the parent class
+        self._enable_synchrnoizer = Lock()
+        self._is_disabled = Value("b", True)
+
+        # Position data at the time ripple is triggered
+        self._pos_x = -1
+        self._pos_y = -1
+        self._most_recent_speed = 0
+        self._most_recent_pos_timestamp = 0
+        self._serial_port = None
+        try:
+            self._serial_port = SerialPort.BiphasicPort()
+        except Exception as err:
+            logging.warning("Unable to open Serial port.")
+            print(err)
+        logging.info(self.CLASS_IDENTIFIER + "Started Ripple Synchronization thread.")
+
+    def enable(self):
+        self._enable_synchrnoizer.acquire()
+        self._is_disabled.value = False
+        logging.info(self.CLASS_IDENTIFIER + "Ripple disruption ENABLED.")
+        self._enable_synchrnoizer.release()
+
+    def disable(self):
+        self._enable_synchrnoizer.acquire()
+        self._is_disabled.value = True
+        logging.info(self.CLASS_IDENTIFIER + "Ripple disruption DISABLED.")
+        self._enable_synchrnoizer.release()
+
+    def fetch_current_velocity(self):
+        """
+        Get recent velocity (and position) and use that to determine if the
+        animal was running when the current ripple was detected.
+        """
+        while not self.req_stop():
+            if self._position_buffer_connection.poll():
+                position_data = self._position_buffer_connection.recv()
+                with self._position_access:
+                    self._most_recent_pos_timestamp = position_data[0]
+                    self._most_recent_speed = position_data[3]
+                    self._pos_x = position_data[1]
+                    self._pos_y = position_data[2]
+            else:
+                time.sleep(0.005)
+
+    def fetch_most_recent_spike(self):
+        """
+        Get the most recent spike and put it in the rotating spike buffer
+        (keeps track of the last self._SPIKE_BUFFER_SIZE spikes.)
+        """
+        while not self.req_stop():
+            if self._spike_buffer_connection.poll():
+                # NOTE: spike_data received here is a tuple (cluster identity, trodes timestamp)
+                spike_data = self._spike_buffer_connection.recv()
+                with self._spike_access:
+                    if len(self._spike_buffer) == self._SPIKE_BUFFER_SIZE:
+                        removed_spike = self._spike_buffer.popleft()
+                        self._spike_histogram[removed_spike[0]] -= 1
+                    # NOTE: If this starts taking too long, can switch to default dictionary
+                    self._spike_buffer.append(spike_data)
+                    self._spike_histogram[spike_data[0]] += 1
+            else:
+                # NOTE: Making the thread sleep for 5ms might not hurt but we
+                # will have to find out.
+                time.sleep(0.005)
+
+    def run(self):
+        # Create a thread that fetches and keeps track of the last few spikes.
+        spike_fetcher = threading.Thread(name="SpikeFetcher", daemon=True, \
+                target=self.fetch_most_recent_spike)
+        velocity_fetcher = threading.Thread(name="VelocityFetcher", daemon=True, \
+                target=self.fetch_current_velocity)
+
+        spike_fetcher.start()
+        velocity_fetcher.start()
+        while not self.req_stop():
+            # Check if the process has been enabled
+            self._enable_synchrnoizer.acquire()
+            current_state = self._is_disabled.value
+            self._enable_synchrnoizer.release()
+            if current_state:
+                logging.debug(self.CLASS_IDENTIFIER + "Process sleeping")
+                time.sleep(0.1)
+                continue
+
+            logging.debug(self.CLASS_IDENTIFIER + "Waiting for ripple trigger...")
+            with self._sync_event:
+                thread_notified = self._sync_event.wait(self._EVENT_TIMEOUT)
+
+            if thread_notified:
+                # TODO: Only include spikes that occurred a specific amount of time before now.
+                with self._position_access:
+                    # If the animal is running faster than our speed threshold, ignore the ripple
+                    if self._most_recent_speed < RiD.MOVE_VELOCITY_THRESOLD:
+                        print(self.CLASS_IDENTIFIER + "Ripple tiggered. Loc (%d, %d), V %.2fcm/s" \
+                                %(self._pos_x, self._pos_y, self._most_recent_speed))
+                        logging.info(self.CLASS_IDENTIFIER + "Ripple tiggered. Loc (%d, %d), V %.2fcm/s" \
+                                %(self._pos_x, self._pos_y, self._most_recent_speed))
+                        self._serial_port.sendBiphasicPulse()
+
+                with self._spike_access:
+                    if len(self._spike_buffer) > 0:
+                        # By default, returns 10 most frequent entries
+                        most_spiking_unit = self._spike_histogram.most_common()[0][0]
+                        most_recent_spike_time = self._spike_buffer[-1][1]
+                        logging.info(self.CLASS_IDENTIFIER + "Most recent spike at %d"%most_recent_spike_time)
+
+                # DEBUGGING: Print spike count from each of the clusters
+                # print(self._place_field_handler.get_peak_firing_location(most_spiking_unit))
+
+        logging.info(self.CLASS_IDENTIFIER + "Main process exited.")
+        spike_fetcher.join()
+        velocity_fetcher.join()
+        logging.info(self.CLASS_IDENTIFIER + "Helper threads exited.")
+
+class LFPListener(ThreadExtension.StoppableThread):
+    """
+    Thread that listens to the LFP stream and continuously fetches LFP timestamps and data
+    """
+    
+    CLASS_IDENTIFIER  = "[LFPListener] "
+    def __init__(self, sg_client, target_tetrodes):
+        """
+        Class constructor
+        Subsribe to LFP stream on a given client and start listening
+        to LFP data for a set of target tetrode channels.
+        :sg_client: SpikeGadgets client for subscribing LFP steam
+        :target_tetrodes: Set of tetrodes to listen to for ripples
+        """
+        ThreadExtension.StoppableThread.__init__(self)
+        self._target_tetrodes = target_tetrodes
+        self._n_tetrodes = len(self._target_tetrodes)
+        self._lfp_producer = None
+
+        # Data streams
+        # Try opening a new connection
+        self._lfp_stream = sg_client.subscribeLFPData(TrodesInterface.LFP_SUBSCRIPTION_ATTRIBUTE, \
+                self._target_tetrodes)
+        self._lfp_stream.initialize()
+        self._lfp_buffer = self._lfp_stream.create_numpy_array()
+        logging.info(self.CLASS_IDENTIFIER + "Started LFP listener thread.")
+
+    def get_n_tetrodes(self):
+        return self._n_tetrodes
+
+    def get_lfp_listener_connection(self):
+        self._lfp_producer, lfp_consumer = Pipe()
+        return lfp_consumer
+
+    def run(self):
+        """
+        Start fetching LFP frames.
+        """
+        if __debug__:
+            code_profiler = cProfile.Profile()
+            profile_prefix = "lfp_listener_profile"
+            profile_filename = time.strftime(profile_prefix + "_%Y%m%d_%H%M%S.pr")
+            code_profiler.enable()
+
+        down_time = 0.0
+        n_frames_fetched = 0
+        while not self.req_stop():
+            n_lfp_frames = self._lfp_stream.available(0)
+            if n_lfp_frames == 0:
+                # logging.debug(self.CLASS_IDENTIFIER + "No LFP Frames to read... Sleeping.")
+                down_time += 0.001
+                time.sleep(0.001)
+                if down_time > 1.0:
+                    down_time = 0.0
+                    print(self.CLASS_IDENTIFIER + "Warning: Not receiving LFP data.")
+            else:
+                down_time = 0.0
+            for frame_idx in range(n_lfp_frames):
+                timestamp = self._lfp_stream.getData()
+                n_frames_fetched += 1
+                # print(self.CLASS_IDENTIFIER + "Fetched %d frames"%n_frames_fetched)
+                if self._lfp_producer is not None:
+                    self._lfp_producer.send((timestamp.trodes_timestamp, self._lfp_buffer[:]))
+                    # logging.debug(self.CLASS_IDENTIFIER + "LFP Frame at %d sent out for ripple analysis."%timestamp.trodes_timestamp)
+
+        if __debug__:
+            code_profiler.disable()
+            code_profiler.dump_stats(profile_filename)
+
+class RippleDetector(ThreadExtension.StoppableProcess):
+    """
+    Thread for ripple detection on a set of channels [ONLINE]
+    """
+
+    def __init__(self, lfp_listener, baseline_stats=None, \
+            trigger_condition=None, shared_buffers=None):
+        """
+
+        :baseline_stats: Ripple power mean and std to detect/trigger interruption
+        :trigger_condition: Instance of multiprocessing.Event() (or
+            threading.Condition()) to communicate synchronization with other threads.
+        """
+
+        ThreadExtension.StoppableProcess.__init__(self)
+        # TODO: Error handling if baseline stats are not provided - Get them by
+        # looking at the data for some time.
+
+        # Mean and standard deviation could either be provided, or estimated in
+        # real time. Since the animal spends most of his time running, we can
+        # probably get away by not looking at running speed to turn the
+        # computation of mean and standard deviation on/off 
+        self._n_tetrodes = lfp_listener.get_n_tetrodes()
+        if baseline_stats is None:
+            self._mean_ripple_power = np.full(self._n_tetrodes, D_MEAN_RIPPLE_POWER, dtype='float')
+            self._std_ripple_power = np.full(self._n_tetrodes, D_STD_RIPPLE_POWER, dtype='float')
+        else:
+            self._mean_ripple_power = baseline_stats[0]
+            self._std_ripple_power  = baseline_stats[1]
+        self._trigger_condition = trigger_condition[0]
+        self._show_trigger = trigger_condition[1]
+
+        # Output connections
+        self._ripple_buffer_connections = []
+
+        # Input pipe for accessing LFP stream
+        self._lfp_consumer = lfp_listener.get_lfp_listener_connection()
+
+        # Shared variables
+        self._local_lfp_buffer = collections.deque(maxlen=RiD.LFP_BUFFER_LENGTH)
+        self._local_ripple_power_buffer = collections.deque(maxlen=RiD.RIPPLE_POWER_BUFFER_LENGTH)
+        self._raw_lfp_buffer = np.reshape(np.frombuffer(shared_buffers[0], dtype='double'), (self._n_tetrodes, RiD.LFP_BUFFER_LENGTH))
+        self._ripple_power_buffer = np.reshape(np.frombuffer(shared_buffers[1], dtype='double'), (self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH))
+
+        # TODO: Check that initialization worked!
+        self._ripple_filter = signal.butter(RiD.LFP_FILTER_ORDER, \
+                (RiD.RIPPLE_LO_FREQ, RiD.RIPPLE_HI_FREQ), btype='bandpass', \
+                analog=False, output='sos', fs=RiD.LFP_FREQUENCY)
+
+        logging.info(MODULE_IDENTIFIER + "Started Ripple detection thread.")
+
+    def get_ripple_buffer_connections(self):
+        """
+        Returns a connection to the stored ripple power and raw lfp buffer
+        :returns: Receiving end of the pipe for ripple buffer
+        """
+        my_end, your_end = Pipe()
+        self._ripple_buffer_connections.append(my_end)
+        return your_end
+
+    def run(self):
+        """
+        Start thread execution
+
+        :t_max: Max amount of hardware time (measured by Trodes timestamps)
+            that ripple analysis should work for.
+        :returns: Nothing
+        """
+        # Filter the contents of the signal frame by frame
+        ripple_frame_filter = signal.sosfilt_zi(self._ripple_filter)
+
+        # Tile it to take in all the tetrodes at once
+        ripple_frame_filter = np.tile(np.reshape(ripple_frame_filter, \
+                (RiD.LFP_FILTER_ORDER, 1, 2)), (1, self._n_tetrodes, 1))
+        # Buffers for storing/manipulating raw LFP, ripple filtered LFP and
+        # ripple power.
+        raw_lfp_window = np.zeros((self._n_tetrodes, RiD.LFP_FILTER_ORDER), dtype='float')
+        ripple_power = collections.deque(maxlen=RiD.RIPPLE_SMOOTHING_WINDOW)
+        previous_mean_ripple_power = np.zeros_like(self._mean_ripple_power)
+        lfp_window_ptr = 0
+        pow_window_ptr = 0
+        n_data_pts_seen = 0
+
+        # Delay measures for ripple detection (and trigger)
+        ripple_unseen = False
+        prev_ripple = -np.Inf
+        curr_time   = 0.0
+        start_wall_time = time.time()
+        curr_wall_time = start_wall_time
+
+        # Keep track of the total time for which nothing was received
+        down_time = 0.0
+        while not self.req_stop():
+            # Acquire buffered LFP frames and fill them in a filter buffer
+            if self._lfp_consumer.poll():
+                # print(MODULE_IDENTIFIER + "LFP Frame received for filtering.")
+                (timestamp, current_lfp_frame) = self._lfp_consumer.recv()
+                raw_lfp_window[:, lfp_window_ptr] = current_lfp_frame
+                self._local_lfp_buffer.append(current_lfp_frame)
+                lfp_window_ptr += 1
+                down_time = 0.0
+
+                # If the filter window is full, filter the data and record it in rippple power
+                if (lfp_window_ptr == RiD.LFP_FILTER_ORDER):
+                    lfp_window_ptr = 0
+                    filtered_window, ripple_frame_filter = signal.sosfilt(self._ripple_filter, \
+                           raw_lfp_window, axis=1, zi=ripple_frame_filter)
+                    current_ripple_power = np.sqrt(np.mean(np.power(filtered_window, 2), axis=1))
+                    ripple_power.append(current_ripple_power)
+
+                    # Fill in the shared data variables
+                    self._local_ripple_power_buffer.append(current_ripple_power)
+
+                    # TODO: Enable this part of the code to update the mean and STD over time
+                    # Update the mean and std for ripple power at each of the tetrodes
+                    """
+                    np.copyto(previous_mean_ripple_power, self._mean_ripple_power)
+                    self._mean_ripple_power += (ripple_power[:, pow_window_ptr] - previous_mean_ripple_power)/n_data_pts_seen
+                    self._std_ripple_power += (ripple_power[:, pow_window_ptr] - previous_mean_ripple_power) * \
+                            (ripple_power[:, pow_window_ptr] - self._mean_ripple_power)
+                    # This is the accumulate sum of squares. The actual variance is <current-value>/(n_data_pts_seen-1)
+                    """
+                    n_data_pts_seen += 1
+                    # print("Read %d frames so far."%n_data_pts_seen)
+        
+                    # TODO: Right now, we are not using average power in the smoothing window, but the current power.
+                    power_to_baseline_ratio = np.divide(current_ripple_power - self._mean_ripple_power, self._std_ripple_power)
+
+                    # Timestamp has both trodes and system timestamps!
+                    curr_time = float(timestamp)/RiD.SPIKE_SAMPLING_FREQ
+                    logging.debug(MODULE_IDENTIFIER + "Frame @ %d filtered, mean ripple strength %.2f"%(timestamp, np.mean(power_to_baseline_ratio)))
+                    if ((curr_time - prev_ripple) > RiD.RIPPLE_REFRACTORY_PERIOD):
+                        # TODO: Consider switching to all, or atleast a majority of tetrodes for ripple detection.
+                        if (power_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD).any():
+                            prev_ripple = curr_time
+                            with self._trigger_condition:
+                                # First trigger interruption and all time critical operations
+                                self._trigger_condition.notify()
+                                curr_wall_time = time.time()
+                                ripple_unseen = True
+                            logging.info(MODULE_IDENTIFIER + "Detected ripple at %.2f, TS: %d. Peak Strength: %.2f"% \
+                                    (curr_time, timestamp, np.max(power_to_baseline_ratio)))
+                    if ((curr_time - prev_ripple) > RiD.LFP_BUFFER_TIME/2) and ripple_unseen:
+                        ripple_unseen = False
+                        # Copy data over for visualization
+                        if len(self._local_lfp_buffer) == RiD.LFP_BUFFER_LENGTH:
+                            np.copyto(self._raw_lfp_buffer, np.asarray(self._local_lfp_buffer).T)
+                            np.copyto(self._ripple_power_buffer, np.asarray(self._local_ripple_power_buffer).T)
+                            logging.info(MODULE_IDENTIFIER + "%.2fs: Peak ripple power in frame %.2f"%(curr_time, np.max(self._ripple_power_buffer)))
+                            with self._show_trigger:
+                                # First trigger interruption and all time critical operations
+                                self._show_trigger.notify()
+            else:
+                # logging.debug(MODULE_IDENTIFIER + "No LFP Frames to process. Sleeping")
+                time.sleep(0.005)
+                down_time += 0.005
+                if down_time > 1.0:
+                    print(MODULE_IDENTIFIER + "Warning: Not receiving LFP data.")
+                    down_time = 0.0
+"""
+Code below here is from the previous iterations where we were using a single
+file to detect and disrupt all ripples based on the LFP on a single tetrode.
+"""
 def writeLogFile(trodes_timestamps, ripple_events, wall_ripple_times, interrupt_events):
     outf = open(os.getcwd() + "/ripple_interruption_out__" +str(time.time()) + ".txt", "w")
 
@@ -39,132 +416,8 @@ def writeLogFile(trodes_timestamps, ripple_events, wall_ripple_times, interrupt_
 
     outf.close()
 
-def visualizeLFP(timestamps, raw_lfp_buffer, ripple_power, ripple_filtered_lfp, \
-        ripple_events=None, do_animation=False):
-    # Normalize both EEG and Ripple power so that they can be visualized together.
-    norm_lfp, lfp_mean, lfp_std = normalizeData(raw_lfp_buffer[0,:])
-    norm_ripple_power, power_mean, power_std = normalizeData(ripple_power[0,:])
-    norm_raw_ripple, ripple_mean, ripple_std = normalizeData(ripple_filtered_lfp[0,:])
-
-    print("Ripple Statistics...")
-    print("Mean: %.2f"%power_mean)
-    print("Std: %.2f"%power_std)
-
-    # Plots - Pick a tetrode to plot the data from
-    # Static plots
-    plt.ion()
-    n_tetrodes = 1
-    for tetrode_idx in range(n_tetrodes):
-        fig, (ax1, ax2) = plt.subplots(2,1,sharex=True)
-        ax1.plot(timestamps, norm_lfp)
-        if ripple_events is not None:
-            ax1.scatter(ripple_events, np.zeros(len(ripple_events)), c="r")
-        ax1.grid(True)
-        ax2.plot(timestamps, norm_raw_ripple)
-        ax2.plot(timestamps, norm_ripple_power)
-        ax2.grid(True)
-        plt.show()
-
-    """
-    # Plot a histogram of the LFP power
-    plt.figure()
-    hist_axes = plt.axes()
-    plt.hist(norm_ripple_power, bins=RiD.N_POWER_BINS, density=True)
-    plt.grid(True)
-    hist_axes.yaxis.set_major_formatter(PercentFormatter(xmax=1))
-    plt.show()
-    """
-
-    if do_animation:
-        # Animation
-        wait_for_user_input = input('Press ENTER to continue, or Q to ABORT.')
-        if (wait_for_user_input == 'Q'):
-            return
-        animateLFP(timestamps, norm_lfp, norm_raw_ripple, norm_ripple_power, 400)
-    return (power_mean, power_std)
-
-def animateLFP(timestamps, lfp, raw_ripple, ripple_power, frame_size, statistic=None):
-    """
-    Animate a given LFP by plotting a fixed size sliding frame.
-
-    :timestamps: time-points for the LFP data
-    :lfp: LFP (Raw/Filtered) for a single tetrode
-    :raw_ripple: LFP Passed through a ripple filter
-    :ripple_power: Ripple power calculated over a moving winow centered at all
-        the data points.
-    :frame_size: Size of the frame that should be seen at once
-    :statistic: Function handle that should be applied to the data to generate
-        a scalar quantity that can also be plotted!
-    """
-
-    # Turn interactive plotting off. It messes up animation
-    plt.ioff()
-
-    # Change this to '3d' if the need every arises for a multi-dimensional plot
-    lfp_fig   = plt.figure()
-    plot_axes = plt.axes(projection=None)
-
-    # Start with an empty plot, it can be then updated by animation functions
-    # NOTE: The way frame is accessed in animation internals forces us to
-    # make this an array if nothing else is being passed in. Having text
-    # removes this requirement.
-    lfp_frame,   = plot_axes.plot([], [], animated=True)
-    r_raw_frame, = plot_axes.plot([], [], animated=True)
-    r_pow_frame, = plot_axes.plot([], [], animated=True)
-    txt_template = 't = %.2fs'
-    lfp_measure  = plot_axes.text(0.5, 0.09, '', transform=plot_axes.transAxes)
-
-    # Local functions for setting up animation frames and cycling through them
-    def _nextAnimFrame(step=0):
-        """
-        # Making sure that the step index and data are coming in properly
-        print(step)
-        print(lfp[step])
-        """
-        lfp_frame.set_data(timestamps[step:step+frame_size], lfp[step:step+frame_size])
-        r_raw_frame.set_data(timestamps[step:step+frame_size], raw_ripple[step:step+frame_size])
-        r_pow_frame.set_data(timestamps[step:step+frame_size], ripple_power[step:step+frame_size])
-        lfp_measure.set_text(txt_template % timestamps[step])
-        # Updating the limits is needed still so that the correct range of data
-        # is displayed! It doesn't update the axis labels though - That's a
-        # different ballgame!
-        plot_axes.set_xlim(timestamps[step], timestamps[step+frame_size])
-        return lfp_frame, r_raw_frame, r_pow_frame, lfp_measure
-
-    def _initAnimFrame():
-        # NOTE: Init function called twice! I have seen this before but still
-        # don't understand why it works this way!
-        # print("Initializing animation frame...")
-        plot_axes.set_xlabel('Time (s)')
-        plot_axes.set_ylabel('EEG (uV)')
-        plot_axes.set_ylim(min(lfp), max(lfp))
-        plot_axes.set_xlim(timestamps[0], timestamps[frame_size])
-        plot_axes.grid(True)
-        return _nextAnimFrame()
-
-    n_frames = len(timestamps) - frame_size
-    lfp_anim = animation.FuncAnimation(lfp_fig, _nextAnimFrame, np.arange(0, n_frames), \
-            init_func=_initAnimFrame, interval=RiD.LFP_ANIMATION_INTERVAL, \
-            blit=True, repeat=False)
-    plt.figure(lfp_fig.number)
-
-    # Make the filtered ripple thinner
-    r_raw_frame.set_linewidth(0.5)
-    plt.show(plot_axes)
-
-def sendBiphasicPulse(serial_port):
-    serial_port.setDTR(True)
-    time.sleep(0.0001)
-    serial_port.setDTR(False)
-    time.sleep(0.0001)
-    serial_port.setRTS(True)
-    time.sleep(0.0001)
-    serial_port.setRTS(False)
-    time.sleep(0.001)
-    return
-
-def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None, \
-        show_interruptions=False, interrupt_ripples=False):
+def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
+        ripple_statistics=None, interrupt_ripples=False):
     """
     Get ripple data statistics for a particular tetrode and a user defined time
     period.
@@ -175,21 +428,19 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
         statistics.
     :analysis_time: Amount of time (specified in seconds) for which the data
         should be analyzed to get ripple statistics.
+    :show_ripple: Show ripple as they happen in real time.
+    :ripple_statistics: Mean and STD for declaring something a sharp-wave
+        ripple.
     :returns: Distribution of ripple power, ripple amplitude and frequency
     """
-    BAUDRATE     = 9600
-    DEFAULT_PORT = '/dev/ttyS0'
 
-    ser = None
-    if interrupt_ripples:
-        ser = serial.Serial(DEFAULT_PORT, BAUDRATE, timeout=0, stopbits=serial.STOPBITS_ONE, \
-                bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE)
-
-    if show_interruptions:
+    if show_ripples:
         plt.ion()
 
+    if interrupt_ripples:
+        ser = SerialPort.BiphasicPort();
     n_tetrodes = len(tetrodes)
-    report_ripples = (interruption_statistics is not None)
+    report_ripples = (ripple_statistics is not None)
 
     # Create a ripple filter (discrete butterworth filter with cutoff
     # frequencies set at Ripple LO and HI cutoffs.)
@@ -238,10 +489,10 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
     interrupt_events = []
     if report_ripples:
         print('Using pre-recorded ripple statistics')
-        print('Mean: %.2f'%interruption_statistics[0])
-        print('Std: %.2f'%interruption_statistics[1])
+        print('Mean: %.2f'%ripple_statistics[0])
+        print('Std: %.2f'%ripple_statistics[1])
 
-    if show_interruptions:
+    if show_ripples:
         interruption_fig = plt.figure()
         interruption_axes = plt.axes()
         plt.plot([], [])
@@ -284,7 +535,7 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
                         is_first_ripple = False
                     else:
                         # Show the previous interruption after a sufficient time has elapsed
-                        if show_interruptions:
+                        if show_ripples:
                             if (iter_idx == int((prev_ripple + RiD.INTERRUPTION_WINDOW) * RiD.LFP_FREQUENCY)):
                                 data_begin_idx = int(max(0, iter_idx - 2*RiD.INTERRUPTION_TPTS))
                                 interruption_axes.clear()
@@ -298,22 +549,17 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
                                 # print(raw_lfp_buffer[0, data_begin_idx:iter_idx])
 
                         # If any of the tetrodes has a ripple, let's call it a ripple for now
-                        ripple_to_baseline_ratio = (frame_ripple_power[0] - interruption_statistics[0])/ \
-                                interruption_statistics[1]
+                        ripple_to_baseline_ratio = (frame_ripple_power[0] - ripple_statistics[0])/ \
+                                ripple_statistics[1]
                         if (ripple_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD):
                             current_time = float(iter_idx)/float(RiD.LFP_FREQUENCY)
                             if ((current_time - prev_ripple) > RiD.RIPPLE_REFRACTORY_PERIOD):
                                 prev_ripple = current_time
                                 current_wall_time = time.time() - start_wall_time
                                 time_lag = (current_wall_time - current_time)
+                                if interrupt_ripples:
+                                    ser.sendBiphasicPulse()
                                 print("Ripple @ %.2f, Real Time %.2f [Lag: %.2f], strength: %.1f"%(current_time, current_wall_time, time_lag, ripple_to_baseline_ratio))
-                                if interrupt_ripples and ((current_time - prev_interrupt) > RiD.INTERRUPT_REFRACTORY_PERIOD):
-                                    prev_interrupt = current_time;
-                                    sendBiphasicPulse(ser)
-                                    # TODO: Add ripple interruption code
-                                    interruption_time = time.time() - start_wall_time
-                                    print("Ripple Interrupted@ %.2f!"% interruption_time)
-                                    interrupt_events.append(interruption_time)
                                 trodes_timestamps.append(trodes_time_stamp)
                                 ripple_events.append(current_time)
                                 wall_ripple_times.append(current_wall_time)
@@ -324,7 +570,7 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
 
     client.closeConnections()
     print("Collected raw LFP Data. Visualizing.")
-    power_mean, power_std = visualizeLFP(timestamps, raw_lfp_buffer, ripple_power, \
+    power_mean, power_std = Visualization.visualizeLFP(timestamps, raw_lfp_buffer, ripple_power, \
             ripple_filtered_lfp, ripple_events, do_animation=False)
     if report_ripples:
         writeLogFile(trodes_timestamps, ripple_events, wall_ripple_times, interrupt_events)
@@ -334,25 +580,24 @@ def getRippleStatistics(tetrodes, analysis_time=4, interruption_statistics=None,
     return (power_mean, power_std)
 
 def main():
-    # tetrodes_to_be_analyzed = [1,2,3,14,15,16,17,18,19,20,21,22,23,24,25,26,32,37,39,40]
-    # tetrodes_to_be_analyzed = [23,14,17,18,39]
-    tetrodes_to_be_analyzed = [3]
-    """
-    getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
-            interruption_statistics=[60.0, 40.0], show_interruptions=True, \
-            interrupt_ripples=False, analysis_time=20)
-    """
+    tetrodes_to_be_analyzed = [2,14]
+    if len(sys.argv) > 2:
+        stim_time = float(sys.argv[2])
+    else:
+        stim_time = 10.0
+
     if len(sys.argv) == 1:
         (power_mean, power_std) = getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
-                analysis_time=10.0)
-    elif (int(sys.argv[1][0]) == 0):
-        getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
-                interruption_statistics=[50.0, 40.0], show_interruptions=True, \
-                interrupt_ripples=True, analysis_time=200)
+                analysis_time=100.0)
     elif (int(sys.argv[1][0]) == 1):
         getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
-                interruption_statistics=[50.0, 40.0], show_interruptions=True, \
-                interrupt_ripples=False, analysis_time=20)
+                ripple_statistics=[75.0, 45.0], show_ripples=True, \
+                analysis_time=stim_time)
+    elif (int(sys.argv[1][0]) == 2):
+        print("Running for %.2fs"%stim_time)
+        getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
+                ripple_statistics=[75.0, 45.0], show_ripples=True, \
+                analysis_time=stim_time, interrupt_ripples=True)
 
 if (__name__ == "__main__"):
     main()

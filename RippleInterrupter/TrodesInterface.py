@@ -1,7 +1,13 @@
+"""
+Connection interface to Trodes
+"""
+import logging
 from spikegadgets import trodesnetwork as tn
 
 # Constant declaration
-LFP_SUBSCRIPTION_ATTRIBUTE = 1024
+MODULE_IDENTIFIER = "[TrodesInterface] "
+LFP_SUBSCRIPTION_ATTRIBUTE = 2014
+SPIKE_SUBSCRIPTION_ATTRIBUTE = 1024
 
 class SGClient(tn.AbstractModuleClient):
     """
@@ -22,13 +28,17 @@ class SGClient(tn.AbstractModuleClient):
 
         # Call the parent class constructor
         tn.AbstractModuleClient.__init__(self, name, connection, port)
-        print("Initialized connection to Trodes.")
+        if (self.initialize() != 0):
+            error_message = "Could not connect to Trodes. Aborting!"
+            logging.debug(MODULE_IDENTIFIER + error_message)
+            raise Exception(error_message)
+        logging.debug(MODULE_IDENTIFIER + "Initialized connection to Trodes.")
 
     def recv_quit(self):
         self.recvquit = True
 
     def recv_event(self, origin, event, msg):
-        if origin == "CameraModule" and event == "newZone":
+        if origin == "CameraModule.2" and event == "2Dpos":
             self.recvquit = True
 
         print(origin)
