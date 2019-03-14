@@ -72,17 +72,12 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
         with self._buffer_lock:
             new_spks = np.zeros((1,self.num_bins_plot_each_side*2))
             trodes_ts = self._sg_client.latestTrodesTimestamp()
-            curr_bin = (trodes_ts // self._win_width) % self._num_spk_bins
-            b1 = self.ripple_bin - self.num_bins_plot_each_side
-            b2 = self.ripple_bin + self.num_bins_plot_each_side
+            b2 = (trodes_ts // self._win_width) % self._num_spk_bins
+            b1 = b2 - RiD.CALIB_PLOT_BUFFER_LENGTH
+
             if b1 < 0:
-                new_spks[0:(- b1)] = self._spike_count_online[(b1 + self._num_spk_bins):]
-                new_spks[(-b1):self.num_bins_plot_each_side] = self._spike_count_online[0:(self.num_bins_plot_each_side+b1)]
-                new_spks[self.num_bins_plot_each_side:] = self._spike_count_online[(self.num_bins_plot_each_side+b1):b2]
-            elif b2 > self._num_spk_bins:
-                new_spks[0:self.num_bins_plot_each_side] = self._spike_count_online[b1:(b1+self.num_bins_plot_each_side)]
-                new_spks[self.num_bins_plot_each_side:(self._num_spk_bins - self.ripple_bin+self.num_bins_plot_each_side)] = self._spike_count_online[self.ripple_bin:]
-                new_spks[(self._num_spk_bins - self.ripple_bin+self.num_bins_plot_each_side):] = self._spike_count_online[0:(self.num_bins_plot_each_side-self._num_spk_bins+self.ripple_bin)]
+                new_spks[0:(-b1)] = self._spike_count_online[(b1+self._num_spk_bins):]
+                new_spks[(-b1):] = self._spike_count_online[0:b2]
             else:
                 new_spks[0:] = self._spike_count_online[b1:b2]
 
