@@ -20,7 +20,8 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
         self._bin_times = np.zeros((self._num_spk_bins))
         self._spike_count_online = np.zeros((self._num_spk_bins))
         self.max_spk_iter = 100
-        self.num_bins_plot_each_side = RiD.CALIB_PLOT_BUFFER_LENGTH / 2
+#        print(RiD.CALIB_PLOT_BUFFER_LENGTH)
+        self.num_bins_plot_each_side = RiD.CALIB_PLOT_BUFFER_LENGTH // 2
         self._spike_counts = np.zeros((0,RiD.CALIB_PLOT_BUFFER_LENGTH))
     
         self._shared_calib_plot_means = np.reshape(np.frombuffer(shared_buffers[0], dtype='double'), (RiD.CALIB_PLOT_BUFFER_LENGTH))
@@ -65,13 +66,13 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
 
 
     def mark_ripple(self):
-        ripple_trodes_ts = self._sg_client.latestTrodesTimestamp()
-        self.ripple_bin = (ripple_trodes_ts // self._win_width) % self._num_spk_bins
-
+        pass
 
     def update_shared_buffer(self):
         with self._buffer_lock:
             new_spks = np.zeros((1,self.num_bins_plot_each_side*2))
+            trodes_ts = self._sg_client.latestTrodesTimestamp()
+            curr_bin = (trodes_ts // self._win_width) % self._num_spk_bins
             b1 = self.ripple_bin - self.num_bins_plot_each_side
             b2 = self.ripple_bin + self.num_bins_plot_each_side
             if b1 < 0:
