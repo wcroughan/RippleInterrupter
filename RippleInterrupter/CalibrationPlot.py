@@ -92,3 +92,35 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
         means = np.mean(self._spike_counts)
         std_errs = np.divide(np.std(self._spike_counts), np.sqrt(self._spike_counts.shape[0]))
         #TODO send data to some graphics function
+
+
+class CalibrationPlotTrigger(threading.Thread):
+    
+    """
+    Listens for ripples and communicates with CalibrationPlot object defined above
+    """
+
+    REPLAY_ANALYSIS_WINDOW = []
+    def __init__(self, ripple_trigger, calibplot):
+        """
+        Constructor. Whenever there is a ripple_trigger, look at the replay
+        content and analyze if it is of interest to use (and therefore needs to
+        be interrupted.)
+
+        :ripple_trigger: Event used to start looking at a replay and deciding
+            if we will interrupt it.
+        """
+
+        threading.Thread.__init__(self)
+        self._ripple_trigger = ripple_trigger
+        self._calibration_plot = calibplot
+
+    def run(self):
+        # TODO: Need to have some condition here to make sure that threads can
+        # be close off properly.
+        while (True):
+
+            # with here is used as a simple way to acquire lock on ripple_trigger
+            with self._ripple_trigger:
+                self._ripple_trigger.wait()
+                self._calibration_plot.mark_ripple()
