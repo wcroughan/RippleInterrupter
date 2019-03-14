@@ -37,7 +37,7 @@ def main():
         profile_filename = time.strftime(profile_prefix + "_%Y%m%d_%H%M%S.pr")
 
     # Not necessary to add a filename here. Can be read using a dialog box now
-    tetrodes_of_interest = [2, 14]
+    tetrodes_of_interest = [27]
 
     # Uncomment to use a hardcoded file
     # cluster_filename = "./test_clusters.trodesClusters"
@@ -51,8 +51,8 @@ def main():
         print("Warning: Unable to read cluster file. Using default map.")
         n_units = 1
         cluster_identity_map = dict()
-        cluster_identity_map[2] = {1: 0}
-        cluster_identity_map[14] = {}
+        cluster_identity_map[27] = {1: 0}
+        # cluster_identity_map[3] = {}
     print(cluster_identity_map)
 
     # Uncomment to let the user select a file

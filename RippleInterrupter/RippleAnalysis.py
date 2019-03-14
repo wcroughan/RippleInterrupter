@@ -27,7 +27,7 @@ import cProfile
 
 MODULE_IDENTIFIER = "[RippleAnalysis] "
 D_MEAN_RIPPLE_POWER = 80.0
-D_STD_RIPPLE_POWER = 55.0
+D_STD_RIPPLE_POWER = 40.0
 
 class RippleSynchronizer(ThreadExtension.StoppableProcess):
     """
@@ -579,7 +579,8 @@ def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
     return (power_mean, power_std)
 
 def main():
-    tetrodes_to_be_analyzed = [2,14]
+    # tetrodes_to_be_analyzed = [2,14]
+    tetrodes_to_be_analyzed = [27]
     if len(sys.argv) > 2:
         stim_time = float(sys.argv[2])
     else:
@@ -590,12 +591,12 @@ def main():
                 analysis_time=100.0)
     elif (int(sys.argv[1][0]) == 1):
         getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
-                ripple_statistics=[75.0, 45.0], show_ripples=True, \
+                ripple_statistics=[75.0, 35.0], show_ripples=True, \
                 analysis_time=stim_time)
     elif (int(sys.argv[1][0]) == 2):
         print("Running for %.2fs"%stim_time)
         getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
-                ripple_statistics=[75.0, 45.0], show_ripples=True, \
+                ripple_statistics=[75.0, 35.0], show_ripples=True, \
                 analysis_time=stim_time, interrupt_ripples=True)
 
 if (__name__ == "__main__"):

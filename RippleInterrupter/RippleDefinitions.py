@@ -27,8 +27,8 @@ INTERRUPT_REFRACTORY_PERIOD = 1.0
 
 # Custom constants
 LFP_ANIMATION_INTERVAL = 5     # Animation Frame rate (this is the delay between frames)
-RIPPLE_POWER_THRESHOLD = 5     # Multiplicative factor for calling something a ripple
-MOVE_VELOCITY_THRESOLD = 8.0
+RIPPLE_POWER_THRESHOLD = 3.0     # Multiplicative factor for calling something a ripple
+MOVE_VELOCITY_THRESOLD = 200.0
 
 # Plotting and aesthetics
 N_POWER_BINS = 20
