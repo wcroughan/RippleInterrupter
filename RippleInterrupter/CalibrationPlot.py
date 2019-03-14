@@ -72,8 +72,11 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
         with self._buffer_lock:
             new_spks = np.zeros((1,self.num_bins_plot_each_side*2))
             trodes_ts = self._sg_client.latestTrodesTimestamp()
-            b2 = (trodes_ts // self._win_width) % self._num_spk_bins
-            b1 = b2 - RiD.CALIB_PLOT_BUFFER_LENGTH
+            b2 = int((trodes_ts // self._win_width) % self._num_spk_bins)
+            b1 = int(b2 - RiD.CALIB_PLOT_BUFFER_LENGTH)
+
+            print(str(b1))
+            print(str(b2))
 
             if b1 < 0:
                 new_spks[0:(-b1)] = self._spike_count_online[(b1+self._num_spk_bins):]
