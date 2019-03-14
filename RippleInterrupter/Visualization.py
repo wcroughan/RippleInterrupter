@@ -292,8 +292,6 @@ class GraphicsManager(Process):
         does not continuously update the frame but only when a ripple is triggerred.
         """
         
-        raise "define data buffers"
-
         # NOTE: This call blocks access to ripple_trigger_condition for
         # __RIPPLE_DETECTION_TIMEOUT, which could be a long while. Don't let
         # this block any important functionality.

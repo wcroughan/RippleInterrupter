@@ -38,7 +38,7 @@ def main():
         profile_filename = time.strftime(profile_prefix + "_%Y%m%d_%H%M%S.pr")
 
     # Not necessary to add a filename here. Can be read using a dialog box now
-    tetrodes_of_interest = [2, 14]
+    tetrodes_of_interest = [27]
 
     # Uncomment to use a hardcoded file
     # cluster_filename = "./test_clusters.trodesClusters"

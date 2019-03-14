@@ -71,7 +71,7 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
 
     def update_shared_buffer(self):
         with self._buffer_lock:
-            new_spks = np.zeros(1,self.num_bins_plot_each_side*2)
+            new_spks = np.zeros((1,self.num_bins_plot_each_side*2))
             b1 = self.ripple_bin - self.num_bins_plot_each_side
             b2 = self.ripple_bin + self.num_bins_plot_each_side
             if b1 < 0:
