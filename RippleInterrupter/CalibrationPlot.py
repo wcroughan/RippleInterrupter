@@ -68,10 +68,9 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
     def mark_ripple(self):
         pass
 
-    def update_shared_buffer(self):
+    def update_shared_buffer(self, trodes_ts):
         with self._buffer_lock:
             new_spks = np.zeros((1,self.num_bins_plot_each_side*2))
-            trodes_ts = self._sg_client.latestTrodesTimestamp()
             b2 = int((trodes_ts // self._win_width) % self._num_spk_bins)
             b1 = int(b2 - RiD.CALIB_PLOT_BUFFER_LENGTH)
 

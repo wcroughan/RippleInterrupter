@@ -391,7 +391,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                                 # First trigger interruption and all time critical operations
                                 self._show_trigger.notify()
                                 
-                            self._calib_plot.update_shared_buffer()
+                            self._calib_plot.update_shared_buffer(timestamp)
                             with self._calib_trigger_condition:
                                 self._calib_trigger_condition.notify()
             else:
