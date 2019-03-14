@@ -240,7 +240,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
     Thread for ripple detection on a set of channels [ONLINE]
     """
 
-    def __init__(self, lfp_listener, baseline_stats=None, \
+    def __init__(self, lfp_listener, calib_plot, baseline_stats=None, \
             trigger_condition=None, shared_buffers=None):
         """
 
@@ -266,6 +266,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
             self._std_ripple_power  = baseline_stats[1]
         self._trigger_condition = trigger_condition[0]
         self._show_trigger = trigger_condition[1]
+        self._calib_trigger_condition = trigger_condition[2]
 
         # Output connections
         self._ripple_buffer_connections = []
@@ -283,6 +284,8 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         self._ripple_filter = signal.butter(RiD.LFP_FILTER_ORDER, \
                 (RiD.RIPPLE_LO_FREQ, RiD.RIPPLE_HI_FREQ), btype='bandpass', \
                 analog=False, output='sos', fs=RiD.LFP_FREQUENCY)
+
+        self._calib_plot = calib_plot
 
         logging.info(MODULE_IDENTIFIER + "Started Ripple detection thread.")
 
@@ -387,6 +390,10 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                             with self._show_trigger:
                                 # First trigger interruption and all time critical operations
                                 self._show_trigger.notify()
+                                
+                            self._calib_plot.update_shared_buffer()
+                            with self._calib_trigger_condition:
+                                self._calib_trigger_condition.notify()
             else:
                 # logging.debug(MODULE_IDENTIFIER + "No LFP Frames to process. Sleeping")
                 time.sleep(0.005)

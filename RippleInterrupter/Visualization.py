@@ -156,8 +156,8 @@ class GraphicsManager(Process):
     __CLUSTERS_TO_PLOT = [1]
     __MAX_FIRING_RATE = 100
     __RIPPLE_DETECTION_TIMEOUT = 1.0
-    def __init__(self, ripple_buffers, spike_listener, position_estimator, \
-            place_field_handler, ripple_trigger_thread, ripple_trigger_condition, \
+    def __init__(self, ripple_buffers, calib_plot_buffers, spike_listener, position_estimator, \
+            place_field_handler, ripple_trigger_thread, ripple_trigger_condition, calib_trigger_condition, \
             shared_place_fields, clusters=None):
         """
         Graphical Manager for all the processes
@@ -185,6 +185,7 @@ class GraphicsManager(Process):
         self._place_field_handler = place_field_handler
         self._ripple_trigger_thread = ripple_trigger_thread
         self._ripple_trigger_condition = ripple_trigger_condition
+        self._calib_trigger_condition = calib_trigger_condition
         if clusters is None:
             self._n_clusters = self._spike_listener.get_n_clusters()
             self._clusters = range(self._n_clusters)
@@ -203,6 +204,9 @@ class GraphicsManager(Process):
         self._shared_ripple_power_buffer = np.reshape(np.frombuffer(ripple_buffers[1], dtype='double'), (self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH))
         self._shared_place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), (self._n_clusters, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
 
+        self._shared_calib_plot_means = np.reshape(np.frombuffer(calib_plot_buffers[0], dtype='double'), (RiD.CALIB_PLOT_BUFFER_LENGTH))
+        self._shared_calib_plot_std_errs = np.reshape(np.frombuffer(calib_plot_buffers[1], dtype='double'), (RiD.CALIB_PLOT_BUFFER_LENGTH))
+
         # Local copies of the shared data that can be used at a leisurely pace
         self._lfp_tpts = np.linspace(0, RiD.LFP_BUFFER_TIME, RiD.LFP_BUFFER_LENGTH)
         self._ripple_power_tpts = np.linspace(0, RiD.LFP_BUFFER_TIME, RiD.RIPPLE_POWER_BUFFER_LENGTH)
@@ -210,6 +214,10 @@ class GraphicsManager(Process):
         self._local_ripple_power_buffer = np.zeros((self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH), dtype='double')
         self._most_recent_pf = np.zeros((PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]), \
                 dtype='float')
+
+        self._spk_cnt_tpts = np.linspace(0, RiD.CALIB_PLOT_BUFFER_TIME, RiD.CALIB_PLOT_BUFFER_LENGTH)
+        self._local_spk_cnt_buffer = np.zeros((RiD.CALIB_PLOT_BUFFER_LENGTH), dtype='double')
+        self._local_spk_cnt_stderr_buffer = np.zeros((RiD.CALIB_PLOT_BUFFER_LENGTH), dtype='double')
 
         # Automatically keep only a fixed number of entries in this buffer... Useful for plotting
         self._pos_timestamps = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
@@ -228,12 +236,15 @@ class GraphicsManager(Process):
         self._rd_fig = None
         self._pf_fig = None
         self._pos_fig = None
+        self._cp_fig = None
         self._rd_ax = None
         self._pf_ax = None
         self._spk_pos_ax = None
+        self._cp_ax = None
         self._rd_frame = []
         self._spk_pos_frame = []
         self._pf_frame = []
+        self._cp_frame = []
         self._anim_objs = []
         self._thread_list = []
 
@@ -258,7 +269,7 @@ class GraphicsManager(Process):
             del self._anim_objs
         self._command_window.destroy()
         self._keep_running.clear()
-
+        
     def update_ripple_detection_frame(self, step=0):
         """
         Function used to show a ripple frame whenever a ripple is trigerred.
@@ -273,6 +284,24 @@ class GraphicsManager(Process):
             self._rd_frame[0].set_data(self._lfp_tpts, self._local_lfp_buffer[0,:]/self.__PEAK_LFP_AMPLITUDE)
             self._rd_frame[1].set_data(self._ripple_power_tpts, -0.5 + (self._local_ripple_power_buffer[0,:] - RippleAnalysis.D_MEAN_RIPPLE_POWER)/(2 * RippleAnalysis.D_STD_RIPPLE_POWER * RiD.RIPPLE_POWER_THRESHOLD))
             return self._rd_frame
+
+    def update_calib_plot_frame(self, step=0):
+        """
+        Function used to show a ripple frame whenever a ripple is trigerred.
+        This is a little different from the other frame update functions as it
+        does not continuously update the frame but only when a ripple is triggerred.
+        """
+        
+        raise "define data buffers"
+
+        # NOTE: This call blocks access to ripple_trigger_condition for
+        # __RIPPLE_DETECTION_TIMEOUT, which could be a long while. Don't let
+        # this block any important functionality.
+        if self._cp_ax is not None:
+            self._cp_frame[0].set_data(self._spk_cnt_tpts, self._local_spk_cnt_buffer)
+            self._cp_frame[1].set_data(self._spk_cnt_tpts, self._local_spk_cnt_buffer + self._local_spk_cnt_stderr_buffer)
+            self._cp_frame[2].set_data(self._spk_cnt_tpts, self._local_spk_cnt_buffer - self._local_spk_cnt_stderr_buffer)
+            return self._cp_frame
 
     def update_position_and_spike_frame(self, step=0):
         """
@@ -303,7 +332,7 @@ class GraphicsManager(Process):
             # max_fr = np.max(self._most_recent_pf)
             self._pf_frame[0].set_array(self._most_recent_pf.T)
             return self._pf_frame
-
+        
     def fetch_incident_ripple(self):
         """
         Fetch raw LFP data and ripple power data.
@@ -317,6 +346,18 @@ class GraphicsManager(Process):
                 np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
                 # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
         logging.info(MODULE_IDENTIFIER + "Ripple frame pipe closed.")
+
+    def fetch_calibration_plot(self):
+        """
+        Fetch raw LFP data and ripple power data.
+        """
+        while self._keep_running.is_set():
+            with self._calib_trigger_condition:
+                ripple_triggered = self._calib_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
+
+            if ripple_triggered:
+                np.copyto(self._local_spk_cnt_buffer, self._shared_calib_plot_means)
+                np.copyto(self._local_spk_cnt_stderr_buffer, self._shared_calib_plot_std_errs)
 
     def fetch_place_fields(self):
         """
@@ -369,7 +410,7 @@ class GraphicsManager(Process):
             self._ripple_trigger_thread.enable()
         self._key_entry.delete(0, tkinter.END)
         pass
-
+    
     def initialize_ripple_detection_fig(self):
         """
         Initialize figure window for showing raw LFP and ripple power.
@@ -390,6 +431,30 @@ class GraphicsManager(Process):
 
         # Create animation object for showing the EEG
         anim_obj = animation.FuncAnimation(self._rd_fig, self.update_ripple_detection_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
+        self._anim_objs.append(anim_obj)
+
+    def initialize_calib_plot_fig(self):
+        """
+        Initialize figure window for showing raw LFP and ripple power.
+        :returns: TODO
+        """
+        self._cp_fig = plt.figure()
+        self._cp_ax = plt.axes()
+        self._cp_ax.set_xlabel("Time (s)")
+        self._cp_ax.set_ylabel("Spike Rate (spks/5ms)")
+        self._cp_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
+        self._cp_ax.set_ylim((0.0, 20.0))
+        self._cp_ax.grid(True)
+
+        spk_cnt_frame, = plt.plot([], [], animated=True)
+        spk_cnt_plus_sterr_frame, = plt.plot([], [], animated=True)
+        spk_cnt_minus_sterr_frame, = plt.plot([], [], animated=True)
+        self._cp_frame.append(spk_cnt_frame)
+        self._cp_frame.append(spk_cnt_plus_sterr_frame)
+        self._cp_frame.append(spk_cnt_minus_sterr_frame)
+
+        # Create animation object for showing the EEG
+        anim_obj = animation.FuncAnimation(self._cp_fig, self.update_calib_plot_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
         self._anim_objs.append(anim_obj)
 
     def initialize_spike_pos_fig(self):
@@ -458,14 +523,18 @@ class GraphicsManager(Process):
                 target=self.fetch_place_fields)
         ripple_frame_fetcher = threading.Thread(name="RippleFrameFetcher", daemon=True, \
                 target=self.fetch_incident_ripple)
+        calbi_plot_fetcher = threading.Thread(name="CalibPlotFetcher", daemon=True, \
+                target=self.fetch_calibration_plot)
 
         position_fetcher.start()
         spike_fetcher.start()
         place_field_fetcher.start()
         ripple_frame_fetcher.start()
+        calbi_plot_fetcher.start()
 
         # Start the animation for Spike-Position figure, place field figure
         self.initialize_ripple_detection_fig()
+        self.initialize_calib_plot_fig()
         self.initialize_spike_pos_fig()
         self.initialize_place_field_fig()
         plt.show()
@@ -476,4 +545,5 @@ class GraphicsManager(Process):
         spike_fetcher.join()
         place_field_fetcher.join()
         ripple_frame_fetcher.join()
+        calbi_plot_fetcher.join()
         logging.info(MODULE_IDENTIFIER + "Closed GUI and display pipes")
