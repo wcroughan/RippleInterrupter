@@ -259,6 +259,7 @@ class GraphicsManager(Process):
             plt.close(self._pos_fig)
             plt.close(self._pf_fig)
             plt.close(self._rd_fig)
+            plt.close(self._cp_fig)
         except Exception as err:
             logging.warning(MODULE_IDENTIFIER + "Error closing figure window")
             print(err)
@@ -266,6 +267,8 @@ class GraphicsManager(Process):
             # Clean up
             del self._pf_fig
             del self._pos_fig
+            del self._rd_fig
+            del self._cp_fig
             del self._anim_objs
         self._command_window.destroy()
         self._keep_running.clear()
@@ -521,14 +524,14 @@ class GraphicsManager(Process):
                 target=self.fetch_place_fields)
         ripple_frame_fetcher = threading.Thread(name="RippleFrameFetcher", daemon=True, \
                 target=self.fetch_incident_ripple)
-        calbi_plot_fetcher = threading.Thread(name="CalibPlotFetcher", daemon=True, \
+        calib_plot_fetcher = threading.Thread(name="CalibPlotFetcher", daemon=True, \
                 target=self.fetch_calibration_plot)
 
         position_fetcher.start()
         spike_fetcher.start()
         place_field_fetcher.start()
         ripple_frame_fetcher.start()
-        calbi_plot_fetcher.start()
+        calib_plot_fetcher.start()
 
         # Start the animation for Spike-Position figure, place field figure
         self.initialize_ripple_detection_fig()
@@ -543,5 +546,5 @@ class GraphicsManager(Process):
         spike_fetcher.join()
         place_field_fetcher.join()
         ripple_frame_fetcher.join()
-        calbi_plot_fetcher.join()
+        calib_plot_fetcher.join()
         logging.info(MODULE_IDENTIFIER + "Closed GUI and display pipes")

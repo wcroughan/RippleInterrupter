@@ -75,6 +75,7 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
             b2 = int((trodes_ts // self._win_width) % self._num_spk_bins)
             b1 = int(b2 - RiD.CALIB_PLOT_BUFFER_LENGTH)
 
+            print(str(trodes_ts))
             print(str(b1))
             print(str(b2))
 
@@ -87,6 +88,10 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
             self._spike_counts = np.vstack((self._spike_counts, new_spks))
             means = np.mean(self._spike_counts)
             std_errs = np.divide(np.std(self._spike_counts), np.sqrt(self._spike_counts.shape[0]))
+
+            print(str(np.max(means)))
+            print(str(np.max(std_errs)))
+            print(str(np.max(self._spike_count_online)))
 
             np.copyto(self._shared_calib_plot_means, means)
             np.copyto(self._shared_calib_plot_std_errs, std_errs)
