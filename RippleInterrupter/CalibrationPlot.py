@@ -64,6 +64,9 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
                     self._spike_count_online[bin] += 1
                     self.spk_iter += 1
 
+                if self.spk_iter > 0:
+                    print(str(self.spk_iter))
+
 
     def mark_ripple(self):
         pass
