@@ -2,6 +2,7 @@ from multiprocessing import Pipe, Condition
 import numpy as np
 import ThreadExtension
 import RippleDefinitions as RiD
+import logging
 
 class CalibrationPlot(ThreadExtension.StoppableProcess):
 
@@ -33,8 +34,8 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
     def run(self):
         while not self.req_stop():
             if not self._spike_buffer.poll():
-                # logging.debug(self.CLASS_IDENTIFIER + "Spike buffer empty, sleeping")
-                time.sleep(0.001)
+                logging.debug(self.CLASS_IDENTIFIER + "Spike buffer empty, sleeping")
+                time.sleep(0.1)
                 continue
 
             with self._buffer_lock:
