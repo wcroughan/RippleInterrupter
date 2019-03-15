@@ -14,6 +14,7 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
     # def __init__(self, position_processor, spike_processor, place_fields):
         ThreadExtension.StoppableProcess.__init__(self)
         self._spike_buffer = spike_processor.get_spike_buffer_connection()
+        print("subscribed to %.2f clusters"%(spike_processor.get_n_clusters()))
         self._sg_client = sg_client
         self._win_width = RiD.CALIB_PLOT_WINDOW_LENGTH * RiD.SPIKE_SAMPLING_FREQ
         self._num_spk_bins = 300
