@@ -118,6 +118,7 @@ def main():
     position_estimator.start()
     place_field_handler.start()
     ripple_trigger.start()
+    calib_plot.start()
 
     # By default, enable the ripple trigerring 
     ripple_trigger.enable()
@@ -139,6 +140,8 @@ def main():
         place_field_handler.join()
         logging.info(MODULE_IDENTIFIER + "Place field builder Stopped")
         lfp_listener.join()
+        logging.info(MODULE_IDENTIFIER + "Spike calibration plot Stopped.")
+        calib_plot.join()
         logging.info(MODULE_IDENTIFIER + "LFP listener Stopped")
         ripple_detector.join()
         logging.info(MODULE_IDENTIFIER + "Ripple detector Stopped")

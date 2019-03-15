@@ -1,4 +1,5 @@
 from multiprocessing import Pipe, Condition
+import time
 import numpy as np
 import ThreadExtension
 import RippleDefinitions as RiD
@@ -35,21 +36,26 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
         while not self.req_stop():
             if not self._spike_buffer.poll():
                 logging.debug(self.CLASS_IDENTIFIER + "Spike buffer empty, sleeping")
+                print(self.CLASS_IDENTIFIER + "Spike buffer empty, sleeping")
                 time.sleep(0.1)
                 continue
 
+            print("Trying to acquir lock!")
             with self._buffer_lock:
+                print("Acquired lock!")
                 self.spk_iter = 0
             
                 while self._spike_buffer.poll() and self.spk_iter < self.max_spk_iter:
                     #get the next spike
                     (spk_cl, spk_time) = self._spike_buffer.recv()
                     logging.debug(self.CLASS_IDENTIFIER + "Received spike from %d at %d"%(spk_cl, spk_time))
-                    bin = (spk_time // self._win_width) % self._num_spk_bins
+                    m_bin = int((spk_time // self._win_width) % self._num_spk_bins)
 
-                    if spk_time > self._bin_times[bin] + self._win_width:
+                    print(m_bin)
+                    print()
+                    if spk_time > self._bin_times[m_bin] + self._win_width:
                         new_time = self._win_width * (spk_time // self._win_width)
-                        this_bin = bin
+                        this_bin = m_bin
                         while self._bin_times[this_bin] < new_time:
                             self._bin_times[this_bin] = new_time
                             self._spike_count_online[this_bin] = 0
@@ -61,9 +67,9 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
 
                             how_far_back = this_bin
 
-                        self._latest_bin = bin
+                        self._latest_bin = m_bin
 
-                    self._spike_count_online[bin] += 1
+                    self._spike_count_online[m_bin] += 1
                     self.spk_iter += 1
 
                 if self.spk_iter > 0:
