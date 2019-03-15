@@ -70,7 +70,7 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
 
     def update_shared_buffer(self, trodes_ts):
         with self._buffer_lock:
-            new_spks = np.zeros((1,self.num_bins_plot_each_side*2))
+            new_spks = np.zeros((self.num_bins_plot_each_side*2))
             b2 = int((trodes_ts // self._win_width) % self._num_spk_bins)
             b1 = int(b2 - RiD.CALIB_PLOT_BUFFER_LENGTH)
 
@@ -79,6 +79,15 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
             print(str(b2))
 
             if b1 < 0:
+                print(str(b1+self._num_spk_bins))
+                bb = -b1
+                print(bb)
+                a = new_spks[0:(-b1)]
+                b = self._spike_count_online[(b1+self._num_spk_bins):]
+                c = new_spks[0:bb]
+                print(a.shape)
+                print(b.shape)
+                print(c.shape)
                 new_spks[0:(-b1)] = self._spike_count_online[(b1+self._num_spk_bins):]
                 new_spks[(-b1):] = self._spike_count_online[0:b2]
             else:
