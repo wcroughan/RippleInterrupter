@@ -214,7 +214,8 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                 if self._csv_writer:
                     self._csv_writer.writerow([current_timestamp, self._data_field['position_x'], self._data_field['position_y']])
 
-        self._csv_file.close()
+        if self._csv_writer:
+            self._csv_file.close()
 
         if __debug__:
             code_profiler.disable()

@@ -200,9 +200,11 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                     gaussian_filter(self._place_fields, sigma=3, output=self._place_fields)
                     np.log(self._place_fields, out=self._log_place_fields, where=self._place_fields!=0)
                     logging.info(self.CLASS_IDENTIFIER + "Fields updated. Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._place_fields), np.mean(self._place_fields)))
-        self._csv_file.close()
-        # Dump all the calculated place fields in a file
-        np.save(self._place_field_filename, self._place_fields)
+
+        if self._csv_writer:
+            self._csv_file.close()
+            # Dump all the calculated place fields in a file
+            np.save(self._place_field_filename, self._place_fields)
 
     def submit_immediate_request(self):
         """

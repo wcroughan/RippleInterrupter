@@ -98,3 +98,12 @@ def get_open_field_configuration(filename=None):
     except Exception as err:
         print('Unable to read configuration file %s. Using defaults.'%filename)
         configuration.read(DEFAULT_CONFIG_FILE)
+
+class Config(object):
+
+    """
+    Get the configuration for running ripple/replay interruption
+    """
+
+    def __init__(self):
+        """TODO: to be defined1. """
