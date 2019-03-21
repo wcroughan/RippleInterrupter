@@ -16,14 +16,12 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
     # def __init__(self, position_processor, spike_processor, place_fields):
         ThreadExtension.StoppableProcess.__init__(self)
         self._spike_buffer = spike_processor.get_spike_buffer_connection()
-        print("subscribed to %.2f clusters"%(spike_processor.get_n_clusters()))
         self._sg_client = sg_client
         self._win_width = RiD.CALIB_PLOT_WINDOW_LENGTH * RiD.SPIKE_SAMPLING_FREQ
         self._num_spk_bins = 300
         self._bin_times = np.zeros((self._num_spk_bins))
         self._spike_count_online = np.zeros((self._num_spk_bins))
         self.max_spk_iter = 100
-#        print(RiD.CALIB_PLOT_BUFFER_LENGTH)
         self.num_bins_plot_each_side = RiD.CALIB_PLOT_BUFFER_LENGTH // 2
         self._spike_counts = np.zeros((0,RiD.CALIB_PLOT_BUFFER_LENGTH))
     
@@ -51,8 +49,6 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
                     logging.debug(self.CLASS_IDENTIFIER + "Received spike from %d at %d"%(spk_cl, spk_time))
                     m_bin = int((spk_time // self._win_width) % self._num_spk_bins)
 
-                    print(m_bin)
-                    print()
                     if spk_time > self._bin_times[m_bin] + self._win_width:
                         new_time = self._win_width * (spk_time // self._win_width)
                         this_bin = m_bin
@@ -72,8 +68,6 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
                     self._spike_count_online[m_bin] += 1
                     self.spk_iter += 1
 
-                if self.spk_iter > 0:
-                    print(str(self.spk_iter))
 
 
     def mark_ripple(self):
@@ -85,20 +79,11 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
             b2 = int((trodes_ts // self._win_width) % self._num_spk_bins)
             b1 = int(b2 - RiD.CALIB_PLOT_BUFFER_LENGTH)
 
-            print(str(trodes_ts))
-            print(str(b1))
-            print(str(b2))
-
             if b1 < 0:
-                print(str(b1+self._num_spk_bins))
                 bb = -b1
-                print(bb)
                 a = new_spks[0:(-b1)]
                 b = self._spike_count_online[(b1+self._num_spk_bins):]
                 c = new_spks[0:bb]
-                print(a.shape)
-                print(b.shape)
-                print(c.shape)
                 new_spks[0:(-b1)] = self._spike_count_online[(b1+self._num_spk_bins):]
                 new_spks[(-b1):] = self._spike_count_online[0:b2]
             else:
@@ -107,10 +92,6 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
             self._spike_counts = np.vstack((self._spike_counts, new_spks))
             means = np.mean(self._spike_counts)
             std_errs = np.divide(np.std(self._spike_counts), np.sqrt(self._spike_counts.shape[0]))
-
-            print(str(np.max(means)))
-            print(str(np.max(std_errs)))
-            print(str(np.max(self._spike_count_online)))
 
             np.copyto(self._shared_calib_plot_means, means)
             np.copyto(self._shared_calib_plot_std_errs, std_errs)
