@@ -34,13 +34,10 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
         while not self.req_stop():
             if not self._spike_buffer.poll():
                 logging.debug(self.CLASS_IDENTIFIER + "Spike buffer empty, sleeping")
-                print(self.CLASS_IDENTIFIER + "Spike buffer empty, sleeping")
                 time.sleep(0.1)
                 continue
 
-            print("Trying to acquir lock!")
             with self._buffer_lock:
-                print("Acquired lock!")
                 self.spk_iter = 0
             
                 while self._spike_buffer.poll() and self.spk_iter < self.max_spk_iter:
