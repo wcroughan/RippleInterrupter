@@ -39,7 +39,7 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
 
             with self._buffer_lock:
                 self.spk_iter = 0
-            
+
                 while self._spike_buffer.poll() and self.spk_iter < self.max_spk_iter:
                     #get the next spike
                     (spk_cl, spk_time) = self._spike_buffer.recv()
@@ -63,6 +63,7 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
                         self._latest_bin = m_bin
 
                     self._spike_count_online[m_bin] += 1
+                    print(m_bin)
                     self.spk_iter += 1
 
 
@@ -78,14 +79,12 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
 
             if b1 < 0:
                 bb = -b1
-                a = new_spks[0:(-b1)]
-                b = self._spike_count_online[(b1+self._num_spk_bins):]
-                c = new_spks[0:bb]
                 new_spks[0:(-b1)] = self._spike_count_online[(b1+self._num_spk_bins):]
                 new_spks[(-b1):] = self._spike_count_online[0:b2]
             else:
                 new_spks[0:] = self._spike_count_online[b1:b2]
 
+            print(self._spike_count_online)
             self._spike_counts = np.vstack((self._spike_counts, new_spks))
             means = np.mean(self._spike_counts)
             std_errs = np.divide(np.std(self._spike_counts), np.sqrt(self._spike_counts.shape[0]))
