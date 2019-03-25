@@ -322,7 +322,8 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         n_data_pts_seen = 0
 
         # Delay measures for ripple detection (and trigger)
-        ripple_unseen = False
+        ripple_unseen_LFP = False
+        ripple_unseen_calib = False
         prev_ripple = -np.Inf
         curr_time   = 0.0
         start_wall_time = time.time()
@@ -377,11 +378,12 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                                 # First trigger interruption and all time critical operations
                                 self._trigger_condition.notify()
                                 curr_wall_time = time.time()
-                                ripple_unseen = True
+                                ripple_unseen_LFP = True
+                                ripple_unseen_calib = True
                             logging.info(MODULE_IDENTIFIER + "Detected ripple at %.2f, TS: %d. Peak Strength: %.2f"% \
                                     (curr_time, timestamp, np.max(power_to_baseline_ratio)))
-                    if ((curr_time - prev_ripple) > RiD.LFP_BUFFER_TIME/2) and ripple_unseen:
-                        ripple_unseen = False
+                    if ((curr_time - prev_ripple) > RiD.LFP_BUFFER_TIME/2) and ripple_unseen_LFP:
+                        ripple_unseen_LFP = False
                         # Copy data over for visualization
                         if len(self._local_lfp_buffer) == RiD.LFP_BUFFER_LENGTH:
                             np.copyto(self._raw_lfp_buffer, np.asarray(self._local_lfp_buffer).T)
@@ -391,9 +393,11 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                                 # First trigger interruption and all time critical operations
                                 self._show_trigger.notify()
                                 
-                            self._calib_plot.update_shared_buffer(timestamp)
-                            with self._calib_trigger_condition:
-                                self._calib_trigger_condition.notify()
+                    if ((curr_time - prev_ripple) > RiD.CALIB_PLOT_BUFFER_TIME/2) and ripple_unseen_calib:
+                        ripple_unseen_calib = False
+                        self._calib_plot.update_shared_buffer(timestamp)
+                        with self._calib_trigger_condition:
+                            self._calib_trigger_condition.notify()
             else:
                 # logging.debug(MODULE_IDENTIFIER + "No LFP Frames to process. Sleeping")
                 time.sleep(0.005)

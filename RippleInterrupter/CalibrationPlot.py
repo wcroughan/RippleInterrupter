@@ -12,22 +12,22 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
     """
     CLASS_IDENTIFIER = "[CalibrationPlot] "
 
-    def __init__(self, sg_client, shared_buffers, spike_processor):
+    def __init__(self, sg_client, shared_buffers, spike_processor, buffer_lock):
     # def __init__(self, position_processor, spike_processor, place_fields):
         ThreadExtension.StoppableProcess.__init__(self)
         self._spike_buffer = spike_processor.get_spike_buffer_connection()
         self._sg_client = sg_client
         self._win_width = RiD.CALIB_PLOT_WINDOW_LENGTH * RiD.SPIKE_SAMPLING_FREQ
-        self._num_spk_bins = 300
-        self._bin_times = np.zeros((self._num_spk_bins))
-        self._spike_count_online = np.zeros((self._num_spk_bins))
+        RiD.CALIB_PLOT_ONLINE_BUFFER_SIZE = 300
+        self._bin_times = np.zeros((RiD.CALIB_PLOT_ONLINE_BUFFER_SIZE))
+        self._spike_count_online = np.zeros((RiD.CALIB_PLOT_ONLINE_BUFFER_SIZE))
         self.max_spk_iter = 100
-        self.num_bins_plot_each_side = RiD.CALIB_PLOT_BUFFER_LENGTH // 2
         self._spike_counts = np.zeros((0,RiD.CALIB_PLOT_BUFFER_LENGTH))
     
         self._shared_calib_plot_means = np.reshape(np.frombuffer(shared_buffers[0], dtype='double'), (RiD.CALIB_PLOT_BUFFER_LENGTH))
         self._shared_calib_plot_std_errs = np.reshape(np.frombuffer(shared_buffers[1], dtype='double'), (RiD.CALIB_PLOT_BUFFER_LENGTH))
-        self._buffer_lock = Condition()
+        self._spike_count_online = np.reshape(np.frombuffer(shared_buffers[2], dtype='uint32'), (RiD.CALIB_PLOT_ONLINE_BUFFER_SIZE))
+        self._buffer_lock = buffer_lock
 
 
     def run(self):
@@ -44,7 +44,7 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
                     #get the next spike
                     (spk_cl, spk_time) = self._spike_buffer.recv()
                     logging.debug(self.CLASS_IDENTIFIER + "Received spike from %d at %d"%(spk_cl, spk_time))
-                    m_bin = int((spk_time // self._win_width) % self._num_spk_bins)
+                    m_bin = int((spk_time // self._win_width) % RiD.CALIB_PLOT_ONLINE_BUFFER_SIZE)
 
                     if spk_time > self._bin_times[m_bin] + self._win_width:
                         new_time = self._win_width * (spk_time // self._win_width)
@@ -55,39 +55,30 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
 
                             this_bin -= 1
                             if this_bin == -1:
-                                this_bin = self._num_spk_bins - 1
+                                this_bin = RiD.CALIB_PLOT_ONLINE_BUFFER_SIZE - 1
                             new_time -= self._win_width
-
-                            how_far_back = this_bin
 
                         self._latest_bin = m_bin
 
                     self._spike_count_online[m_bin] += 1
-                    print(m_bin)
                     self.spk_iter += 1
-
-
-
-    def mark_ripple(self):
-        pass
 
     def update_shared_buffer(self, trodes_ts):
         with self._buffer_lock:
-            new_spks = np.zeros((self.num_bins_plot_each_side*2))
-            b2 = int((trodes_ts // self._win_width) % self._num_spk_bins)
+            new_spks = np.zeros((RiD.CALIB_PLOT_BUFFER_LENGTH))
+            b2 = int((trodes_ts // self._win_width) % RiD.CALIB_PLOT_ONLINE_BUFFER_SIZE)
             b1 = int(b2 - RiD.CALIB_PLOT_BUFFER_LENGTH)
 
             if b1 < 0:
                 bb = -b1
-                new_spks[0:(-b1)] = self._spike_count_online[(b1+self._num_spk_bins):]
+                new_spks[0:(-b1)] = self._spike_count_online[(b1+RiD.CALIB_PLOT_ONLINE_BUFFER_SIZE):]
                 new_spks[(-b1):] = self._spike_count_online[0:b2]
             else:
                 new_spks[0:] = self._spike_count_online[b1:b2]
 
-            print(self._spike_count_online)
             self._spike_counts = np.vstack((self._spike_counts, new_spks))
-            means = np.mean(self._spike_counts)
-            std_errs = np.divide(np.std(self._spike_counts), np.sqrt(self._spike_counts.shape[0]))
+            means = np.mean(self._spike_counts, axis=0)
+            std_errs = np.divide(np.std(self._spike_counts, axis=0), np.sqrt(self._spike_counts.shape[0]))
 
             np.copyto(self._shared_calib_plot_means, means)
             np.copyto(self._shared_calib_plot_std_errs, std_errs)

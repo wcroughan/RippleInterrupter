@@ -68,7 +68,7 @@ def main():
             PositionAnalysis.N_POSITION_BINS[1])
     shared_calib_plot_means = RawArray(ctypes.c_double, RiD.CALIB_PLOT_BUFFER_LENGTH)
     shared_calib_plot_std_errs = RawArray(ctypes.c_double, RiD.CALIB_PLOT_BUFFER_LENGTH)
-
+    shared_calib_plot_spike_count_buffer = RawArray(ctypes.c_uint32, RiD.CALIB_PLOT_ONLINE_BUFFER_SIZE)
 
     # Open connection to trodes.
     sg_client = TrodesInterface.SGClient("ReplayInterruption")
@@ -79,6 +79,7 @@ def main():
     trig_condition  = Condition()
     show_trigger    = Condition()
     calib_trigger   = Condition()
+    calib_plot_condition = Condition()
 
     # Start threads for collecting spikes and LFP
     # Trodes needs strings!
@@ -86,7 +87,7 @@ def main():
     try:
         lfp_listener = RippleAnalysis.LFPListener(sg_client, tetrode_argument)
         spike_listener      = SpikeAnalysis.SpikeDetector(sg_client, cluster_identity_map)
-        calib_plot          = CalibrationPlot.CalibrationPlot(sg_client,  (shared_calib_plot_means, shared_calib_plot_std_errs), spike_listener)
+        calib_plot          = CalibrationPlot.CalibrationPlot(sg_client,  (shared_calib_plot_means, shared_calib_plot_std_errs, shared_calib_plot_spike_count_buffer), spike_listener, calib_plot_condition)
 
         ripple_detector = RippleAnalysis.RippleDetector(lfp_listener, calib_plot, \
                 trigger_condition=(trig_condition, show_trigger, calib_trigger), \
