@@ -332,6 +332,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
             if self._lfp_consumer.poll():
                 # print(MODULE_IDENTIFIER + "LFP Frame received for filtering.")
                 (timestamp, current_lfp_frame) = self._lfp_consumer.recv()
+                #print(timestamp)
                 raw_lfp_window[:, lfp_window_ptr] = current_lfp_frame
                 self._local_lfp_buffer.append(current_lfp_frame)
                 lfp_window_ptr += 1

@@ -5,6 +5,8 @@ import time
 BAUDRATE     = 9600
 DEFAULT_PORT = '/dev/ttyS0'
 
+REALLY_STIM = False
+
 class SerialPort(object):
 
     """
@@ -12,6 +14,9 @@ class SerialPort(object):
     """
 
     def sendBiphasicPulse(self):
+        if not REALLY_STIM:
+            return
+
         self._serial_port.setDTR(True)
         time.sleep(0.0001)
         self._serial_port.setDTR(False)
@@ -23,6 +28,9 @@ class SerialPort(object):
         return
 
     def __init__(self, port_id=DEFAULT_PORT, baudrate=BAUDRATE):
+        if not REALLY_STIM:
+            return
+
         # TODO: Put this in a try/catch block
         self._serial_port = serial.Serial(port_id, baudrate, timeout=0, \
                 stopbits=serial.STOPBITS_ONE, \
