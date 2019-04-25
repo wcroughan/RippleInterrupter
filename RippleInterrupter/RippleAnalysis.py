@@ -228,7 +228,7 @@ class LFPListener(ThreadExtension.StoppableThread):
                 n_frames_fetched += 1
                 # print(self.CLASS_IDENTIFIER + "Fetched %d frames"%n_frames_fetched)
                 if self._lfp_producer is not None:
-                    self._lfp_producer.send((timestamp.trodes_timestamp, self._lfp_buffer[:]))
+                    self._lfp_producer.send((timestamp.trodes_timestamp, self._lfp_buffer[:], time.time()))
                     # logging.debug(self.CLASS_IDENTIFIER + "LFP Frame at %d sent out for ripple analysis."%timestamp.trodes_timestamp)
 
         if __debug__:
@@ -331,7 +331,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
             # Acquire buffered LFP frames and fill them in a filter buffer
             if self._lfp_consumer.poll():
                 # print(MODULE_IDENTIFIER + "LFP Frame received for filtering.")
-                (timestamp, current_lfp_frame) = self._lfp_consumer.recv()
+                (timestamp, current_lfp_frame, frame_time) = self._lfp_consumer.recv()
                 #print(timestamp)
                 raw_lfp_window[:, lfp_window_ptr] = current_lfp_frame
                 self._local_lfp_buffer.append(current_lfp_frame)
@@ -375,6 +375,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                                 # First trigger interruption and all time critical operations
                                 self._trigger_condition.notify()
                                 curr_wall_time = time.time()
+                                logging.info(MODULE_IDENTIFIER + "Detected ripple, notified with lag of %.2f ms"%(curr_wall_time-frame_time))
                                 ripple_unseen = True
                             logging.info(MODULE_IDENTIFIER + "Detected ripple at %.2f, TS: %d. Peak Strength: %.2f"% \
                                     (curr_time, timestamp, np.max(power_to_baseline_ratio)))
