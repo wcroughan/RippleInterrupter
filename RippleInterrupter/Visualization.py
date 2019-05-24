@@ -16,6 +16,11 @@ import threading
 import logging
 import numpy as np
 
+# Creating windows using PyQt
+from PyQt5.QtWidgets import QMainWindow, QAction, qApp, QApplication, QDialog, QFileDialog, QMessageBox
+from PyQt5.QtWidgets import QPushButton, QSlider, QRadioButton, QLabel, QInputDialog
+from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QGridLayout, QComboBox
+
 # Local Imports
 import Configuration
 import RippleAnalysis
@@ -174,14 +179,10 @@ class GraphicsManager(Process):
         Process.__init__(self)
 
         # Graphics windows
-        self._command_window = tkinter.Tk()
-        tkinter.Label(self._command_window, text="Enter command to execute...").pack()
-        self._key_entry = tkinter.Entry(self._command_window)
-        self._key_entry.bind("<Return>", self.process_command)
-        self._key_entry.pack()
-        exit_button = tkinter.Button(self._command_window, text='Quit', command=self.kill_gui)
-        exit_button.pack()
+        self.widget = QDialog()
 
+        # Create layout and windows using PyQt
+        self.setLayout()
         self._keep_running = Event()
         self._spike_listener = spike_listener
         self._position_estimator = position_estimator
@@ -263,6 +264,9 @@ class GraphicsManager(Process):
         self._spike_buffer = self._place_field_handler.get_spike_place_buffer_connection(self.__CLUSTERS_TO_PLOT)
         logging.info(MODULE_IDENTIFIER + "Graphics interface started.")
     
+    def setLayout(self):
+        pass
+
     def kill_gui(self):
         self._command_window.quit()
         try:
@@ -381,8 +385,6 @@ class GraphicsManager(Process):
             self._place_field_handler.submit_immediate_request()
             # np.copyto(self._most_recent_pf, self._shared_place_fields[self.__CLUSTERS_TO_PLOT[0], :, :])
             np.mean(self._shared_place_fields, out=self._most_recent_pf, axis=0)
-            # logging.debug(MODULE_IDENTIFIER + "Fetched place fields. Peak FR: %.2f, Mean FR: %.2f"%\
-            #         (np.max(self._shared_place_fields), np.mean(self._shared_place_fields)))
             # Release the request that paused place field computation
             self._place_field_handler.end_immediate_request()
         logging.info(MODULE_IDENTIFIER + "Place Field pipe closed.")
