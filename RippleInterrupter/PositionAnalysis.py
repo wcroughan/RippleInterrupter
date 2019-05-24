@@ -39,7 +39,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
     __MAX_REAL_TIME_JUMP = __MAX_TIMESTAMP_JUMP/RiD.SPIKE_SAMPLING_FREQ
 
     #def __init__(self, sg_client, n_bins, past_position_buffer, camera_number=1):
-    def __init__(self, sg_client, n_bins=N_POSITION_BINS, camera_number=1):
+    def __init__(self, sg_client, n_bins=N_POSITION_BINS, camera_number=1, write_spike_log=False):
         ThreadExtension.StoppableThread.__init__(self)
         self._data_field = np.ndarray([], dtype=[('timestamp', 'u4'), ('line_segment', 'i4'), \
                 ('position_on_segment', 'f8'), ('position_x', 'i2'), ('position_y', 'i2')])
@@ -62,14 +62,15 @@ class PositionEstimator(ThreadExtension.StoppableThread):
             logging.warning("Failed to open Camera Module")
             raise Exception("Error: Could not connect to camera, aborting.")
         self._position_consumer.initialize()
-        csv_filename = time.strftime("position_data_log" + "_%Y%m%d_%H%M%S.csv")
-        try:
-            self._csv_file = open(csv_filename, mode='w')
-            self._csv_writer = csv.writer(self._csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            self._csv_writer.writerow(['TIMESTAMP', 'POS_X', 'POS_Y'])
-        except Exception as err:
-            self._csv_writer = None
-            logging.critical(MODULE_IDENTIFIER + "Unable to open log file.")
+        self._csv_writer = None
+        if write_spike_log:
+            csv_filename = time.strftime("position_data_log" + "_%Y%m%d_%H%M%S.csv")
+            try:
+                self._csv_file = open(csv_filename, mode='w')
+                self._csv_writer = csv.writer(self._csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+                self._csv_writer.writerow(['TIMESTAMP', 'POS_X', 'POS_Y'])
+            except Exception as err:
+                logging.critical(MODULE_IDENTIFIER + "Unable to open log file.")
             print(err)
 
         logging.info(MODULE_IDENTIFIER + "Starting Position tracking thread")

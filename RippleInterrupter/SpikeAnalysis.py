@@ -29,7 +29,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
     CLASS_IDENTIFIER = "[PlaceFieldHandler] "
     _ALLOWED_TIMESTAMPS_LAG = 12000
 
-    def __init__(self, position_processor, spike_processor, shared_place_fields):
+    def __init__(self, position_processor, spike_processor, shared_place_fields, write_spike_log=False):
     # def __init__(self, position_processor, spike_processor, place_fields):
         ThreadExtension.StoppableProcess.__init__(self)
         self._position_buffer = position_processor.get_position_buffer_connection()
@@ -46,15 +46,16 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         self._field_statistics_connection = None
         self._requested_clusters = []
         self._place_field_filename = time.strftime("place_field_log" + "_%Y%m%d_%H%M%S")
-        csv_filename = time.strftime("spike_data_log" + "_%Y%m%d_%H%M%S.csv")
-        try:
-            self._csv_file = open(csv_filename, mode='w')
-            self._csv_writer = csv.writer(self._csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-            self._csv_writer.writerow(['CLUSTER_ID', 'TIMESTAMP', 'POS_X', 'POS_Y', 'SPEED'])
-        except Exception as err:
-            self._csv_writer = None
-            logging.critical(MODULE_IDENTIFIER + "Unable to open log file.")
-            print(err)
+        self._csv_writer = None
+        if write_spike_log:
+            csv_filename = time.strftime("spike_data_log" + "_%Y%m%d_%H%M%S.csv")
+            try:
+                self._csv_file = open(csv_filename, mode='w')
+                self._csv_writer = csv.writer(self._csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+                self._csv_writer.writerow(['CLUSTER_ID', 'TIMESTAMP', 'POS_X', 'POS_Y', 'SPEED'])
+            except Exception as err:
+                logging.critical(MODULE_IDENTIFIER + "Unable to open log file.")
+                print(err)
         logging.info(self.CLASS_IDENTIFIER + "Started thread for building place fields.")
 
     def get_field_CoM(self, cluster_idx=None):
