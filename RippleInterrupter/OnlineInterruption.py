@@ -46,11 +46,9 @@ def main():
     # cluster_filename = "./test_clusters.trodesClusters"
     # cluster_filename = "open_field_full_config20190220_172702.trodesClusters"
     cluster_filename = None
-<<<<<<< Updated upstream
     n_units, cluster_identity_map = Configuration.readClusterFile(cluster_filename, tetrodes_of_interest)
     if tetrodes_of_interest is None:
         tetrodes_of_interest = list(cluster_identity_map.keys())
-=======
     cluster_config = Configuration.read_cluster_file(cluster_filename, tetrodes_of_interest)
     if cluster_config is not None:
         n_units = cluster_config[0]
@@ -62,7 +60,6 @@ def main():
         cluster_identity_map[2] = {1: 0}
         cluster_identity_map[14] = {}
     print(cluster_identity_map)
->>>>>>> Stashed changes
 
     # Uncomment to let the user select a file
     # n_units, cluster_identity_map = SpikeAnalysis.readClusterFile(tetrodes=tetrodes_of_interest)

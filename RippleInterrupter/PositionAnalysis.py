@@ -1,6 +1,7 @@
 """
 Collect position data from trodes
 """
+import csv
 import threading
 import time
 from copy import copy
@@ -25,10 +26,10 @@ class PositionEstimator(ThreadExtension.StoppableThread):
     """
 
     # Min/Max position values in x and y to be used for binning
-    __P_MIN_X = 200
+    __P_MIN_X = 100
     __P_MIN_Y = -100
-    __P_MAX_X = 1200
-    __P_MAX_Y = 1000
+    __P_MAX_X = 1300
+    __P_MAX_Y = 1100
     __P_BIN_SIZE_X = (__P_MAX_X - __P_MIN_X)
     __P_BIN_SIZE_Y = (__P_MAX_Y - __P_MIN_Y)
     __REAL_BIN_SIZE_X = FIELD_SIZE[0]/__P_BIN_SIZE_X
@@ -61,8 +62,17 @@ class PositionEstimator(ThreadExtension.StoppableThread):
             logging.warning("Failed to open Camera Module")
             raise Exception("Could not connect to camera, aborting.")
         self._position_consumer.initialize()
-        logging.info(MODULE_IDENTIFIER + "Starting Position tracking thread")
+        csv_filename = time.strftime("position_data_log" + "_%Y%m%d_%H%M%S.csv")
+        try:
+            self._csv_file = open(csv_filename, mode='w')
+            self._csv_writer = csv.writer(self._csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            self._csv_writer.writerow(['TIMESTAMP', 'POS_X', 'POS_Y'])
+        except Exception as err:
+            self._csv_writer = None
+            logging.critical(MODULE_IDENTIFIER + "Unable to open log file.")
+            print(err)
 
+        logging.info(MODULE_IDENTIFIER + "Starting Position tracking thread")
         self._position_buffer_connections = []
 
     def getPositionBin(self):
@@ -81,6 +91,16 @@ class PositionEstimator(ThreadExtension.StoppableThread):
         x_bin = np.floor_divide(self._n_bins_x * (px - self.__P_MIN_X),self.__P_BIN_SIZE_X)
         # Camera data coming in has flipped Y-coordinates!
         y_bin = np.floor_divide(self._n_bins_y * (self.__P_MAX_Y - py),self.__P_BIN_SIZE_Y)
+
+        if x_bin < 0:
+            x_bin = 0
+        elif x_bin > self._n_bins_x:
+            x_bin = self._n_bins_x-1
+
+        if y_bin < 0:
+            y_bin = 0
+        elif y_bin > self._n_bins_y:
+            y_bin = self._n_bins_y-1
         return (x_bin, y_bin)
 
     """
@@ -191,6 +211,11 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                             self.__SPEED_SMOOTHING_FACTOR * last_velocity
                     for outp in self._position_buffer_connections:
                         outp.send((current_timestamp, curr_x_bin, curr_y_bin, last_velocity))
+                if self._csv_writer:
+                    self._csv_writer.writerow([current_timestamp, self._data_field['position_x'], self._data_field['position_y']])
+
+        if self._csv_writer:
+            self._csv_file.close()
 
         if __debug__:
             code_profiler.disable()
