@@ -2,11 +2,6 @@
 Visualization of various measures
 """
 
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-import matplotlib.cm as colormap
-from matplotlib.ticker import PercentFormatter
-from mpl_toolkits.mplot3d import Axes3D
 from collections import deque
 from multiprocessing import Process, Event
 import tkinter
@@ -14,7 +9,16 @@ import time
 from datetime import datetime
 import threading
 import logging
-import numpy as np
+
+# Matplotlib in Qt5
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.figure import Figure
+from matplotlib import gridspec
+from matplotlib.ticker import PercentFormatter
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 # Creating windows using PyQt
 from PyQt5.QtWidgets import QMainWindow, QAction, qApp, QApplication, QDialog, QFileDialog, QMessageBox
@@ -179,10 +183,37 @@ class GraphicsManager(Process):
         Process.__init__(self)
 
         # Graphics windows
-        self.widget = QDialog()
+        self.widget  = QDialog()
+        self.figure  = Figure(figsize=(12,16))
+        self.canvas  = FigureCanvas(self.figure)
+        plot_grid    = gridspec.GridSpec(2, 2)
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        self._rd_ax = self.figure.add_subplot(plot_grid[0])
+        self._pf_ax = self.figure.add_subplot(plot_grid[1])
+        self._cp_ax = self.figure.add_subplot(plot_grid[3])
 
-        # Create layout and windows using PyQt
-        self.setLayout()
+        # This is tricky because right now we are using this as an array to
+        # store multiple axes, each plotting a different unit.
+        self._spk_pos_ax = self.figure.add_subplot(plot_grid[2])
+
+        # Selecting individual units
+        self.unit_selection = QComboBox()
+        self.unit_selection.currentIndexChanged.connect(self.refresh)
+        # Add next and prev buttons to look at individual cells.
+        self.next_unit_button = QPushButton('Next')
+        self.next_unit_button.clicked.connect(self.NextCell)
+        self.prev_unit_button = QPushButton('Prev')
+        self.prev_unit_button.clicked.connect(self.PrevCell)
+
+        # Selecting individual tetrodes
+        self.tetrode_selection = QComboBox()
+        self.tetrode_selection.currentIndexChanged.connect(self.refresh)
+        # Add next and prev buttons to look at individual cells.
+        self.next_tet_button = QPushButton('Next')
+        self.next_tet_button.clicked.connect(self.NextTetrode)
+        self.prev_tet_button = QPushButton('Prev')
+        self.prev_tet_button.clicked.connect(self.PrevTetrode)
+
         self._keep_running = Event()
         self._spike_listener = spike_listener
         self._position_estimator = position_estimator
@@ -243,15 +274,6 @@ class GraphicsManager(Process):
         # Place Fields
         # Position/Spikes overalaid
         self.__N_SUBPLOT_ROWS = int(np.ceil((self._n_clusters/self.__N_SUBPLOT_COLS)))
-        self._rd_fig = None
-        self._pf_fig = None
-        self._pos_fig = None
-        self._cp_fig = None
-        self._rd_ax = None
-        self._pf_ax = None
-        self._spk_pos_ax = []
-        self._spk_pos_ax = None
-        self._cp_ax = None
         self._rd_frame = []
         self._spk_pos_frame = []
         self._pf_frame = []
@@ -263,28 +285,29 @@ class GraphicsManager(Process):
         self._position_buffer = self._position_estimator.get_position_buffer_connection()
         self._spike_buffer = self._place_field_handler.get_spike_place_buffer_connection(self.__CLUSTERS_TO_PLOT)
         logging.info(MODULE_IDENTIFIER + "Graphics interface started.")
-    
+        self.setLayout()
+
     def setLayout(self):
-        pass
+        parent_layout_box = QVBoxLayout()
+        parent_layout_box.addWidget(self.toolbar)
+        parent_layout_box.addWidget(self.canvas)
+        parent_layout_box.addStretch(1)
+        parent_layout_box.addLayout(hbox_controls)
+
+        # Controls for looking at individual units
+        vbox_unit_buttons = QVBoxLayout()
+        vbox_unit_buttons.addWidget(self.unit_selection)
+        vbox_unit_buttons.addWidget(self.next_unit_button)
+        vbox_unit_buttons.addWidget(self.prev_unit_button)
+        vbox_unit_buttons.addWidget(self.tetrode_selection)
+        vbox_unit_buttons.addWidget(self.next_tet_button)
+        vbox_unit_buttons.addWidget(self.prev_tet_button)
+        vbox_unit_buttons.addStretch(1)
+        parent_layout_box.addLayout(vbox_unit_buttons)
+        QDialog.setLayout(self.widget, parent_layout_box)
 
     def kill_gui(self):
         self._command_window.quit()
-        try:
-            plt.close(self._pos_fig)
-            plt.close(self._pf_fig)
-            plt.close(self._rd_fig)
-            plt.close(self._cp_fig)
-        except Exception as err:
-            logging.warning(MODULE_IDENTIFIER + "Error closing figure window")
-            print(err)
-        finally:
-            # Clean up
-            del self._pf_fig
-            del self._pos_fig
-            del self._rd_fig
-            del self._cp_fig
-            del self._anim_objs
-        self._command_window.destroy()
         self._keep_running.clear()
         
     def update_ripple_detection_frame(self, step=0):

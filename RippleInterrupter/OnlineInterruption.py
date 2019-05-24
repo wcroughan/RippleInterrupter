@@ -107,6 +107,11 @@ class CommandWindow(QMainWindow):
         # File menu - Save, Load (Processed Data), Quit
         file_menu = menu_bar.addMenu('&File')
 
+        connect_action = file_menu.addAction('&Connect')
+        connect_action.setShortcut('Ctrl+C')
+        connect_action.setStatusTip('Connect SpikeGadgets')
+        connect_action.triggered.connect(self.connectSpikeGadgets)
+
         # =============== SAVE MENU =============== 
         save_menu = file_menu.addMenu('&Save')
         save_place_fields_action = QAction('Place &Fields', self)
@@ -160,7 +165,7 @@ class CommandWindow(QMainWindow):
         else:
             self.ripple_trigger.disable()
 
-    def connect(self):
+    def connectSpikeGadgets(self):
         """
         Connect to Trodes client.
         """
@@ -169,6 +174,10 @@ class CommandWindow(QMainWindow):
         except Exception as err:
             QtHelperUtils.display_warning('Unable to connect to Trodes!')
             print(err)
+            return
+        if not self.cluster_identity_map:
+            self.loadClusterFile()
+        self.startThreads()
 
     def loadClusterFile(self, cluster_filename=None):
         """
@@ -177,7 +186,7 @@ class CommandWindow(QMainWindow):
         # Uncomment to use a hardcoded file
         # cluster_filename = "./test_clusters.trodesClusters"
         # cluster_filename = "open_field_full_config20190220_172702.trodesClusters"
-        cluster_config = Configuration.read_cluster_file(cluster_filename, tetrodes_of_interest)
+        cluster_config = Configuration.read_cluster_file(cluster_filename, self.tetrodes_of_interest)
         if cluster_config is not None:
             self.n_units = cluster_config[0]
             self.cluster_identity_map = cluster_config[1]
@@ -317,6 +326,7 @@ def main():
     logging.debug(MODULE_IDENTIFIER + "Starting Log file at " + time.ctime())
 
     qt_args = list()
+    qt_args.append('OnlineInterruption.py')
     qt_args.append('-style')
     qt_args.append('Windows')
     print(MODULE_IDENTIFIER + "Qt Arguments: " + str(qt_args))
