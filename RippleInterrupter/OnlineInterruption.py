@@ -100,6 +100,12 @@ class CommandWindow(QMainWindow):
     def plotBayesianEstimate(self):
         QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
 
+    def disconnectAndQuit(self):
+        if self.graphical_interface is not None:
+            self.graphical_interface.kill_gui()
+        self.stopThreads()
+        qApp.quit()
+
     def setupMenus(self):
         # Set up the menu bar
         menu_bar = self.menuBar()
@@ -146,7 +152,7 @@ class CommandWindow(QMainWindow):
         quit_action = QAction('&Exit', self)
         quit_action.setShortcut('Ctrl+Q')
         quit_action.setStatusTip('Exit Program')
-        quit_action.triggered.connect(qApp.quit)
+        quit_action.triggered.connect(self.disconnectAndQuit)
 
         # Add actions to the file menu
         file_menu.addAction(quit_action)
@@ -197,6 +203,9 @@ class CommandWindow(QMainWindow):
             # Calibration data
             self.initCalibrationThreads()
 
+            # Ripple triggered actions
+            self.initRippleTriggerThreads()
+
             self.graphical_interface = Visualization.GraphicsManager((self.shared_raw_lfp_buffer,\
                     self.shared_ripple_buffer), (self.shared_calib_plot_means, self.shared_calib_plot_std_errs),\
                     self.spike_listener, self.position_estimator, self.place_field_handler, self.ripple_trigger,\
@@ -245,59 +254,68 @@ class CommandWindow(QMainWindow):
         try:
             # Join all the threads to wait for their execution to  finish
             # Run cleanup here
-            graphical_interface.join()
+            self.graphical_interface.join()
             if __debug__:
                 self.code_profiler.disable()
                 self.code_profiler.dump_stats(profile_filename)
             logging.info(MODULE_IDENTIFIER + "GUI terminated")
-            spike_listener.join()
+            self.spike_listener.join()
             logging.info(MODULE_IDENTIFIER  + "Spike Listener Stopped")
-            position_estimator.join()
+            self.position_estimator.join()
             logging.info(MODULE_IDENTIFIER + "Position data collection Stopped")
-            place_field_handler.join()
+            self.place_field_handler.join()
             logging.info(MODULE_IDENTIFIER + "Place field builder Stopped")
-            lfp_listener.join()
+            self.lfp_listener.join()
             logging.info(MODULE_IDENTIFIER + "Spike calibration plot Stopped.")
-            calib_plot.join()
+            self.calib_plot.join()
             logging.info(MODULE_IDENTIFIER + "LFP listener Stopped")
-            ripple_detector.join()
+            self.ripple_detector.join()
             logging.info(MODULE_IDENTIFIER + "Ripple detector Stopped")
-            ripple_trigger.join()
+            self.ripple_trigger.join()
             logging.info(MODULE_IDENTIFIER + "Ripple event synchronizer Stopped")
-        except (KeyboardInterrupt, SystemExit):
-            logging.debug(MODULE_IDENTIFIER + "Caught Keyboard Interrupt from user...")
-        finally:
-            # TODO: Delete all the threads
-            del shared_place_fields
-            del shared_ripple_buffer
-            del shared_raw_lfp_buffer
-            del lfp_listener
-            del spike_listener
-            del position_estimator
-            del place_field_handler
-            del ripple_trigger
-            del graphical_interface
             self.sg_client.closeConnections()
-            print(MODULE_IDENTIFIER + "Program finished. Exiting.")
-            del sg_client
+        except Exception as err:
+            logging.debug(MODULE_IDENTIFIER + "Caught Interrupt while exiting...")
+            print(err)
+        print(MODULE_IDENTIFIER + "Program finished. Exiting.")
 
     def startThreads(self):
         """
         Start all the processing thread.
         """
-        self.graphical_interface.start()
-        self.lfp_listener.start()
-        self.ripple_detector.start()
-        self.spike_listener.start()
-        self.position_estimator.start()
-        self.place_field_handler.start()
-        self.ripple_trigger.start()
-        self.calib_plot.start()
+        try:
+            self.graphical_interface.start()
+            self.lfp_listener.start()
+            self.ripple_detector.start()
+            self.spike_listener.start()
+            self.position_estimator.start()
+            self.place_field_handler.start()
+            self.ripple_trigger.start()
+            self.calib_plot.start()
+        except Exception as err:
+            QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to stream. Check connection to client!')
+            print(err)
+            return
 
         if DEFAULT_RIPPLE_TRIGGERING:
             self.ripple_trigger.enable()
         else:
             self.ripple_trigger.disable()
+
+    def initRippleTriggerThreads(self):
+        """
+        Initialize threads dependent on ripple triggers (these need pretty much everything!)
+        """
+        try:
+            self.ripple_detector = RippleAnalysis.RippleDetector(self.lfp_listener, self.calib_plot,\
+                    trigger_condition=(self.trig_condition, self.show_trigger, self.calib_trigger),\
+                    shared_buffers=(self.shared_raw_lfp_buffer, self.shared_ripple_buffer))
+            self.ripple_trigger = RippleAnalysis.RippleSynchronizer(self.trig_condition, self.spike_listener,\
+                    self.position_estimator, self.place_field_handler)
+        except Exception as err:
+            QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start ripple trigger threads(s).')
+            print(err)
+            return
 
     def initLFPThreads(self):
         """
@@ -308,9 +326,6 @@ class CommandWindow(QMainWindow):
         try:
             tetrode_argument = [str(tet) for tet in self.tetrodes_of_interest]
             self.lfp_listener = RippleAnalysis.LFPListener(self.sg_client, tetrode_argument)
-            self.ripple_detector = RippleAnalysis.RippleDetector(self.lfp_listener, self.calib_plot,\
-                    trigger_condition=(self.trig_condition, self.show_trigger, self.calib_trigger),\
-                    shared_buffers=(self.shared_raw_lfp_buffer, self.shared_ripple_buffer))
         except Exception as err:
             QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start LFP thread(s).')
             print(err)

@@ -406,9 +406,10 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                                 
                     if ((curr_time - prev_ripple) > RiD.CALIB_PLOT_BUFFER_TIME/2) and ripple_unseen_calib:
                         ripple_unseen_calib = False
-                        self._calib_plot.update_shared_buffer(timestamp)
-                        with self._calib_trigger_condition:
-                            self._calib_trigger_condition.notify()
+                        if self._calib_plot is not None:
+                            self._calib_plot.update_shared_buffer(timestamp)
+                            with self._calib_trigger_condition:
+                                self._calib_trigger_condition.notify()
             else:
                 # logging.debug(MODULE_IDENTIFIER + "No LFP Frames to process. Sleeping")
                 time.sleep(0.005)

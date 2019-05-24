@@ -170,8 +170,13 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                 if (prev_x_bin < 0):
                     # First recorded bin!
                     #self._past_position_buffer.put((self._data_field['timestamp'], curr_bin_id))
-                    for outp in self._position_buffer_connections:
-                        outp.send((current_timestamp, curr_x_bin, curr_y_bin, 0.0))
+                    try:
+                        for outp in self._position_buffer_connections:
+                            outp.send((current_timestamp, curr_x_bin, curr_y_bin, 0.0))
+                    except BrokenPipeError as err:
+                        print(MODULE_IDENTIFIER + 'Unable to write to Pipe. Aborting.')
+                        break
+
                     prev_x_bin = curr_x_bin
                     prev_y_bin = curr_y_bin
                     logging.info(MODULE_IDENTIFIER + "Position Started (%d, %d)"%(curr_x_bin, curr_y_bin))
