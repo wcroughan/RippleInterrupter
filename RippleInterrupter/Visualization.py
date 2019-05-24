@@ -430,7 +430,7 @@ class GraphicsManager(Process):
                 np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
                 np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
                 # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
-            time.sleep(self.__RIPPLE_DETECTION_TIMEOUT)
+            # time.sleep(self.__RIPPLE_DETECTION_TIMEOUT)
         logging.info(MODULE_IDENTIFIER + "Ripple frame pipe closed.")
 
     def fetch_calibration_plot(self):
@@ -444,13 +444,14 @@ class GraphicsManager(Process):
             if ripple_triggered:
                 np.copyto(self._local_spk_cnt_buffer, self._shared_calib_plot_means)
                 np.copyto(self._local_spk_cnt_stderr_buffer, self._shared_calib_plot_std_errs)
-            time.sleep(self.__RIPPLE_DETECTION_TIMEOUT)
+            # time.sleep(self.__RIPPLE_DETECTION_TIMEOUT)
 
     def fetch_place_fields(self):
         """
         Fetch place field data from place field handler.
         """
         while self._keep_running.is_set():
+            time.sleep(self.__PLACE_FIELD_REFRESH_RATE)
             # Request place field handler to pause place field calculation
             # while we fetch the data
             self._place_field_handler.submit_immediate_request()
@@ -458,7 +459,6 @@ class GraphicsManager(Process):
             np.mean(self._shared_place_fields, out=self._most_recent_pf, axis=0)
             # Release the request that paused place field computation
             self._place_field_handler.end_immediate_request()
-            time.sleep(self.__PLACE_FIELD_REFRESH_RATE)
         logging.info(MODULE_IDENTIFIER + "Place Field pipe closed.")
 
     def fetch_spikes_and_update_frames(self):
@@ -473,7 +473,7 @@ class GraphicsManager(Process):
                     self._spk_pos_x[data_idx].append(spike_data[1])
                     self._spk_pos_y[data_idx].append(spike_data[2])
                 # logging.debug(MODULE_IDENTIFIER + "Fetched spike from cluster: %d, in bin (%d, %d). TS: %d"%spike_data)
-            time.sleep(self.__PLOT_REFRESH_RATE)
+            # time.sleep(self.__PLOT_REFRESH_RATE)
         logging.info(MODULE_IDENTIFIER + "Spike pipe closed.")
 
     def fetch_position_and_update_frames(self):
@@ -486,7 +486,7 @@ class GraphicsManager(Process):
                 self._speed.append(position_data[3])
                 # logging.debug(MODULE_IDENTIFIER + "Fetched Position data... (%d, %d), v: %.2fcm/s"% \
                 #       (position_data[1],position_data[2], position_data[3]))
-            time.sleep(self.__PLOT_REFRESH_RATE)
+            # time.sleep(self.__PLOT_REFRESH_RATE)
         logging.info(MODULE_IDENTIFIER + "Position pipe closed.")
 
     def process_command(self, key_in):

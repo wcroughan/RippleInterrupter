@@ -175,6 +175,8 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                             outp.send((current_timestamp, curr_x_bin, curr_y_bin, 0.0))
                     except BrokenPipeError as err:
                         print(MODULE_IDENTIFIER + 'Unable to write to Pipe. Aborting.')
+                        print(err)
+                        print(self._position_buffer_connections)
                         break
 
                     prev_x_bin = curr_x_bin

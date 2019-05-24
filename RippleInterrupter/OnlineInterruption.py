@@ -45,7 +45,7 @@ class CommandWindow(QMainWindow):
             # Create code profiler
             self.code_profiler = cProfile.Profile()
             profile_prefix = "replay_disruption_profile"
-            profile_filename = time.strftime(profile_prefix + "_%Y%m%d_%H%M%S.pr")
+            self.profile_filename = time.strftime(profile_prefix + "_%Y%m%d_%H%M%S.pr")
 
         # Tetrode info fields
         self.n_units = 0
@@ -257,7 +257,7 @@ class CommandWindow(QMainWindow):
             self.graphical_interface.join()
             if __debug__:
                 self.code_profiler.disable()
-                self.code_profiler.dump_stats(profile_filename)
+                self.code_profiler.dump_stats(self.profile_filename)
             logging.info(MODULE_IDENTIFIER + "GUI terminated")
             self.spike_listener.join()
             logging.info(MODULE_IDENTIFIER  + "Spike Listener Stopped")
