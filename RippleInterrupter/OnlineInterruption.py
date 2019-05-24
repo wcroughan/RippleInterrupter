@@ -40,26 +40,29 @@ def main():
         profile_filename = time.strftime(profile_prefix + "_%Y%m%d_%H%M%S.pr")
 
     # Not necessary to add a filename here. Can be read using a dialog box now
-    # tetrodes_of_interest = [2, 14]
-    tetrodes_of_interest = [27]
+    # Uncomment to let these tetrodes be selected from the cluster file
+    tetrodes_of_interest = None
+    # tetrodes_of_interest = [27]
 
     # Uncomment to use a hardcoded file
     # cluster_filename = "./test_clusters.trodesClusters"
     # cluster_filename = "open_field_full_config20190220_172702.trodesClusters"
     cluster_filename = None
-    n_units, cluster_identity_map = Configuration.readClusterFile(cluster_filename, tetrodes_of_interest)
-    if tetrodes_of_interest is None:
-        tetrodes_of_interest = list(cluster_identity_map.keys())
     cluster_config = Configuration.read_cluster_file(cluster_filename, tetrodes_of_interest)
     if cluster_config is not None:
         n_units = cluster_config[0]
         cluster_identity_map = cluster_config[1]
+        if (n_units == 0):
+            print(MODULE_IDENTIFIER + 'WARNING: No clusters found in the cluster file.')
+        if tetrodes_of_interest is None:
+            tetrodes_of_interest = list(cluster_identity_map.keys())
     else:
         print("Warning: Unable to read cluster file. Using default map.")
         n_units = 1
         cluster_identity_map = dict()
         cluster_identity_map[2] = {1: 0}
         cluster_identity_map[14] = {}
+    print(MODULE_IDENTIFIER + 'Read cluster identity map.')
     print(cluster_identity_map)
 
     # Uncomment to let the user select a file

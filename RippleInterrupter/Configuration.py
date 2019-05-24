@@ -44,6 +44,9 @@ def read_cluster_file(filename=None, tetrodes=None):
         print(err)
         return (0, {})
 
+    if __debug__:
+        print(MODULE_IDENTIFIER, 'Read cluster file ' + filename)
+
     # The file is organized as:
     # [ROOT] SpikeSortInfo
     #       -> PolygonClusters
@@ -56,13 +59,16 @@ def read_cluster_file(filename=None, tetrodes=None):
     tree_root = cluster_tree.getroot()
     polygon_clusters = tree_root.getchildren()[0]
     ntrode_list = list(polygon_clusters)
-
     if tetrodes is None:
         tetrodes = range(1, 1+len(ntrode_list))
 
+    if __debug__:
+        print(MODULE_IDENTIFIER + '%d tetrode(s) in cluster file.'%len(tetrodes))
+        print(tetrodes)
+
     for t_i in tetrodes:
         # Offset by 1 because Trodes tetrodes start with 1!
-        ntrode = ntrode_list[ti-1]
+        ntrode = ntrode_list[t_i-1]
         n_clusters_on_ntrode = 0
         tetrode_idx = ntrode.get('nTrodeIndex')
         if len(list(ntrode)) == 0:
@@ -77,7 +83,7 @@ def read_cluster_file(filename=None, tetrodes=None):
             cluster_idx_to_id_map[int(local_cluster_idx)] = raw_cluster_idx
             raw_cluster_idx += 1
             n_clusters_on_ntrode += 1
-        n_trode_to_cluster_idx_map[ti] = cluster_idx_to_id_map
+        n_trode_to_cluster_idx_map[t_i] = cluster_idx_to_id_map
         if n_clusters_on_ntrode == 0:
             n_trode_to_cluster_idx_map.pop(ntrode, None)
 
