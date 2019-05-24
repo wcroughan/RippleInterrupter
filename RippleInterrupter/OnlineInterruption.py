@@ -108,9 +108,14 @@ class CommandWindow(QMainWindow):
         file_menu = menu_bar.addMenu('&File')
 
         connect_action = file_menu.addAction('&Connect')
-        connect_action.setShortcut('Ctrl+C')
+        connect_action.setShortcut('Ctrl+N')
         connect_action.setStatusTip('Connect SpikeGadgets')
         connect_action.triggered.connect(self.connectSpikeGadgets)
+
+        stream_action = file_menu.addAction('S&tream')
+        stream_action.setShortcut('Ctrl+T')
+        stream_action.setStatusTip('Stream data')
+        stream_action.triggered.connect(self.startThreads)
 
         # =============== SAVE MENU =============== 
         save_menu = file_menu.addMenu('&Save')
@@ -177,22 +182,44 @@ class CommandWindow(QMainWindow):
             return
         if not self.cluster_identity_map:
             self.loadClusterFile()
-        self.startThreads()
+
+        try:
+            # TODO: Use preferences to selectively start the desired threads
+            # LFP Threads
+            self.initLFPThreads()
+
+            # Position data
+            self.position_estimator  = PositionAnalysis.PositionEstimator(self.sg_client)
+
+            # Spike data
+            self.initSpikeThreads()
+
+            # Calibration data
+            self.initCalibrationThreads()
+
+            self.graphical_interface = Visualization.GraphicsManager((self.shared_raw_lfp_buffer,\
+                    self.shared_ripple_buffer), (self.shared_calib_plot_means, self.shared_calib_plot_std_errs),\
+                    self.spike_listener, self.position_estimator, self.place_field_handler, self.ripple_trigger,\
+                    self.show_trigger, self.calib_trigger, self.shared_place_fields)
+        except Exception as err:
+            print(err)
+            return
+        self.setCentralWidget(self.graphical_interface.widget)
 
     def loadClusterFile(self, cluster_filename=None):
         """
         Load cluster information from a cluster file.
         """
         # Uncomment to use a hardcoded file
-        # cluster_filename = "./test_clusters.trodesClusters"
+        cluster_filename = "./config/full_config20190304.trodesClusters"
         # cluster_filename = "open_field_full_config20190220_172702.trodesClusters"
         cluster_config = Configuration.read_cluster_file(cluster_filename, self.tetrodes_of_interest)
         if cluster_config is not None:
             self.n_units = cluster_config[0]
             self.cluster_identity_map = cluster_config[1]
-            if (n_units == 0):
+            if (self.n_units == 0):
                 print(MODULE_IDENTIFIER + 'WARNING: No clusters found in the cluster file.')
-            if tetrodes_of_interest is None:
+            if self.tetrodes_of_interest is None:
                 self.tetrodes_of_interest = list(self.cluster_identity_map.keys())
         else:
             print("Warning: Unable to read cluster file. Using default map.")
@@ -200,7 +227,9 @@ class CommandWindow(QMainWindow):
             self.cluster_identity_map = dict()
             self.cluster_identity_map[2] = {1: 0}
             self.cluster_identity_map[14] = {}
-        QtHelperUtils.display_information(MODULE_IDENTIFIER + 'Read cluster identity map.')
+
+        if __debug__:
+            QtHelperUtils.display_information(MODULE_IDENTIFIER + 'Read cluster identity map.')
         print(self.cluster_identity_map)
 
         # Uncomment to let the user select a file
@@ -256,27 +285,6 @@ class CommandWindow(QMainWindow):
         """
         Start all the processing thread.
         """
-        tetrode_argument = [str(tet) for tet in self.tetrodes_of_interest]
-        try:
-            # Add conditions for which of the these threads are actually requested by the user
-            self.lfp_listener = RippleAnalysis.LFPListener(self.sg_client, tetrode_argument)
-            self.spike_listener = SpikeAnalysis.SpikeDetector(self.sg_client, self.cluster_identity_map)
-            self.calib_plot     = CalibrationPlot.CalibrationPlot(sg_client, (shared_calib_plot_means, shared_calib_plot_std_errs, shared_calib_plot_spike_count_buffer), spike_listener, calib_plot_condition)
-            self.ripple_detector = RippleAnalysis.RippleDetector(lfp_listener, calib_plot, \
-                    trigger_condition=(trig_condition, show_trigger, calib_trigger), \
-                    shared_buffers=(shared_raw_lfp_buffer, shared_ripple_buffer))
-
-            # Initialize threads for looking at the actual/decoded position
-            self.position_estimator  = PositionAnalysis.PositionEstimator(sg_client)
-            self.place_field_handler = SpikeAnalysis.PlaceFieldHandler(position_estimator, spike_listener, shared_place_fields)
-            self.ripple_trigger = RippleAnalysis.RippleSynchronizer(trig_condition, spike_listener, position_estimator, place_field_handler)
-            self.graphical_interface = Visualization.GraphicsManager((shared_raw_lfp_buffer, shared_ripple_buffer), (shared_calib_plot_means, shared_calib_plot_std_errs), spike_listener, \
-                    position_estimator, place_field_handler, ripple_trigger, show_trigger, calib_trigger, shared_place_fields)
-        except Exception as err:
-            print(err)
-            return
-
-        self.setCentralWidget(self.graphical_interface.widget)
         self.graphical_interface.start()
         self.lfp_listener.start()
         self.ripple_detector.start()
@@ -295,17 +303,37 @@ class CommandWindow(QMainWindow):
         """
         Initialize the threads needed for LFP processing.
         """
-        self.shared_raw_lfp_buffer = RawArray(ctypes.c_double, n_tetrodes * RiD.LFP_BUFFER_LENGTH)
-        self.shared_ripple_buffer = RawArray(ctypes.c_double, n_tetrodes * RiD.RIPPLE_POWER_BUFFER_LENGTH)
+        self.shared_raw_lfp_buffer = RawArray(ctypes.c_double, self.n_tetrodes * RiD.LFP_BUFFER_LENGTH)
+        self.shared_ripple_buffer = RawArray(ctypes.c_double, self.n_tetrodes * RiD.RIPPLE_POWER_BUFFER_LENGTH)
+        try:
+            tetrode_argument = [str(tet) for tet in self.tetrodes_of_interest]
+            self.lfp_listener = RippleAnalysis.LFPListener(self.sg_client, tetrode_argument)
+            self.ripple_detector = RippleAnalysis.RippleDetector(self.lfp_listener, self.calib_plot,\
+                    trigger_condition=(self.trig_condition, self.show_trigger, self.calib_trigger),\
+                    shared_buffers=(self.shared_raw_lfp_buffer, self.shared_ripple_buffer))
+        except Exception as err:
+            QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start LFP thread(s).')
+            print(err)
+            return
 
-        pass
-
-    def initSpikeThread(self):
+    def initSpikeThreads(self):
         """
         Initialize thread needed for spike processing
         """
-        self.shared_place_fields = RawArray(ctypes.c_double, n_units * PositionAnalysis.N_POSITION_BINS[0] * \
+        self.shared_place_fields = RawArray(ctypes.c_double, self.n_units * PositionAnalysis.N_POSITION_BINS[0] * \
                 PositionAnalysis.N_POSITION_BINS[1])
+        try:
+            self.spike_listener = SpikeAnalysis.SpikeDetector(self.sg_client, self.cluster_identity_map)
+            self.place_field_handler = SpikeAnalysis.PlaceFieldHandler(self.position_estimator,\
+                    self.spike_listener, self.shared_place_fields)
+            # Triggerring events based on sharp-wave ripples
+            # Initialize threads for looking at the actual/decoded position
+            self.ripple_trigger = RippleAnalysis.RippleSynchronizer(self.trig_condition, self.spike_listener,\
+                    self.position_estimator, self.place_field_handler)
+        except Exception as err:
+            QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start spike thread(s).')
+            print(err)
+            return
 
     def initCalibrationThreads(self):
         """
@@ -314,7 +342,14 @@ class CommandWindow(QMainWindow):
         self.shared_calib_plot_means = RawArray(ctypes.c_double, RiD.CALIB_PLOT_BUFFER_LENGTH)
         self.shared_calib_plot_std_errs = RawArray(ctypes.c_double, RiD.CALIB_PLOT_BUFFER_LENGTH)
         self.shared_calib_plot_spike_count_buffer = RawArray(ctypes.c_uint32, RiD.CALIB_PLOT_ONLINE_BUFFER_SIZE)
-
+        try:
+            self.calib_plot = CalibrationPlot.CalibrationPlot(self.sg_client, (self.shared_calib_plot_means,\
+                    self.shared_calib_plot_std_errs, self.shared_calib_plot_spike_count_buffer),\
+                    self.spike_listener, self.calib_plot_condition)
+        except Exception as err:
+            QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start calibration thread.')
+            print(err)
+            return
 def main():
     # Start logging before anything else
     log_file_prefix = "replay_disruption_log"

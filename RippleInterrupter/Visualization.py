@@ -6,6 +6,7 @@ from collections import deque
 from multiprocessing import Process, Event
 import tkinter
 import time
+import numpy as np
 from datetime import datetime
 import threading
 import logging
@@ -18,6 +19,7 @@ from matplotlib import gridspec
 from matplotlib.ticker import PercentFormatter
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
+import matplotlib.cm as colormap
 import matplotlib.animation as animation
 
 # Creating windows using PyQt
@@ -187,7 +189,7 @@ class GraphicsManager(Process):
         self.figure  = Figure(figsize=(12,16))
         self.canvas  = FigureCanvas(self.figure)
         plot_grid    = gridspec.GridSpec(2, 2)
-        self.toolbar = NavigationToolbar(self.canvas, self)
+        self.toolbar = NavigationToolbar(self.canvas, self.widget)
         self._rd_ax = self.figure.add_subplot(plot_grid[0])
         self._pf_ax = self.figure.add_subplot(plot_grid[1])
         self._cp_ax = self.figure.add_subplot(plot_grid[3])
@@ -198,16 +200,16 @@ class GraphicsManager(Process):
 
         # Selecting individual units
         self.unit_selection = QComboBox()
-        self.unit_selection.currentIndexChanged.connect(self.refresh)
+        # self.unit_selection.currentIndexChanged.connect(self.refresh)
         # Add next and prev buttons to look at individual cells.
         self.next_unit_button = QPushButton('Next')
-        self.next_unit_button.clicked.connect(self.NextCell)
+        self.next_unit_button.clicked.connect(self.NextUnit)
         self.prev_unit_button = QPushButton('Prev')
-        self.prev_unit_button.clicked.connect(self.PrevCell)
+        self.prev_unit_button.clicked.connect(self.PrevUnit)
 
         # Selecting individual tetrodes
         self.tetrode_selection = QComboBox()
-        self.tetrode_selection.currentIndexChanged.connect(self.refresh)
+        # self.tetrode_selection.currentIndexChanged.connect(self.refresh)
         # Add next and prev buttons to look at individual cells.
         self.next_tet_button = QPushButton('Next')
         self.next_tet_button.clicked.connect(self.NextTetrode)
@@ -286,13 +288,13 @@ class GraphicsManager(Process):
         self._spike_buffer = self._place_field_handler.get_spike_place_buffer_connection(self.__CLUSTERS_TO_PLOT)
         logging.info(MODULE_IDENTIFIER + "Graphics interface started.")
         self.setLayout()
+        self.clearAxes()
 
     def setLayout(self):
         parent_layout_box = QVBoxLayout()
         parent_layout_box.addWidget(self.toolbar)
         parent_layout_box.addWidget(self.canvas)
         parent_layout_box.addStretch(1)
-        parent_layout_box.addLayout(hbox_controls)
 
         # Controls for looking at individual units
         vbox_unit_buttons = QVBoxLayout()
@@ -305,6 +307,51 @@ class GraphicsManager(Process):
         vbox_unit_buttons.addStretch(1)
         parent_layout_box.addLayout(vbox_unit_buttons)
         QDialog.setLayout(self.widget, parent_layout_box)
+
+    def NextUnit(self):
+        QtHelperUtils.display_warning('Function not implemented!')
+
+    def PrevUnit(self):
+        QtHelperUtils.display_warning('Function not implemented!')
+
+    def NextTetrode(self):
+        QtHelperUtils.display_warning('Function not implemented!')
+
+    def PrevTetrode(self):
+        QtHelperUtils.display_warning('Function not implemented!')
+
+    def clearAxes(self):
+        # Ripple detection axis
+        self._rd_ax.cla()
+        self._rd_ax.set_xlabel("Time (s)")
+        self._rd_ax.set_ylabel("EEG (uV)")
+        self._rd_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
+        self._rd_ax.set_ylim((-1.0, 1.0))
+        self._rd_ax.grid(True)
+
+        # Calibration plot
+        self._cp_ax.cla()
+        self._cp_ax.set_xlabel("Time (s)")
+        self._cp_ax.set_ylabel("Spike Rate (spks/5ms)")
+        self._cp_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
+        self._cp_ax.set_ylim((0.0, 20.0))
+        self._cp_ax.grid(True)
+
+        # Place field
+        self._pf_ax.cla()
+        self._pf_ax.set_xlabel("x (bin)")
+        self._pf_ax.set_ylabel("y (bin)")
+        self._pf_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
+        self._pf_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
+        self._pf_ax.grid(True)
+
+        # Spikes (from a single cell) and position
+        self._spk_pos_ax.cla()
+        self._spk_pos_ax.set_xlabel("x (bin)")
+        self._spk_pos_ax.set_ylabel("y (bin)")
+        self._spk_pos_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
+        self._spk_pos_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
+        self._spk_pos_ax.grid(True)
 
     def kill_gui(self):
         self._command_window.quit()
@@ -456,11 +503,6 @@ class GraphicsManager(Process):
         """
         self._rd_fig = plt.figure()
         self._rd_ax = plt.axes()
-        self._rd_ax.set_xlabel("Time (s)")
-        self._rd_ax.set_ylabel("EEG (uV)")
-        self._rd_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
-        self._rd_ax.set_ylim((-1.0, 1.0))
-        self._rd_ax.grid(True)
 
         lfp_frame, = plt.plot([], [], animated=True)
         ripple_power_frame, = plt.plot([], [], animated=True)
@@ -478,11 +520,6 @@ class GraphicsManager(Process):
         """
         self._cp_fig = plt.figure()
         self._cp_ax = plt.axes()
-        self._cp_ax.set_xlabel("Time (s)")
-        self._cp_ax.set_ylabel("Spike Rate (spks/5ms)")
-        self._cp_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
-        self._cp_ax.set_ylim((0.0, 20.0))
-        self._cp_ax.grid(True)
 
         spk_cnt_frame, = plt.plot([], [], animated=True)
         spk_cnt_plus_sterr_frame, = plt.plot([], [], animated=True)
@@ -541,11 +578,6 @@ class GraphicsManager(Process):
         """
         self._pf_fig = plt.figure()
         self._pf_ax = plt.axes()
-        self._pf_ax.set_xlabel("x (bin)")
-        self._pf_ax.set_ylabel("y (bin)")
-        self._pf_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
-        self._pf_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
-        self._pf_ax.grid(True)
 
         pf_heatmap = self._pf_ax.imshow(np.zeros((PositionAnalysis.N_POSITION_BINS[0], \
                 PositionAnalysis.N_POSITION_BINS[1]), dtype='float'), vmin=0, \
