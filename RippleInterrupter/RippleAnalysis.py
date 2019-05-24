@@ -54,10 +54,10 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
         self._spike_access = Lock()
         # TODO: This functionality should be moved to the parent class
         self._enable_synchrnoizer = Lock()
-        self._is_disabled = Value("b", False)
         self._clusters_of_interest = [Configuration.EXPERIMENT_DAY_20190307__INTERESTING_CLUSTERS_A[:], \
                 Configuration.EXPERIMENT_DAY_20190307__INTERESTING_CLUSTERS_B[:]]
         print(self._clusters_of_interest)
+        self._is_disabled = Value("b", True)
 
         # Position data at the time ripple is triggered
         self._pos_x = -1
@@ -157,6 +157,7 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
                                 %(self._pos_x, self._pos_y, self._most_recent_speed))
                         logging.info(self.CLASS_IDENTIFIER + "Ripple tiggered. Loc (%d, %d), V %.2fcm/s" \
                                 %(self._pos_x, self._pos_y, self._most_recent_speed))
+                        self._serial_port.sendBiphasicPulse()
 
                     with self._spike_access:
                         if len(self._spike_buffer) > 0:
@@ -220,12 +221,19 @@ class LFPListener(ThreadExtension.StoppableThread):
             profile_filename = time.strftime(profile_prefix + "_%Y%m%d_%H%M%S.pr")
             code_profiler.enable()
 
+        down_time = 0.0
         n_frames_fetched = 0
         while not self.req_stop():
             n_lfp_frames = self._lfp_stream.available(0)
             if n_lfp_frames == 0:
                 # logging.debug(self.CLASS_IDENTIFIER + "No LFP Frames to read... Sleeping.")
+                down_time += 0.001
                 time.sleep(0.001)
+                if down_time > 1.0:
+                    down_time = 0.0
+                    print(self.CLASS_IDENTIFIER + "Warning: Not receiving LFP data.")
+            else:
+                down_time = 0.0
             for frame_idx in range(n_lfp_frames):
                 timestamp = self._lfp_stream.getData()
                 n_frames_fetched += 1
@@ -243,7 +251,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
     Thread for ripple detection on a set of channels [ONLINE]
     """
 
-    def __init__(self, lfp_listener, baseline_stats=None, \
+    def __init__(self, lfp_listener, calib_plot, baseline_stats=None, \
             trigger_condition=None, shared_buffers=None):
         """
 
@@ -269,6 +277,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
             self._std_ripple_power  = baseline_stats[1]
         self._trigger_condition = trigger_condition[0]
         self._show_trigger = trigger_condition[1]
+        self._calib_trigger_condition = trigger_condition[2]
 
         # Output connections
         self._ripple_buffer_connections = []
@@ -286,6 +295,8 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         self._ripple_filter = signal.butter(RiD.LFP_FILTER_ORDER, \
                 (RiD.RIPPLE_LO_FREQ, RiD.RIPPLE_HI_FREQ), btype='bandpass', \
                 analog=False, output='sos', fs=RiD.LFP_FREQUENCY)
+
+        self._calib_plot = calib_plot
 
         logging.info(MODULE_IDENTIFIER + "Started Ripple detection thread.")
 
@@ -322,11 +333,15 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         n_data_pts_seen = 0
 
         # Delay measures for ripple detection (and trigger)
-        ripple_unseen = False
+        ripple_unseen_LFP = False
+        ripple_unseen_calib = False
         prev_ripple = -np.Inf
-        curr_time   = 0
+        curr_time   = 0.0
         start_wall_time = time.time()
         curr_wall_time = start_wall_time
+
+        # Keep track of the total time for which nothing was received
+        down_time = 0.0
         while not self.req_stop():
             # Acquire buffered LFP frames and fill them in a filter buffer
             if self._lfp_consumer.poll():
@@ -335,6 +350,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                 raw_lfp_window[:, lfp_window_ptr] = current_lfp_frame
                 self._local_lfp_buffer.append(current_lfp_frame)
                 lfp_window_ptr += 1
+                down_time = 0.0
 
                 # If the filter window is full, filter the data and record it in rippple power
                 if (lfp_window_ptr == RiD.LFP_FILTER_ORDER):
@@ -368,16 +384,17 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                     if ((curr_time - prev_ripple) > RiD.RIPPLE_REFRACTORY_PERIOD):
                         # TODO: Consider switching to all, or atleast a majority of tetrodes for ripple detection.
                         if (power_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD).any():
-                            logging.info(MODULE_IDENTIFIER + "Detected ripple at %.2f. Peak Strength: %.2f"% \
-                                    (curr_time, np.max(power_to_baseline_ratio)))
                             prev_ripple = curr_time
                             with self._trigger_condition:
                                 # First trigger interruption and all time critical operations
                                 self._trigger_condition.notify()
                                 curr_wall_time = time.time()
-                                ripple_unseen = True
-                    if ((curr_time - prev_ripple) > RiD.LFP_BUFFER_TIME/2) and ripple_unseen:
-                        ripple_unseen = False
+                                ripple_unseen_LFP = True
+                                ripple_unseen_calib = True
+                            logging.info(MODULE_IDENTIFIER + "Detected ripple at %.2f, TS: %d. Peak Strength: %.2f"% \
+                                    (curr_time, timestamp, np.max(power_to_baseline_ratio)))
+                    if ((curr_time - prev_ripple) > RiD.LFP_BUFFER_TIME/2) and ripple_unseen_LFP:
+                        ripple_unseen_LFP = False
                         # Copy data over for visualization
                         if len(self._local_lfp_buffer) == RiD.LFP_BUFFER_LENGTH:
                             np.copyto(self._raw_lfp_buffer, np.asarray(self._local_lfp_buffer).T)
@@ -386,9 +403,19 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                             with self._show_trigger:
                                 # First trigger interruption and all time critical operations
                                 self._show_trigger.notify()
+                                
+                    if ((curr_time - prev_ripple) > RiD.CALIB_PLOT_BUFFER_TIME/2) and ripple_unseen_calib:
+                        ripple_unseen_calib = False
+                        self._calib_plot.update_shared_buffer(timestamp)
+                        with self._calib_trigger_condition:
+                            self._calib_trigger_condition.notify()
             else:
                 # logging.debug(MODULE_IDENTIFIER + "No LFP Frames to process. Sleeping")
                 time.sleep(0.005)
+                down_time += 0.005
+                if down_time > 1.0:
+                    print(MODULE_IDENTIFIER + "Warning: Not receiving LFP data.")
+                    down_time = 0.0
 """
 Code below here is from the previous iterations where we were using a single
 file to detect and disrupt all ripples based on the LFP on a single tetrode.
@@ -412,7 +439,7 @@ def writeLogFile(trodes_timestamps, ripple_events, wall_ripple_times, interrupt_
     outf.close()
 
 def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
-        ripple_statistics=None):
+        ripple_statistics=None, interrupt_ripples=False):
     """
     Get ripple data statistics for a particular tetrode and a user defined time
     period.
@@ -432,6 +459,8 @@ def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
     if show_ripples:
         plt.ion()
 
+    if interrupt_ripples:
+        ser = SerialPort.BiphasicPort();
     n_tetrodes = len(tetrodes)
     report_ripples = (ripple_statistics is not None)
 
@@ -535,6 +564,7 @@ def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
                                 interruption_axes.plot(timestamps[data_begin_idx:iter_idx], raw_lfp_buffer[0, \
                                         data_begin_idx:iter_idx])
                                 interruption_axes.scatter(prev_ripple, 0, c="r")
+                                interruption_axes.set_ylim(-3000, 3000)
                                 plt.grid(True)
                                 plt.draw()
                                 plt.pause(0.001)
@@ -549,6 +579,8 @@ def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
                                 prev_ripple = current_time
                                 current_wall_time = time.time() - start_wall_time
                                 time_lag = (current_wall_time - current_time)
+                                if interrupt_ripples:
+                                    ser.sendBiphasicPulse()
                                 print("Ripple @ %.2f, Real Time %.2f [Lag: %.2f], strength: %.1f"%(current_time, current_wall_time, time_lag, ripple_to_baseline_ratio))
                                 trodes_timestamps.append(trodes_time_stamp)
                                 ripple_events.append(current_time)
@@ -570,14 +602,24 @@ def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
     return (power_mean, power_std)
 
 def main():
-    tetrodes_to_be_analyzed = [24,33]
+    tetrodes_to_be_analyzed = [2,14]
+    if len(sys.argv) > 2:
+        stim_time = float(sys.argv[2])
+    else:
+        stim_time = 10.0
+
     if len(sys.argv) == 1:
         (power_mean, power_std) = getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
                 analysis_time=100.0)
     elif (int(sys.argv[1][0]) == 1):
         getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
-                ripple_statistics=[60.0, 30.0], show_ripples=True, \
-                analysis_time=100.0)
+                ripple_statistics=[75.0, 45.0], show_ripples=True, \
+                analysis_time=stim_time)
+    elif (int(sys.argv[1][0]) == 2):
+        print("Running for %.2fs"%stim_time)
+        getRippleStatistics([str(tetrode) for tetrode in tetrodes_to_be_analyzed], \
+                ripple_statistics=[75.0, 45.0], show_ripples=True, \
+                analysis_time=stim_time, interrupt_ripples=True)
 
 if (__name__ == "__main__"):
     main()

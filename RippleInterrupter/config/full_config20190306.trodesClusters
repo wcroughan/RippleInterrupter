@@ -1,0 +1,84 @@
+<?xml version="1.0"?>
+<SpikeSortingInfo>
+ <PolygonClusters Timepoint="2319663" uV_conversion_denominator="65536" Method="Manually drawn polygons" uV_conversion_numerator="12780">
+  <nTrode nTrodeIndex="0" nTrodeID="1" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="1" nTrodeID="2" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4">
+   <Cluster clusterIndex="1">
+    <Polygon yAxis="3" xAxis="0">
+     <Vertex x="3299" y="2060"/>
+     <Vertex x="2719" y="2035"/>
+     <Vertex x="2131" y="2010"/>
+     <Vertex x="1790" y="1902"/>
+     <Vertex x="1474" y="1678"/>
+     <Vertex x="1398" y="1104"/>
+     <Vertex x="1534" y="905"/>
+     <Vertex x="2088" y="996"/>
+     <Vertex x="2745" y="1279"/>
+    </Polygon>
+   </Cluster>
+   <Cluster clusterIndex="2">
+    <Polygon yAxis="3" xAxis="0">
+     <Vertex x="818" y="1545"/>
+     <Vertex x="451" y="1487"/>
+     <Vertex x="179" y="980"/>
+     <Vertex x="272" y="672"/>
+     <Vertex x="485" y="805"/>
+     <Vertex x="690" y="1154"/>
+    </Polygon>
+   </Cluster>
+  </nTrode>
+  <nTrode nTrodeIndex="2" nTrodeID="3" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="3" nTrodeID="4" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="4" nTrodeID="5" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="5" nTrodeID="6" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="6" nTrodeID="7" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="7" nTrodeID="8" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="8" nTrodeID="9" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="9" nTrodeID="10" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="10" nTrodeID="11" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="11" nTrodeID="12" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="12" nTrodeID="13" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="13" nTrodeID="14" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4">
+   <Cluster clusterIndex="1">
+    <Polygon yAxis="1" xAxis="0">
+     <Vertex x="105" y="398"/>
+     <Vertex x="219" y="370"/>
+     <Vertex x="442" y="487"/>
+     <Vertex x="526" y="587"/>
+     <Vertex x="544" y="683"/>
+     <Vertex x="507" y="765"/>
+     <Vertex x="412" y="786"/>
+     <Vertex x="299" y="736"/>
+     <Vertex x="200" y="672"/>
+     <Vertex x="116" y="487"/>
+    </Polygon>
+   </Cluster>
+  </nTrode>
+  <nTrode nTrodeIndex="14" nTrodeID="15" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="15" nTrodeID="16" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="16" nTrodeID="17" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="17" nTrodeID="18" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="18" nTrodeID="19" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="19" nTrodeID="20" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="20" nTrodeID="21" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="21" nTrodeID="22" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="22" nTrodeID="23" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="23" nTrodeID="24" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="24" nTrodeID="25" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="25" nTrodeID="26" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="26" nTrodeID="27" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="27" nTrodeID="28" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="28" nTrodeID="29" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="29" nTrodeID="30" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="30" nTrodeID="31" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="31" nTrodeID="32" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="32" nTrodeID="33" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="33" nTrodeID="34" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="34" nTrodeID="35" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="35" nTrodeID="36" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="36" nTrodeID="37" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="37" nTrodeID="38" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="38" nTrodeID="39" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+  <nTrode nTrodeIndex="39" nTrodeID="40" Features="Max channel 1, Max channel 2, Max channel 3, Max channel 4"/>
+ </PolygonClusters>
+</SpikeSortingInfo>

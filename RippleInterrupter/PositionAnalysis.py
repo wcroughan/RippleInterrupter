@@ -34,8 +34,8 @@ class PositionEstimator(ThreadExtension.StoppableThread):
     __P_BIN_SIZE_Y = (__P_MAX_Y - __P_MIN_Y)
     __REAL_BIN_SIZE_X = FIELD_SIZE[0]/__P_BIN_SIZE_X
     __REAL_BIN_SIZE_Y = FIELD_SIZE[1]/__P_BIN_SIZE_Y
-    __SPEED_SMOOTHING_FACTOR = 0.2
-    __MAX_TIMESTAMP_JUMP = 10000
+    __SPEED_SMOOTHING_FACTOR = 0.8
+    __MAX_TIMESTAMP_JUMP = 12000
     __MAX_REAL_TIME_JUMP = __MAX_TIMESTAMP_JUMP/RiD.SPIKE_SAMPLING_FREQ
 
     #def __init__(self, sg_client, n_bins, past_position_buffer, camera_number=1):
@@ -60,7 +60,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
         if (self._position_consumer is None):
             # Failed to open connection to camera module
             logging.warning("Failed to open Camera Module")
-            raise Exception("Could not connect to camera, aborting.")
+            raise Exception("Error: Could not connect to camera, aborting.")
         self._position_consumer.initialize()
         csv_filename = time.strftime("position_data_log" + "_%Y%m%d_%H%M%S.csv")
         try:
@@ -136,6 +136,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
         # TODO: Because it will not be possible to get the correct first time
         # stamp, we will have to ignore the first data entry obtained here.
         # Otherwise it will skew the occupancy!
+        down_time = 0.0
         prev_step_timestamp = 0
         real_time_spent_in_prev_bin = 0.0
         real_distance_moved = 0.0
@@ -146,7 +147,13 @@ class PositionEstimator(ThreadExtension.StoppableThread):
         while not self.req_stop():
             n_available_frames = self._position_consumer.available(0)
             if n_available_frames == 0:
+                down_time += 0.02
                 time.sleep(0.02)
+                if down_time > 1.0:
+                    down_time = 0.0
+                    print(MODULE_IDENTIFIER + "Warning: Not receiving position data.")
+            else:
+                down_time = 0.0
             for frame_idx in range(n_available_frames):
                 self._position_consumer.readData(self._data_field)
                 current_timestamp = self._data_field['timestamp']
