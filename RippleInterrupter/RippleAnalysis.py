@@ -167,7 +167,7 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
                             logging.info(self.CLASS_IDENTIFIER + "Most recent spike at %d"%most_recent_spike_time)
                             print(self._spike_histogram)
                         else:
-                            print("Spike buffer empty!")
+                            logging.debug(self.CLASS_IDENTIFIER + "Spike buffer empty!")
 
                 # DEBUGGING: Print spike count from each of the clusters
                 # print(self._place_field_handler.get_peak_firing_location(most_spiking_unit))

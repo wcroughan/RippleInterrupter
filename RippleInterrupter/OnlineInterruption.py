@@ -285,10 +285,10 @@ class CommandWindow(QMainWindow):
         """
         try:
             self.graphical_interface.start()
+            self.position_estimator.start()
             self.lfp_listener.start()
             self.ripple_detector.start()
             self.spike_listener.start()
-            self.position_estimator.start()
             self.place_field_handler.start()
             self.ripple_trigger.start()
             self.calib_plot.start()

@@ -17,7 +17,6 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from matplotlib.figure import Figure
 from matplotlib import gridspec
 from matplotlib.ticker import PercentFormatter
-from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 import matplotlib.cm as colormap
 import matplotlib.animation as animation
@@ -162,7 +161,7 @@ class GraphicsManager(Process):
 
     __N_POSITION_ELEMENTS_TO_PLOT = 100
     __N_SPIKES_TO_PLOT = 2000
-    __N_ANIMATION_FRAMES = 5000
+    __N_ANIMATION_FRAMES = 50000
     __PLACE_FIELD_REFRESH_RATE = 1
     __PLOT_REFRESH_RATE = 0.05
     __PEAK_LFP_AMPLITUDE = 3000
@@ -187,17 +186,17 @@ class GraphicsManager(Process):
 
         # Graphics windows
         self.widget  = QDialog()
-        self.figure  = Figure(figsize=(12,16))
-        self.canvas  = FigureCanvas(self.figure)
+        self.widget.figure  = Figure(figsize=(12,16))
+        self.canvas  = FigureCanvas(self.widget.figure)
         plot_grid    = gridspec.GridSpec(2, 2)
         self.toolbar = NavigationToolbar(self.canvas, self.widget)
-        self._rd_ax = self.figure.add_subplot(plot_grid[0])
-        self._pf_ax = self.figure.add_subplot(plot_grid[1])
-        self._cp_ax = self.figure.add_subplot(plot_grid[3])
+        self._rd_ax = self.widget.figure.add_subplot(plot_grid[0])
+        self._pf_ax = self.widget.figure.add_subplot(plot_grid[1])
+        self._cp_ax = self.widget.figure.add_subplot(plot_grid[3])
 
         # This is tricky because right now we are using this as an array to
         # store multiple axes, each plotting a different unit.
-        self._spk_pos_ax = self.figure.add_subplot(plot_grid[2])
+        self._spk_pos_ax = self.widget.figure.add_subplot(plot_grid[2])
 
         # Selecting individual units
         self.unit_selection = QComboBox()
@@ -354,6 +353,8 @@ class GraphicsManager(Process):
         self._spk_pos_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
         self._spk_pos_ax.grid(True)
 
+        self.canvas.draw()
+
     def kill_gui(self):
         self._keep_running.clear()
         
@@ -364,6 +365,7 @@ class GraphicsManager(Process):
         does not continuously update the frame but only when a ripple is triggerred.
         """
         
+        print(MODULE_IDENTIFIER + 'Updating ripple frame.')
         # NOTE: This call blocks access to ripple_trigger_condition for
         # __RIPPLE_DETECTION_TIMEOUT, which could be a long while. Don't let
         # this block any important functionality.
@@ -371,6 +373,8 @@ class GraphicsManager(Process):
             self._rd_frame[0].set_data(self._lfp_tpts, self._local_lfp_buffer[0,:]/self.__PEAK_LFP_AMPLITUDE)
             self._rd_frame[1].set_data(self._ripple_power_tpts, -0.5 + (self._local_ripple_power_buffer[0,:] - RippleAnalysis.D_MEAN_RIPPLE_POWER)/(2 * RippleAnalysis.D_STD_RIPPLE_POWER * RiD.RIPPLE_POWER_THRESHOLD))
             return self._rd_frame
+        else:
+            print(self._rd_ax)
 
     def update_calib_plot_frame(self, step=0):
         """
@@ -392,7 +396,7 @@ class GraphicsManager(Process):
         """
         Function used for animating the current position of the animal.
         """
-        if len(self._spk_pos_ax) != 0:
+        if self._spk_pos_ax:
             # print(self._pos_x)
             # print(self._pos_y)
             # TODO: Add colors based on which cluster the spikes are coming from
@@ -499,17 +503,6 @@ class GraphicsManager(Process):
                 time.sleep(self.__PLOT_REFRESH_RATE)
         logging.info(MODULE_IDENTIFIER + "Position pipe closed.")
 
-    def process_command(self, key_in):
-        user_input = self._key_entry.get()
-        if user_input == 's':
-            print('Pausing ripple interruption.')
-            self._ripple_trigger_thread.disable()
-        elif user_input == 'r':
-            print('Resuming ripple interruption.')
-            self._ripple_trigger_thread.enable()
-        self._key_entry.delete(0, tkinter.END)
-        pass
-    
     def pauseAnimation(self):
         """
         Pause all animation sources.
@@ -535,7 +528,7 @@ class GraphicsManager(Process):
         self._rd_frame.append(ripple_power_frame)
 
         # Create animation object for showing the EEG
-        anim_obj = animation.FuncAnimation(self.figure, self.update_ripple_detection_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
+        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_ripple_detection_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
         self._anim_objs.append(anim_obj)
 
     def initialize_calib_plot_fig(self):
@@ -551,7 +544,7 @@ class GraphicsManager(Process):
         self._cp_frame.append(spk_cnt_minus_sterr_frame)
 
         # Create animation object for showing the EEG
-        anim_obj = animation.FuncAnimation(self.figure, self.update_calib_plot_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
+        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_calib_plot_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
         self._anim_objs.append(anim_obj)
 
     def initialize_spike_pos_fig(self):
@@ -559,55 +552,26 @@ class GraphicsManager(Process):
         Initialize figure window for showing spikes overlaid on position
         """
         # TODO: Deal with this to only plot spikes from the unit we are interested in.
-        self._pos_fig, self._spk_pos_ax = plt.subplots(self.__N_SUBPLOT_ROWS, self.__N_SUBPLOT_COLS)
-        # Create graphics entries for the actual position and also each of the spike clusters
-        if (self.__N_SUBPLOT_ROWS == 1) or (self.__N_SUBPLOT_COLS == 1):
-            # Matplotlib returns a 1D array in this case, a 2D array otherwise
-            center_frame = int(self.__N_SUBPLOT_COLS/2)
-            for cl_idx in range(self._n_clusters): 
-                self._spk_pos_ax[cl_idx].set_xlabel("x (bin)")
-                self._spk_pos_ax[cl_idx].set_ylabel("y (bin)")
-                self._spk_pos_ax[cl_idx].set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
-                self._spk_pos_ax[cl_idx].set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
-                self._spk_pos_ax[cl_idx].grid(True)
-                spk_frame, = self._spk_pos_ax[cl_idx].plot([], [], linestyle='None', marker='o', alpha=0.4, animated=True)
-                self._spk_pos_frame.append(spk_frame)
-            pos_frame, = self._spk_pos_ax[center_frame].plot([], [], animated=True)
-            vel_frame  = self._spk_pos_ax[center_frame].text(40.0, 2.0, 'speed = 0cm/s')
-            self._spk_pos_frame.append(pos_frame)
-            self._spk_pos_frame.append(vel_frame)
-        else:
-            for cl_idx in range(self._n_clusters): 
-                grid_idx = np.unravel_index(cl_idx, (self.__N_SUBPLOT_ROWS, self.__N_SUBPLOT_COLS))
-                self._spk_pos_ax[grid_idx[0]][grid_idx[1]].set_xlabel("x (bin)")
-                self._spk_pos_ax[grid_idx[0]][grid_idx[1]].set_ylabel("y (bin)")
-                self._spk_pos_ax[grid_idx[0]][grid_idx[1]].set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
-                self._spk_pos_ax[grid_idx[0]][grid_idx[1]].set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
-                self._spk_pos_ax[grid_idx[0]][grid_idx[1]].grid(True)
-                spk_frame, = self._spk_pos_ax[grid_idx[0]][grid_idx[1]].plot([], [], linestyle='None', marker='o', alpha=0.4, animated=True)
-                self._spk_pos_frame.append(spk_frame)
-            # TODO: Change this to make it the center plot?
-            pos_frame, = self._spk_pos_ax[0][0].plot([], [], animated=True)
-            vel_frame  = self._spk_pos_ax[0][0].text(40.0, 2.0, 'speed = 0cm/s')
-            self._spk_pos_frame.append(pos_frame)
-            self._spk_pos_frame.append(vel_frame)
+        spk_frame, = self._spk_pos_ax.plot([], [], linestyle='None', marker='o', alpha=0.4, animated=True)
+        pos_frame, = self._spk_pos_ax.plot([], [], animated=True)
+        vel_frame  = self._spk_pos_ax.text(40.0, 2.0, 'speed = 0cm/s')
+        self._spk_pos_frame.append(spk_frame)
+        self._spk_pos_frame.append(pos_frame)
+        self._spk_pos_frame.append(vel_frame)
 
-        anim_obj = animation.FuncAnimation(self.figure, self.update_position_and_spike_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
+        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_position_and_spike_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
         self._anim_objs.append(anim_obj)
 
     def initialize_place_field_fig(self):
         """
         Initialize figure window for dynamically showing place fields.
         """
-        self._pf_fig = plt.figure()
-        self._pf_ax = plt.axes()
-
         pf_heatmap = self._pf_ax.imshow(np.zeros((PositionAnalysis.N_POSITION_BINS[0], \
                 PositionAnalysis.N_POSITION_BINS[1]), dtype='float'), vmin=0, \
                 vmax=self.__MAX_FIRING_RATE, animated=True)
         plt.colorbar(pf_heatmap)
         self._pf_frame.append(pf_heatmap)
-        anim_obj = animation.FuncAnimation(self.figure, self.update_place_field_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
+        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_place_field_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
         self._anim_objs.append(anim_obj)
 
     def run(self):
@@ -640,6 +604,7 @@ class GraphicsManager(Process):
         self.initialize_calib_plot_fig()
         self.initialize_spike_pos_fig()
         self.initialize_place_field_fig()
+        print(MODULE_IDENTIFIER + 'Animation plots initialized.')
 
         # This is a blocking command... After you exit this, everything will end.
         while self._keep_running.is_set():
