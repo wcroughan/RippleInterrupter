@@ -422,6 +422,7 @@ class GraphicsManager(Process):
         """
         Fetch raw LFP data and ripple power data.
         """
+        logging.info(MODULE_IDENTIFIER + "Ripple frame pipe opened.")
         while self._keep_running.is_set():
             with self._ripple_trigger_condition:
                 ripple_triggered = self._ripple_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
@@ -430,13 +431,15 @@ class GraphicsManager(Process):
                 np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
                 np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
                 # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
-            # time.sleep(self.__RIPPLE_DETECTION_TIMEOUT)
+            else:
+                time.sleep(self.__RIPPLE_DETECTION_TIMEOUT)
         logging.info(MODULE_IDENTIFIER + "Ripple frame pipe closed.")
 
     def fetch_calibration_plot(self):
         """
         Fetch raw LFP data and ripple power data.
         """
+        logging.info(MODULE_IDENTIFIER + "Calibration pipe opened.")
         while self._keep_running.is_set():
             with self._calib_trigger_condition:
                 ripple_triggered = self._calib_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
@@ -444,12 +447,15 @@ class GraphicsManager(Process):
             if ripple_triggered:
                 np.copyto(self._local_spk_cnt_buffer, self._shared_calib_plot_means)
                 np.copyto(self._local_spk_cnt_stderr_buffer, self._shared_calib_plot_std_errs)
-            # time.sleep(self.__RIPPLE_DETECTION_TIMEOUT)
+            else:
+                time.sleep(self.__RIPPLE_DETECTION_TIMEOUT)
+        logging.info(MODULE_IDENTIFIER + "Calibration pipe closed.")
 
     def fetch_place_fields(self):
         """
         Fetch place field data from place field handler.
         """
+        logging.info(MODULE_IDENTIFIER + "Place Field pipe opened.")
         while self._keep_running.is_set():
             time.sleep(self.__PLACE_FIELD_REFRESH_RATE)
             # Request place field handler to pause place field calculation
@@ -462,8 +468,9 @@ class GraphicsManager(Process):
         logging.info(MODULE_IDENTIFIER + "Place Field pipe closed.")
 
     def fetch_spikes_and_update_frames(self):
+        logging.info(MODULE_IDENTIFIER + "Spike pipe opened.")
         while self._keep_running.is_set():
-            while self._spike_buffer.poll():
+            if self._spike_buffer.poll():
                 spike_data = self._spike_buffer.recv()
                 # TODO: This is a little inefficient. For every spike we get,
                 # we check to see if it is in the clusters of interest and then
@@ -472,11 +479,13 @@ class GraphicsManager(Process):
                     data_idx = self._clusters.index(spike_data[0])
                     self._spk_pos_x[data_idx].append(spike_data[1])
                     self._spk_pos_y[data_idx].append(spike_data[2])
-                # logging.debug(MODULE_IDENTIFIER + "Fetched spike from cluster: %d, in bin (%d, %d). TS: %d"%spike_data)
-            # time.sleep(self.__PLOT_REFRESH_RATE)
+                logging.debug(MODULE_IDENTIFIER + "Fetched spike from cluster: %d, in bin (%d, %d). TS: %d"%spike_data)
+            else:
+                time.sleep(self.__PLOT_REFRESH_RATE)
         logging.info(MODULE_IDENTIFIER + "Spike pipe closed.")
 
     def fetch_position_and_update_frames(self):
+        logging.info(MODULE_IDENTIFIER + "Position pipe opened.")
         while self._keep_running.is_set():
             if self._position_buffer.poll():
                 position_data = self._position_buffer.recv()
@@ -484,9 +493,10 @@ class GraphicsManager(Process):
                 self._pos_x.append(position_data[1])
                 self._pos_y.append(position_data[2])
                 self._speed.append(position_data[3])
-                # logging.debug(MODULE_IDENTIFIER + "Fetched Position data... (%d, %d), v: %.2fcm/s"% \
-                #       (position_data[1],position_data[2], position_data[3]))
-            # time.sleep(self.__PLOT_REFRESH_RATE)
+                logging.debug(MODULE_IDENTIFIER + "Fetched Position data... (%d, %d), v: %.2fcm/s"% \
+                      (position_data[1],position_data[2], position_data[3]))
+            else:
+                time.sleep(self.__PLOT_REFRESH_RATE)
         logging.info(MODULE_IDENTIFIER + "Position pipe closed.")
 
     def process_command(self, key_in):
@@ -632,6 +642,9 @@ class GraphicsManager(Process):
         self.initialize_place_field_fig()
 
         # This is a blocking command... After you exit this, everything will end.
+        while self._keep_running.is_set():
+            time.sleep(1.0)
+
         for p__thread in self._thread_list:
             p__thread.join()
         logging.info(MODULE_IDENTIFIER + "Closed GUI and display pipes")

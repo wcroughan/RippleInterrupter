@@ -341,10 +341,6 @@ class CommandWindow(QMainWindow):
             self.spike_listener = SpikeAnalysis.SpikeDetector(self.sg_client, self.cluster_identity_map)
             self.place_field_handler = SpikeAnalysis.PlaceFieldHandler(self.position_estimator,\
                     self.spike_listener, self.shared_place_fields)
-            # Triggerring events based on sharp-wave ripples
-            # Initialize threads for looking at the actual/decoded position
-            self.ripple_trigger = RippleAnalysis.RippleSynchronizer(self.trig_condition, self.spike_listener,\
-                    self.position_estimator, self.place_field_handler)
         except Exception as err:
             QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start spike thread(s).')
             print(err)
