@@ -114,8 +114,8 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                 logging.debug(self.CLASS_IDENTIFIER + "Waiting for Place field request to complete.")
                 time.sleep(0.001) #5ms
 
-            if not self._spike_buffer.poll():
-                # logging.debug(self.CLASS_IDENTIFIER + "Spike buffer empty, sleeping")
+            if not (self._spike_buffer.poll() or self._position_buffer.poll()):
+                # logging.debug(self.CLASS_IDENTIFIER + "Spike/Position buffers empty, sleeping")
                 time.sleep(0.001)
                 continue
 
@@ -128,7 +128,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
             # adjusting), spike connection will never be polled, but position
             # pipe will get filled up, preventing all other processes from
             # moving ahead.
-            self._spike_buffer.poll() or self._position_buffer.poll()
+            
             while (self._spike_buffer.poll() or self._position_buffer.poll()) and not self._has_pf_request:
                 # logging.debug(MODULE_IDENTIFIER + "Main loop rentry.")
                 # NOTE: This assumes technically that spikes are in strict
