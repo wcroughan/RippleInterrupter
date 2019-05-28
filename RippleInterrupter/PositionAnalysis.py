@@ -189,11 +189,8 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                         last_velocity = (1 - self.__SPEED_SMOOTHING_FACTOR) * real_distance_moved/real_time_spent_in_prev_bin + \
                                 self.__SPEED_SMOOTHING_FACTOR * last_velocity
 
-                    print(MODULE_IDENTIFIER + 'Writing output buffers [2]...')
-                    for idx, outp in enumerate(self._position_buffer_connections):
-                        print(idx)
+                    for outp in self._position_buffer_connections:
                         outp.send((current_timestamp, curr_x_bin, curr_y_bin, last_velocity))
-                    print(MODULE_IDENTIFIER + 'Buffers [2] written...')
 
                     # Update the total time spent in the bin we were previously in
                     # self._bin_occupancy[prev_x_bin, prev_y_bin] += real_time_spent_in_prev_bin
@@ -217,11 +214,8 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                     real_time_spent_in_prev_bin += self.__MAX_REAL_TIME_JUMP
                     last_velocity = (1 - self.__SPEED_SMOOTHING_FACTOR) * real_distance_moved/real_time_spent_in_prev_bin + \
                             self.__SPEED_SMOOTHING_FACTOR * last_velocity
-                    print(MODULE_IDENTIFIER + 'Writing output buffers [3]...')
-                    for idx, outp in enumerate(self._position_buffer_connections):
-                        print(idx)
+                    for outp in self._position_buffer_connections:
                         outp.send((current_timestamp, curr_x_bin, curr_y_bin, last_velocity))
-                    print(MODULE_IDENTIFIER + 'Buffers [3] written...')
 
                 if self._csv_writer:
                     self._csv_writer.writerow([current_timestamp, self._data_field['position_x'], self._data_field['position_y']])
