@@ -65,6 +65,7 @@ class CommandWindow(QMainWindow):
 
         # Trodes connection
         self.sg_client = None
+        self.data_streaming = False
 
         # Synchronization conditions across threads
         self.trig_condition  = Condition()
@@ -121,7 +122,7 @@ class CommandWindow(QMainWindow):
         stream_action = file_menu.addAction('S&tream')
         stream_action.setShortcut('Ctrl+T')
         stream_action.setStatusTip('Stream data')
-        stream_action.triggered.connect(self.startThreads)
+        stream_action.triggered.connect(self.streamData)
 
         # =============== SAVE MENU =============== 
         save_menu = file_menu.addMenu('&Save')
@@ -249,9 +250,15 @@ class CommandWindow(QMainWindow):
         # NOTE: Using all the tetrodes that have clusters marked on them for ripple analysis
         self.n_tetrodes = len(self.cluster_identity_map)
 
+    def streamData(self):
+        if self.data_streaming:
+            self.stopThreads()
+            self.data_streaming = False
+        else:
+            self.startThreads()
+            self.data_streaming = True
+
     def stopThreads(self):
-        if __debug__:
-            self.code_profiler.enable()
         try:
             # Join all the threads to wait for their execution to  finish
             # Run cleanup here
@@ -303,6 +310,8 @@ class CommandWindow(QMainWindow):
         else:
             self.ripple_trigger.disable()
         self.statusBar().showMessage('Streaming!')
+        if __debug__:
+            self.code_profiler.enable()
 
     def initRippleTriggerThreads(self):
         """
