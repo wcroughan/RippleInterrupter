@@ -25,6 +25,7 @@ import matplotlib.animation as animation
 from PyQt5.QtWidgets import QMainWindow, QAction, qApp, QApplication, QDialog, QFileDialog, QMessageBox
 from PyQt5.QtWidgets import QPushButton, QSlider, QRadioButton, QLabel, QInputDialog
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QGridLayout, QComboBox
+from PyQt5.QtCore import QThread, pyqtSignal
 
 # Local Imports
 import Configuration
@@ -33,6 +34,7 @@ import PositionAnalysis
 import RippleDefinitions as RiD
 
 MODULE_IDENTIFIER = "[GraphicsHandler] "
+ANIMATION_INTERVAL = 20
 
 def normalizeData(in_data):
     # TODO: Might need tiling of data if there are multiple dimensions
@@ -186,17 +188,17 @@ class GraphicsManager(Process):
 
         # Graphics windows
         self.widget  = QDialog()
-        self.widget.figure  = Figure(figsize=(12,16))
-        self.canvas  = FigureCanvas(self.widget.figure)
+        self.figure  = Figure(figsize=(12,16))
+        self.canvas  = FigureCanvas(self.figure)
         plot_grid    = gridspec.GridSpec(2, 2)
         self.toolbar = NavigationToolbar(self.canvas, self.widget)
-        self._rd_ax = self.widget.figure.add_subplot(plot_grid[0])
-        self._pf_ax = self.widget.figure.add_subplot(plot_grid[1])
-        self._cp_ax = self.widget.figure.add_subplot(plot_grid[3])
+        self._rd_ax = self.figure.add_subplot(plot_grid[0])
+        self._pf_ax = self.figure.add_subplot(plot_grid[1])
+        self._cp_ax = self.figure.add_subplot(plot_grid[3])
 
         # This is tricky because right now we are using this as an array to
         # store multiple axes, each plotting a different unit.
-        self._spk_pos_ax = self.widget.figure.add_subplot(plot_grid[2])
+        self._spk_pos_ax = self.figure.add_subplot(plot_grid[2])
 
         # Selecting individual units
         self.unit_selection = QComboBox()
@@ -238,19 +240,22 @@ class GraphicsManager(Process):
         self._cluster_colormap = colormap.magma(np.linspace(0, 1, self._n_clusters))
 
         # Large arrays that are shared across processes
-        self._new_ripple_frame_availale = threading.Event()
         self._shared_raw_lfp_buffer = np.reshape(np.frombuffer(ripple_buffers[0], dtype='double'), (self._n_tetrodes, RiD.LFP_BUFFER_LENGTH))
         self._shared_ripple_power_buffer = np.reshape(np.frombuffer(ripple_buffers[1], dtype='double'), (self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH))
         self._shared_place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), (self._n_total_clusters, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
 
+        self._calib_lock = threading.Lock()
         self._shared_calib_plot_means = np.reshape(np.frombuffer(calib_plot_buffers[0], dtype='double'), (RiD.CALIB_PLOT_BUFFER_LENGTH))
         self._shared_calib_plot_std_errs = np.reshape(np.frombuffer(calib_plot_buffers[1], dtype='double'), (RiD.CALIB_PLOT_BUFFER_LENGTH))
 
         # Local copies of the shared data that can be used at a leisurely pace
+        self._lfp_lock = threading.Lock()
         self._lfp_tpts = np.linspace(0, RiD.LFP_BUFFER_TIME, RiD.LFP_BUFFER_LENGTH)
         self._ripple_power_tpts = np.linspace(0, RiD.LFP_BUFFER_TIME, RiD.RIPPLE_POWER_BUFFER_LENGTH)
         self._local_lfp_buffer = np.zeros((self._n_tetrodes, RiD.LFP_BUFFER_LENGTH), dtype='double')
         self._local_ripple_power_buffer = np.zeros((self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH), dtype='double')
+
+        self._pf_lock = threading.Lock()
         self._most_recent_pf = np.zeros((PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]), \
                 dtype='float')
 
@@ -260,11 +265,13 @@ class GraphicsManager(Process):
 
         # Automatically keep only a fixed number of entries in this buffer... Useful for plotting
         self._pos_timestamps = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
+        self._pos_lock = threading.Lock()
         self._pos_x = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._pos_y = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._speed = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
 
         # Maintain a separate deque for each cluster to plot
+        self._spike_lock = threading.Lock()
         self._spk_pos_x = []
         self._spk_pos_y = []
         for cl_idx in range(self._n_clusters):
@@ -286,9 +293,39 @@ class GraphicsManager(Process):
         # Communication buffers
         self._position_buffer = self._position_estimator.get_position_buffer_connection()
         self._spike_buffer = self._place_field_handler.get_spike_place_buffer_connection(self.__CLUSTERS_TO_PLOT)
+
+        # Launch a thread for fetching position data constantly
+        # Add options to only start some of these threads
+        self._thread_list = list()
+        self._thread_list.append(threading.Thread(name="PositionFetcher", daemon=True, \
+                target=self.fetch_position_and_update_frames))
+        self._thread_list.append(threading.Thread(name="SpikeFetcher", daemon=True, \
+                target=self.fetch_spikes_and_update_frames))
+        self._thread_list.append(threading.Thread(name="PlaceFieldFetched", daemon=True, \
+                target=self.fetch_place_fields))
+        self._thread_list.append(threading.Thread(name="RippleFrameFetcher", daemon=True, \
+                target=self.fetch_incident_ripple))
+        self._thread_list.append(threading.Thread(name="CalibPlotFetcher", daemon=True, \
+                target=self.fetch_calibration_plot))
+
+        # Create thread locks to update arrays that are being read for updating frames.
+
         logging.info(MODULE_IDENTIFIER + "Graphics interface started.")
         self.setLayout()
         self.clearAxes()
+
+        # Start the animation for Spike-Position figure, place field figure
+        self.initialize_ripple_detection_fig()
+        self.initialize_calib_plot_fig()
+        self.initialize_spike_pos_fig()
+        self.initialize_place_field_fig()
+        self.pauseAnimation()
+        self._keep_running.set()
+        for p__thread in self._thread_list:
+            p__thread.start()
+
+        print(MODULE_IDENTIFIER + 'Animation plots initialized.')
+
 
     def setLayout(self):
         parent_layout_box = QVBoxLayout()
@@ -365,16 +402,14 @@ class GraphicsManager(Process):
         does not continuously update the frame but only when a ripple is triggerred.
         """
         
-        print(MODULE_IDENTIFIER + 'Updating ripple frame.')
         # NOTE: This call blocks access to ripple_trigger_condition for
         # __RIPPLE_DETECTION_TIMEOUT, which could be a long while. Don't let
         # this block any important functionality.
-        if self._rd_ax:
+        with self._lfp_lock:
             self._rd_frame[0].set_data(self._lfp_tpts, self._local_lfp_buffer[0,:]/self.__PEAK_LFP_AMPLITUDE)
-            self._rd_frame[1].set_data(self._ripple_power_tpts, -0.5 + (self._local_ripple_power_buffer[0,:] - RippleAnalysis.D_MEAN_RIPPLE_POWER)/(2 * RippleAnalysis.D_STD_RIPPLE_POWER * RiD.RIPPLE_POWER_THRESHOLD))
-            return self._rd_frame
-        else:
-            print(self._rd_ax)
+            self._rd_frame[1].set_data(self._ripple_power_tpts, -0.5 + (self._local_ripple_power_buffer[0,:] \
+                    - RippleAnalysis.D_MEAN_RIPPLE_POWER)/(2 * RippleAnalysis.D_STD_RIPPLE_POWER * RiD.RIPPLE_POWER_THRESHOLD))
+        return self._rd_frame
 
     def update_calib_plot_frame(self, step=0):
         """
@@ -386,22 +421,21 @@ class GraphicsManager(Process):
         # NOTE: This call blocks access to ripple_trigger_condition for
         # __RIPPLE_DETECTION_TIMEOUT, which could be a long while. Don't let
         # this block any important functionality.
-        if self._cp_ax is not None:
+        with self._calib_lock:
             self._cp_frame[0].set_data(self._spk_cnt_tpts, self._local_spk_cnt_buffer)
             self._cp_frame[1].set_data(self._spk_cnt_tpts, self._local_spk_cnt_buffer + self._local_spk_cnt_stderr_buffer)
             self._cp_frame[2].set_data(self._spk_cnt_tpts, self._local_spk_cnt_buffer - self._local_spk_cnt_stderr_buffer)
-            return self._cp_frame
+        return self._cp_frame
 
     def update_position_and_spike_frame(self, step=0):
         """
         Function used for animating the current position of the animal.
         """
-        if self._spk_pos_ax:
-            # print(self._pos_x)
-            # print(self._pos_y)
-            # TODO: Add colors based on which cluster the spikes are coming from
-            for cl_idx in range(self._n_clusters):
-                self._spk_pos_frame[cl_idx].set_data((self._spk_pos_x[cl_idx], self._spk_pos_y[cl_idx]))
+        cl_idx = max(self.unit_selection.currentIndex(), 0)
+        with self._spike_lock:
+            self._spk_pos_frame[0].set_data((self._spk_pos_x[cl_idx], self._spk_pos_y[cl_idx]))
+
+        with self._pos_lock:
             self._spk_pos_frame[-2].set_data((self._pos_x, self._pos_y))
             if len(self._speed) > 0:
                 self._spk_pos_frame[-1].set_text('speed = %.2fcm/s'%self._speed[-1])
@@ -415,12 +449,12 @@ class GraphicsManager(Process):
         :step: Animation iteration
         :returns: Animation frames to be plotted.
         """
-        if self._pf_ax:
-            # print("Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._most_recent_pf), np.mean(self._most_recent_pf)))
-            # min_fr = np.min(self._most_recent_pf)
-            # max_fr = np.max(self._most_recent_pf)
+        # print("Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._most_recent_pf), np.mean(self._most_recent_pf)))
+        # min_fr = np.min(self._most_recent_pf)
+        # max_fr = np.max(self._most_recent_pf)
+        with self._pf_lock:
             self._pf_frame[0].set_array(self._most_recent_pf.T)
-            return self._pf_frame
+        return self._pf_frame
         
     def fetch_incident_ripple(self):
         """
@@ -432,8 +466,9 @@ class GraphicsManager(Process):
                 ripple_triggered = self._ripple_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
 
             if ripple_triggered:
-                np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
-                np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
+                with self._lfp_lock:
+                    np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
+                    np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
                 # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
             else:
                 time.sleep(self.__RIPPLE_DETECTION_TIMEOUT)
@@ -449,8 +484,9 @@ class GraphicsManager(Process):
                 ripple_triggered = self._calib_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
 
             if ripple_triggered:
-                np.copyto(self._local_spk_cnt_buffer, self._shared_calib_plot_means)
-                np.copyto(self._local_spk_cnt_stderr_buffer, self._shared_calib_plot_std_errs)
+                with self._calib_lock:
+                    np.copyto(self._local_spk_cnt_buffer, self._shared_calib_plot_means)
+                    np.copyto(self._local_spk_cnt_stderr_buffer, self._shared_calib_plot_std_errs)
             else:
                 time.sleep(self.__RIPPLE_DETECTION_TIMEOUT)
         logging.info(MODULE_IDENTIFIER + "Calibration pipe closed.")
@@ -466,7 +502,8 @@ class GraphicsManager(Process):
             # while we fetch the data
             self._place_field_handler.submit_immediate_request()
             # np.copyto(self._most_recent_pf, self._shared_place_fields[self.__CLUSTERS_TO_PLOT[0], :, :])
-            np.mean(self._shared_place_fields, out=self._most_recent_pf, axis=0)
+            with self._pf_lock:
+                np.mean(self._shared_place_fields, out=self._most_recent_pf, axis=0)
             # Release the request that paused place field computation
             self._place_field_handler.end_immediate_request()
         logging.info(MODULE_IDENTIFIER + "Place Field pipe closed.")
@@ -481,8 +518,9 @@ class GraphicsManager(Process):
                 # find its  
                 if spike_data[0] in self._clusters:
                     data_idx = self._clusters.index(spike_data[0])
-                    self._spk_pos_x[data_idx].append(spike_data[1])
-                    self._spk_pos_y[data_idx].append(spike_data[2])
+                    with self._spike_lock:
+                        self._spk_pos_x[data_idx].append(spike_data[1])
+                        self._spk_pos_y[data_idx].append(spike_data[2])
                 logging.debug(MODULE_IDENTIFIER + "Fetched spike from cluster: %d, in bin (%d, %d). TS: %d"%spike_data)
             else:
                 time.sleep(self.__PLOT_REFRESH_RATE)
@@ -493,10 +531,14 @@ class GraphicsManager(Process):
         while self._keep_running.is_set():
             if self._position_buffer.poll():
                 position_data = self._position_buffer.recv()
-                self._pos_timestamps.append(position_data[0])
-                self._pos_x.append(position_data[1])
-                self._pos_y.append(position_data[2])
-                self._speed.append(position_data[3])
+                with self._pos_lock:
+                    self._pos_timestamps.append(position_data[0])
+                    self._pos_x.append(position_data[1])
+                    self._pos_y.append(position_data[2])
+                    self._speed.append(position_data[3])
+                # print(self)
+                # print(self._pos_x)
+                # print(self._pos_y)
                 logging.debug(MODULE_IDENTIFIER + "Fetched Position data... (%d, %d), v: %.2fcm/s"% \
                       (position_data[1],position_data[2], position_data[3]))
             else:
@@ -507,14 +549,14 @@ class GraphicsManager(Process):
         """
         Pause all animation sources.
         """
-        for ao in self.anim_obj:
+        for ao in self._anim_objs:
             ao.event_source.stop()
     
     def playAnimation(self):
         """
         Play all animation sources.
         """
-        for ao in self.anim_obj:
+        for ao in self._anim_objs:
             ao.event_source.start()
 
     def initialize_ripple_detection_fig(self):
@@ -528,7 +570,8 @@ class GraphicsManager(Process):
         self._rd_frame.append(ripple_power_frame)
 
         # Create animation object for showing the EEG
-        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_ripple_detection_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
+        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_ripple_detection_frame, frames=np.arange(self.__N_ANIMATION_FRAMES), interval=ANIMATION_INTERVAL, blit=True)
+        print(MODULE_IDENTIFIER + 'Ripple detection frame created!')
         self._anim_objs.append(anim_obj)
 
     def initialize_calib_plot_fig(self):
@@ -544,7 +587,8 @@ class GraphicsManager(Process):
         self._cp_frame.append(spk_cnt_minus_sterr_frame)
 
         # Create animation object for showing the EEG
-        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_calib_plot_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
+        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_calib_plot_frame, frames=self.__N_ANIMATION_FRAMES, interval=ANIMATION_INTERVAL, blit=True)
+        print(MODULE_IDENTIFIER + 'Spike calibration frame created!')
         self._anim_objs.append(anim_obj)
 
     def initialize_spike_pos_fig(self):
@@ -559,7 +603,8 @@ class GraphicsManager(Process):
         self._spk_pos_frame.append(pos_frame)
         self._spk_pos_frame.append(vel_frame)
 
-        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_position_and_spike_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
+        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_position_and_spike_frame, frames=self.__N_ANIMATION_FRAMES, interval=ANIMATION_INTERVAL, blit=True)
+        print(MODULE_IDENTIFIER + 'Spike-Position frame created!')
         self._anim_objs.append(anim_obj)
 
     def initialize_place_field_fig(self):
@@ -571,7 +616,8 @@ class GraphicsManager(Process):
                 vmax=self.__MAX_FIRING_RATE, animated=True)
         plt.colorbar(pf_heatmap)
         self._pf_frame.append(pf_heatmap)
-        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_place_field_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
+        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_place_field_frame, frames=self.__N_ANIMATION_FRAMES, interval=ANIMATION_INTERVAL, blit=True)
+        print(MODULE_IDENTIFIER + 'Place field frame created!')
         self._anim_objs.append(anim_obj)
 
     def run(self):
@@ -580,36 +626,24 @@ class GraphicsManager(Process):
         in separate threads.
         """
 
+        """
         self._keep_running.set()
-
-        # Launch a thread for fetching position data constantly
-        # Add options to only start some of these threads
-        self._thread_list = list()
-        self._thread_list.append(threading.Thread(name="PositionFetcher", daemon=True, \
-                target=self.fetch_position_and_update_frames))
-        self._thread_list.append(threading.Thread(name="SpikeFetcher", daemon=True, \
-                target=self.fetch_spikes_and_update_frames))
-        self._thread_list.append(threading.Thread(name="PlaceFieldFetched", daemon=True, \
-                target=self.fetch_place_fields))
-        self._thread_list.append(threading.Thread(name="RippleFrameFetcher", daemon=True, \
-                target=self.fetch_incident_ripple))
-        self._thread_list.append(threading.Thread(name="CalibPlotFetcher", daemon=True, \
-                target=self.fetch_calibration_plot))
 
         for p__thread in self._thread_list:
             p__thread.start()
+        """
 
-        # Start the animation for Spike-Position figure, place field figure
-        self.initialize_ripple_detection_fig()
-        self.initialize_calib_plot_fig()
-        self.initialize_spike_pos_fig()
-        self.initialize_place_field_fig()
-        print(MODULE_IDENTIFIER + 'Animation plots initialized.')
+        # Start all the animation sources.
+        self.playAnimation()
 
         # This is a blocking command... After you exit this, everything will end.
         while self._keep_running.is_set():
             time.sleep(1.0)
 
+        # Stop all the animation sources.
+        self.pauseAnimation()
+
+        # Join all the fetcher threads.
         for p__thread in self._thread_list:
             p__thread.join()
         logging.info(MODULE_IDENTIFIER + "Closed GUI and display pipes")

@@ -365,10 +365,12 @@ def main():
     # Start logging before anything else
     log_file_prefix = "replay_disruption_log"
     log_filename = time.strftime(log_file_prefix + "_%Y%m%d_%H%M%S.log")
-    logging.basicConfig(filename=log_filename, format="%(asctime)s.%(msecs)03d:%(message)s", \
-            level=logging.INFO, datefmt="%H:%M:%S")
-    # logging.basicConfig(filename=log_filename, format="%(asctime)s.%(msecs)03d:%(message)s", \
-    #         level=logging.DEBUG, datefmt="%H:%M:%S")
+    if __debug__:
+        logging.basicConfig(filename=log_filename, format="%(asctime)s.%(msecs)03d:%(message)s", \
+                level=logging.DEBUG, datefmt="%H:%M:%S")
+    else:
+        logging.basicConfig(filename=log_filename, format="%(asctime)s.%(msecs)03d:%(message)s", \
+                level=logging.INFO, datefmt="%H:%M:%S")
     logging.debug(MODULE_IDENTIFIER + "Starting Log file at " + time.ctime())
 
     qt_args = list()
