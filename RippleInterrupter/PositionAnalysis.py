@@ -155,24 +155,17 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                     print(MODULE_IDENTIFIER + "Warning: Not receiving position data.")
             else:
                 down_time = 0.0
+
             for frame_idx in range(n_available_frames):
                 self._position_consumer.readData(self._data_field)
                 current_timestamp = self._data_field['timestamp']
                 (curr_x_bin, curr_y_bin) = self.getXYBin()
-                # DEBUG - Desparate
-                """
-                logging.debug(MODULE_IDENTIFIER + "Received Position data at %.2f \
-                        (%d,%d)"%(time.time()-thread_start_time, \
-                            self._data_field['position_x'], \
-                            self._data_field['position_y']))
-                """
-
                 if (prev_x_bin < 0):
-                    # First recorded bin!
-                    #self._past_position_buffer.put((self._data_field['timestamp'], curr_bin_id))
                     try:
+                        print(MODULE_IDENTIFIER + 'Writing output buffers [1]...')
                         for outp in self._position_buffer_connections:
                             outp.send((current_timestamp, curr_x_bin, curr_y_bin, 0.0))
+                        print(MODULE_IDENTIFIER + 'Buffers [1] written...')
                     except BrokenPipeError as err:
                         print(MODULE_IDENTIFIER + 'Unable to write to Pipe. Aborting.')
                         print(err)
@@ -196,11 +189,11 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                         last_velocity = (1 - self.__SPEED_SMOOTHING_FACTOR) * real_distance_moved/real_time_spent_in_prev_bin + \
                                 self.__SPEED_SMOOTHING_FACTOR * last_velocity
 
-                    #self._past_position_buffer.put((prev_step_timestamp, prev_bin_id))
-                    
-                    for outp in self._position_buffer_connections:
+                    print(MODULE_IDENTIFIER + 'Writing output buffers [2]...')
+                    for idx, outp in enumerate(self._position_buffer_connections):
+                        print(idx)
                         outp.send((current_timestamp, curr_x_bin, curr_y_bin, last_velocity))
-                    #self._past_position_buffer.put((current_timestamp, x_bin, y_bin))
+                    print(MODULE_IDENTIFIER + 'Buffers [2] written...')
 
                     # Update the total time spent in the bin we were previously in
                     # self._bin_occupancy[prev_x_bin, prev_y_bin] += real_time_spent_in_prev_bin
@@ -224,8 +217,12 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                     real_time_spent_in_prev_bin += self.__MAX_REAL_TIME_JUMP
                     last_velocity = (1 - self.__SPEED_SMOOTHING_FACTOR) * real_distance_moved/real_time_spent_in_prev_bin + \
                             self.__SPEED_SMOOTHING_FACTOR * last_velocity
-                    for outp in self._position_buffer_connections:
+                    print(MODULE_IDENTIFIER + 'Writing output buffers [3]...')
+                    for idx, outp in enumerate(self._position_buffer_connections):
+                        print(idx)
                         outp.send((current_timestamp, curr_x_bin, curr_y_bin, last_velocity))
+                    print(MODULE_IDENTIFIER + 'Buffers [3] written...')
+
                 if self._csv_writer:
                     self._csv_writer.writerow([current_timestamp, self._data_field['position_x'], self._data_field['position_y']])
 

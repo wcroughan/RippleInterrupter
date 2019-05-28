@@ -123,21 +123,23 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
             # a later time but we will keep filling the spikes at the oldest
             # position bin we ever saw. We need to wait for the position thread
             # to catch up.
-            while self._spike_buffer.poll() and not self._has_pf_request:
-                # logging.debug(MODULE_IDENTIFIER + "Main loop rentry.")
-                #note this assumes technically that spikes are in strict chronological order. Although realistically
-                #we can break that assumption since that would only cause the few spikes that come late to be assigned
-                #to the next place bin the animal is in
 
-                #get the next spike
-                (spk_cl, spk_time) = self._spike_buffer.recv()
-                logging.debug(self.CLASS_IDENTIFIER + "Received spike from %d at %d"%(spk_cl, spk_time))
+            # NEW BUG (2019/05/28) - If no spikes are being received (say early
+            # adjusting), spike connection will never be polled, but position
+            # pipe will get filled up, preventing all other processes from
+            # moving ahead.
+            self._spike_buffer.poll() or self._position_buffer.poll()
+            while (self._spike_buffer.poll() or self._position_buffer.poll()) and not self._has_pf_request:
+                # logging.debug(MODULE_IDENTIFIER + "Main loop rentry.")
+                # NOTE: This assumes technically that spikes are in strict
+                # chronological order. Although realistically we can break that
+                # assumption. It would only cause the few spikes that come late
+                # to be assigned to the next place bin the animal is in
 
                 #if it's after our most recent position update, try and read the next position
                 #keep reading positions until our position data is ahead of our spike data
-                while self._position_buffer.poll() and (spk_time >= curr_postime):
+                if self._position_buffer.poll():
                     (curr_postime, curr_posbin_x, curr_posbin_y, curr_speed) = self._position_buffer.recv()
-
                     logging.debug(self.CLASS_IDENTIFIER + "Received new position (%d, %d) at %d"%(curr_posbin_x, curr_posbin_y, curr_postime))
                     
                     # NOTE: We have to do some repeated computation here but
@@ -161,33 +163,39 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                     prev_posbin_y = curr_posbin_y
                     prev_postime  = curr_postime
 
-                #add this spike to spike counts for place bin
+                # Add this spike to spike counts for place bin
                 # print("Spike from cluster %d, in bin (%d, %d)"%(spk_cl, current_posbin_x, current_posbin_y))
                 # print(current_posbin_y)
 
                 if curr_speed > RiD.MOVE_VELOCITY_THRESOLD:
-                    self._nspks_in_bin[spk_cl, curr_posbin_x, curr_posbin_y] += 1
-                    # Send this to the visualization pipeline to see how spike are being reported
-                    if spk_cl in self._requested_clusters:
-                        for pipe_in in self._spike_place_buffer_connections:
-                            pipe_in.send((spk_cl, curr_posbin_x, curr_posbin_y, spk_time))
-                        logging.debug(self.CLASS_IDENTIFIER + "Spike at %d sent out to listeners"%spk_time)
+                    # Get the next spike
+                    while self._spike_buffer.poll():
+                        (spk_cl, spk_time) = self._spike_buffer.recv()
+                        logging.debug(self.CLASS_IDENTIFIER + "Received spike from %d at %d"%(spk_cl, spk_time))
+
+                        self._nspks_in_bin[spk_cl, curr_posbin_x, curr_posbin_y] += 1
+                        # Send this to the visualization pipeline to see how spike are being reported
+                        if spk_cl in self._requested_clusters:
+                            for pipe_in in self._spike_place_buffer_connections:
+                                pipe_in.send((spk_cl, curr_posbin_x, curr_posbin_y, spk_time))
+                            logging.debug(self.CLASS_IDENTIFIER + "Spike at %d sent out to listeners"%spk_time)
+
+                        pf_update_spk_iter += 1
+                        spike_position_lag = float(spk_time) - float(curr_postime)
+                        if (spike_position_lag > self._ALLOWED_TIMESTAMPS_LAG):
+                            logging.info(self.CLASS_IDENTIFIER + "Position lagging spikes by %d timestamps. S.%d, P.%d"%(spike_position_lag, spk_time, curr_postime))
+                            curr_speed = 0
+                            break
+
+                        if self._csv_writer:
+                            self._csv_writer.writerow([spk_cl, spk_time, curr_posbin_x, curr_posbin_y, curr_speed])
                 else:
                     logging.debug(self.CLASS_IDENTIFIER + "Spike at %d skipped, speed %.2fcm/s below threshold"%(spk_time, curr_speed))
-                pf_update_spk_iter += 1
 
                 # If spike timestamp starts leading position timestamps by too
                 # much, wait for position timestamps to catch up. This
                 # basically forces us to check for a new position entry after
                 # each spike has gone by, minimizing incorrect reporting.
-                spike_position_lag = float(spk_time) - float(curr_postime)
-                if (spike_position_lag > self._ALLOWED_TIMESTAMPS_LAG):
-                    logging.info(self.CLASS_IDENTIFIER + "Position lagging spikes by %d timestamps. S.%d, P.%d"%(spike_position_lag, spk_time, curr_postime))
-                    curr_speed = 0
-                    break
-
-                if self._csv_writer:
-                    self._csv_writer.writerow([spk_cl, spk_time, curr_posbin_x, curr_posbin_y, curr_speed])
 
             if pf_update_spk_iter >= update_pf_every_n_spks and not self._has_pf_request:
                 logging.info(MODULE_IDENTIFIER + "Updating place fields. Last spike at %d"%spk_time)

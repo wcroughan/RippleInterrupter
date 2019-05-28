@@ -214,6 +214,7 @@ class CommandWindow(QMainWindow):
             print(err)
             return
         self.setCentralWidget(self.graphical_interface.widget)
+        self.statusBar().showMessage('Connected to SpikeGadgets. Press Ctrl+T to stream.')
 
     def loadClusterFile(self, cluster_filename=None):
         """
@@ -301,6 +302,7 @@ class CommandWindow(QMainWindow):
             self.ripple_trigger.enable()
         else:
             self.ripple_trigger.disable()
+        self.statusBar().showMessage('Streaming!')
 
     def initRippleTriggerThreads(self):
         """
