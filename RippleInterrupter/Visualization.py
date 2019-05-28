@@ -570,8 +570,9 @@ class GraphicsManager(Process):
         self._rd_frame.append(ripple_power_frame)
 
         # Create animation object for showing the EEG
-        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_ripple_detection_frame, frames=np.arange(self.__N_ANIMATION_FRAMES), interval=ANIMATION_INTERVAL, blit=True)
-        print(MODULE_IDENTIFIER + 'Ripple detection frame created!')
+        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_ripple_detection_frame, frames=np.arange(self.__N_ANIMATION_FRAMES), \
+                interval=ANIMATION_INTERVAL, blit=True, repeat=True)
+        logging.info(MODULE_IDENTIFIER + 'Ripple detection frame created!')
         self._anim_objs.append(anim_obj)
 
     def initialize_calib_plot_fig(self):
@@ -587,8 +588,9 @@ class GraphicsManager(Process):
         self._cp_frame.append(spk_cnt_minus_sterr_frame)
 
         # Create animation object for showing the EEG
-        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_calib_plot_frame, frames=self.__N_ANIMATION_FRAMES, interval=ANIMATION_INTERVAL, blit=True)
-        print(MODULE_IDENTIFIER + 'Spike calibration frame created!')
+        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_calib_plot_frame, frames=np.arange(self.__N_ANIMATION_FRAMES), \
+                interval=ANIMATION_INTERVAL, blit=True, repeat=True)
+        logging.info(MODULE_IDENTIFIER + 'Spike calibration frame created!')
         self._anim_objs.append(anim_obj)
 
     def initialize_spike_pos_fig(self):
@@ -603,8 +605,9 @@ class GraphicsManager(Process):
         self._spk_pos_frame.append(pos_frame)
         self._spk_pos_frame.append(vel_frame)
 
-        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_position_and_spike_frame, frames=self.__N_ANIMATION_FRAMES, interval=ANIMATION_INTERVAL, blit=True)
-        print(MODULE_IDENTIFIER + 'Spike-Position frame created!')
+        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_position_and_spike_frame, \
+                frames=np.arange(self.__N_ANIMATION_FRAMES), interval=ANIMATION_INTERVAL, blit=True, repeat=True)
+        logging.info(MODULE_IDENTIFIER + 'Spike-Position frame created!')
         self._anim_objs.append(anim_obj)
 
     def initialize_place_field_fig(self):
@@ -616,8 +619,9 @@ class GraphicsManager(Process):
                 vmax=self.__MAX_FIRING_RATE, animated=True)
         plt.colorbar(pf_heatmap)
         self._pf_frame.append(pf_heatmap)
-        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_place_field_frame, frames=self.__N_ANIMATION_FRAMES, interval=ANIMATION_INTERVAL, blit=True)
-        print(MODULE_IDENTIFIER + 'Place field frame created!')
+        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_place_field_frame, \
+                frames=np.arange(self.__N_ANIMATION_FRAMES), interval=ANIMATION_INTERVAL, blit=True, repeat=True)
+        logging.info(MODULE_IDENTIFIER + 'Place field frame created!')
         self._anim_objs.append(anim_obj)
 
     def run(self):
