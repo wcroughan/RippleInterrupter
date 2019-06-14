@@ -13,6 +13,12 @@ LFP_FILTER_ORDER  = int(LFP_FILTER_LENGTH * LFP_FREQUENCY)
 LFP_BUFFER_TIME   = 0.5
 LFP_BUFFER_LENGTH = int(LFP_FREQUENCY * LFP_BUFFER_TIME) # 1.0s long display window
 
+#calib plot
+CALIB_PLOT_WINDOW_LENGTH = 0.01
+CALIB_PLOT_BUFFER_TIME   = 0.5
+CALIB_PLOT_BUFFER_LENGTH = int(CALIB_PLOT_BUFFER_TIME / CALIB_PLOT_WINDOW_LENGTH)
+CALIB_PLOT_ONLINE_BUFFER_SIZE = 300
+
 # Frequency range for Ripple. Keep in mind that a high range completely gets
 # rid of the sharp wave ripple - It is a little harder to see the filtered
 # ripple events and tell if they were real ripples or not!

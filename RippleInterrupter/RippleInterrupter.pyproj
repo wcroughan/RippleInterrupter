@@ -22,6 +22,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Logger.py" />
+    <Compile Include="CalibrationPlot.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="OnlineInterruption.py" />
     <Compile Include="PositionAnalysis.py" />
     <Compile Include="PositionDecoding.py" />

@@ -1,6 +1,7 @@
 """
 Collect position data from trodes
 """
+import csv
 import threading
 import time
 from copy import copy
@@ -25,10 +26,10 @@ class PositionEstimator(ThreadExtension.StoppableThread):
     """
 
     # Min/Max position values in x and y to be used for binning
-    __P_MIN_X = 200
+    __P_MIN_X = 100
     __P_MIN_Y = -100
-    __P_MAX_X = 1200
-    __P_MAX_Y = 1000
+    __P_MAX_X = 1300
+    __P_MAX_Y = 1100
     __P_BIN_SIZE_X = (__P_MAX_X - __P_MIN_X)
     __P_BIN_SIZE_Y = (__P_MAX_Y - __P_MIN_Y)
     __REAL_BIN_SIZE_X = FIELD_SIZE[0]/__P_BIN_SIZE_X
@@ -38,7 +39,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
     __MAX_REAL_TIME_JUMP = __MAX_TIMESTAMP_JUMP/RiD.SPIKE_SAMPLING_FREQ
 
     #def __init__(self, sg_client, n_bins, past_position_buffer, camera_number=1):
-    def __init__(self, sg_client, n_bins=N_POSITION_BINS, camera_number=1):
+    def __init__(self, sg_client, n_bins=N_POSITION_BINS, camera_number=1, write_position_log=False):
         ThreadExtension.StoppableThread.__init__(self)
         self._data_field = np.ndarray([], dtype=[('timestamp', 'u4'), ('line_segment', 'i4'), \
                 ('position_on_segment', 'f8'), ('position_x', 'i2'), ('position_y', 'i2')])
@@ -61,8 +62,18 @@ class PositionEstimator(ThreadExtension.StoppableThread):
             logging.warning("Failed to open Camera Module")
             raise Exception("Error: Could not connect to camera, aborting.")
         self._position_consumer.initialize()
-        logging.info(MODULE_IDENTIFIER + "Starting Position tracking thread")
+        self._csv_writer = None
+        if write_position_log:
+            csv_filename = time.strftime("position_data_log" + "_%Y%m%d_%H%M%S.csv")
+            try:
+                self._csv_file = open(csv_filename, mode='w')
+                self._csv_writer = csv.writer(self._csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+                self._csv_writer.writerow(['TIMESTAMP', 'POS_X', 'POS_Y'])
+            except Exception as err:
+                logging.critical(MODULE_IDENTIFIER + "Unable to open log file.")
+            print(err)
 
+        logging.info(MODULE_IDENTIFIER + "Starting Position tracking thread")
         self._position_buffer_connections = []
 
     def getPositionBin(self):
@@ -81,6 +92,16 @@ class PositionEstimator(ThreadExtension.StoppableThread):
         x_bin = np.floor_divide(self._n_bins_x * (px - self.__P_MIN_X),self.__P_BIN_SIZE_X)
         # Camera data coming in has flipped Y-coordinates!
         y_bin = np.floor_divide(self._n_bins_y * (self.__P_MAX_Y - py),self.__P_BIN_SIZE_Y)
+
+        if x_bin < 0:
+            x_bin = 0
+        elif x_bin > self._n_bins_x:
+            x_bin = self._n_bins_x-1
+
+        if y_bin < 0:
+            y_bin = 0
+        elif y_bin > self._n_bins_y:
+            y_bin = self._n_bins_y-1
         return (x_bin, y_bin)
 
     """
@@ -134,23 +155,23 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                     print(MODULE_IDENTIFIER + "Warning: Not receiving position data.")
             else:
                 down_time = 0.0
+
             for frame_idx in range(n_available_frames):
                 self._position_consumer.readData(self._data_field)
                 current_timestamp = self._data_field['timestamp']
                 (curr_x_bin, curr_y_bin) = self.getXYBin()
-                # DEBUG - Desparate
-                """
-                logging.debug(MODULE_IDENTIFIER + "Received Position data at %.2f \
-                        (%d,%d)"%(time.time()-thread_start_time, \
-                            self._data_field['position_x'], \
-                            self._data_field['position_y']))
-                """
-
                 if (prev_x_bin < 0):
-                    # First recorded bin!
-                    #self._past_position_buffer.put((self._data_field['timestamp'], curr_bin_id))
-                    for outp in self._position_buffer_connections:
-                        outp.send((current_timestamp, curr_x_bin, curr_y_bin, 0.0))
+                    try:
+                        print(MODULE_IDENTIFIER + 'Writing output buffers [1]...')
+                        for outp in self._position_buffer_connections:
+                            outp.send((current_timestamp, curr_x_bin, curr_y_bin, 0.0))
+                        print(MODULE_IDENTIFIER + 'Buffers [1] written...')
+                    except BrokenPipeError as err:
+                        print(MODULE_IDENTIFIER + 'Unable to write to Pipe. Aborting.')
+                        print(err)
+                        print(self._position_buffer_connections)
+                        break
+
                     prev_x_bin = curr_x_bin
                     prev_y_bin = curr_y_bin
                     logging.info(MODULE_IDENTIFIER + "Position Started (%d, %d)"%(curr_x_bin, curr_y_bin))
@@ -168,11 +189,8 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                         last_velocity = (1 - self.__SPEED_SMOOTHING_FACTOR) * real_distance_moved/real_time_spent_in_prev_bin + \
                                 self.__SPEED_SMOOTHING_FACTOR * last_velocity
 
-                    #self._past_position_buffer.put((prev_step_timestamp, prev_bin_id))
-                    
                     for outp in self._position_buffer_connections:
                         outp.send((current_timestamp, curr_x_bin, curr_y_bin, last_velocity))
-                    #self._past_position_buffer.put((current_timestamp, x_bin, y_bin))
 
                     # Update the total time spent in the bin we were previously in
                     # self._bin_occupancy[prev_x_bin, prev_y_bin] += real_time_spent_in_prev_bin
@@ -198,6 +216,12 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                             self.__SPEED_SMOOTHING_FACTOR * last_velocity
                     for outp in self._position_buffer_connections:
                         outp.send((current_timestamp, curr_x_bin, curr_y_bin, last_velocity))
+
+                if self._csv_writer:
+                    self._csv_writer.writerow([current_timestamp, self._data_field['position_x'], self._data_field['position_y']])
+
+        if self._csv_writer:
+            self._csv_file.close()
 
         if __debug__:
             code_profiler.disable()

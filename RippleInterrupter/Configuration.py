@@ -17,9 +17,12 @@ from tkinter import Tk, filedialog
 import xml.etree.ElementTree as ET
 
 DEFAULT_CONFIG_FILE='config/default.ini'
-MODULE_IDENTIFIER="[CONFIGURATION] "
+MODULE_IDENTIFIER="[Configuration] "
+EXPERIMENT_DAY_20190307__INTERESTING_CLUSTERS_A = [1, 2, 25, 30, 32, 59]
+EXPERIMENT_DAY_20190307__INTERESTING_CLUSTERS_B = [16, 34, 39, 43, 56]
+EXPERIMENT_DAY_20190307__ALL_INTERESTING_CLUSTERS = [1, 2, 16, 25, 30, 32, 34, 39, 43, 56, 59]
 
-def readClusterFile(filename=None, tetrodes=None):
+def read_cluster_file(filename=None, tetrodes=None):
     """
     Reads a cluster file and generates a list of tetrodes that have cells and
     all the clusters on that tetrode.
@@ -31,17 +34,21 @@ def readClusterFile(filename=None, tetrodes=None):
     if filename is None:
         gui_root = Tk()
         gui_root.wm_withdraw()
-        filename = filedialog.askopenfilename(initialdir = os.getcwd(), title = "Select Cluster file",filetypes = (("cluster files","*.trodesClusters"),("all files","*.*")))
+        filename = filedialog.askopenfilename(initialdir=os.getcwd(), title="Select Cluster file", \
+                filetypes=(("cluster files", "*.trodesClusters"), ("all files", "*.*")))
         gui_root.destroy()
 
     try:
         cluster_tree = ET.parse(filename)
-    except Exception as err:
+    except (FileNotFoundError, IOError) as err:
         print(err)
-        return
+        return (0, {})
+
+    if __debug__:
+        print(MODULE_IDENTIFIER, 'Read cluster file ' + filename)
 
     # The file is organized as:
-    # [ROOT] SpikeSortInfo 
+    # [ROOT] SpikeSortInfo
     #       -> PolygonClusters
     #           -> ntrode (nTrodeID)
     #               -> cluster (clusterIndex)
@@ -52,13 +59,17 @@ def readClusterFile(filename=None, tetrodes=None):
     tree_root = cluster_tree.getroot()
     polygon_clusters = tree_root.getchildren()[0]
     ntrode_list = list(polygon_clusters)
-
     if tetrodes is None:
-        tetrodes = range(1,1+len(ntrode_list))
+        tetrodes = range(1, 1+len(ntrode_list))
 
-    for ti in tetrodes:
+    if __debug__:
+        print(MODULE_IDENTIFIER + '%d tetrode(s) in cluster file.'%len(tetrodes))
+        print(tetrodes)
+
+    for t_i in tetrodes:
         # Offset by 1 because Trodes tetrodes start with 1!
-        ntrode = ntrode_list[ti-1]
+        ntrode = ntrode_list[t_i-1]
+        n_clusters_on_ntrode = 0
         tetrode_idx = ntrode.get('nTrodeIndex')
         if len(list(ntrode)) == 0:
             # Has no clusters on it
@@ -71,10 +82,13 @@ def readClusterFile(filename=None, tetrodes=None):
             local_cluster_idx = cluster.get('clusterIndex')
             cluster_idx_to_id_map[int(local_cluster_idx)] = raw_cluster_idx
             raw_cluster_idx += 1
-        n_trode_to_cluster_idx_map[ti] = cluster_idx_to_id_map
+            n_clusters_on_ntrode += 1
+        n_trode_to_cluster_idx_map[t_i] = cluster_idx_to_id_map
+        if n_clusters_on_ntrode == 0:
+            n_trode_to_cluster_idx_map.pop(ntrode, None)
 
     # Final value of raw_cluster_idx is a proxy for the total number of units we have
-    logging.debug(MODULE_IDENTIFIER + "Cluster map... \n", n_trode_to_cluster_idx_map)
+    logging.info(MODULE_IDENTIFIER + "Cluster map...\n%s"% n_trode_to_cluster_idx_map)
     return raw_cluster_idx, n_trode_to_cluster_idx_map
 
 def get_open_field_configuration(filename=None):
@@ -84,11 +98,23 @@ def get_open_field_configuration(filename=None):
     if filename is None:
         gui_root = Tk()
         gui_root.wm_withdraw()
-        filename = filedialog.askopenfilename(initialdir = os.getcwd(), title = "Select Cluster file",filetypes = (("cluster files","*.trodesClusters"),("all files","*.*")))
+        filename = filedialog.askopenfilename(initialdir=os.getcwd(), title="Select Cluster file", \
+                filetypes=(("cluster files", "*.trodesClusters"), ("all files", "*.*")))
+        gui_root.destroy()
 
     configuration = configparser.ConfigParser()
     try:
         configuration.read(filename)
-    except Exception as err:
+    except (FileNotFoundError, IOError) as err:
         print('Unable to read configuration file %s. Using defaults.'%filename)
+        print(err)
         configuration.read(DEFAULT_CONFIG_FILE)
+
+class Config(object):
+
+    """
+    Get the configuration for running ripple/replay interruption
+    """
+
+    def __init__(self):
+        """TODO: to be defined1. """

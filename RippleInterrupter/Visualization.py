@@ -2,26 +2,39 @@
 Visualization of various measures
 """
 
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-import matplotlib.cm as colormap
-from matplotlib.ticker import PercentFormatter
-from mpl_toolkits.mplot3d import Axes3D
 from collections import deque
 from multiprocessing import Process, Event
 import tkinter
 import time
+import numpy as np
 from datetime import datetime
 import threading
 import logging
-import numpy as np
+
+# Matplotlib in Qt5
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.figure import Figure
+from matplotlib import gridspec
+from matplotlib.ticker import PercentFormatter
+import matplotlib.pyplot as plt
+import matplotlib.cm as colormap
+import matplotlib.animation as animation
+
+# Creating windows using PyQt
+from PyQt5.QtWidgets import QMainWindow, QAction, qApp, QApplication, QDialog, QFileDialog, QMessageBox
+from PyQt5.QtWidgets import QPushButton, QSlider, QRadioButton, QLabel, QInputDialog
+from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QGridLayout, QComboBox
+from PyQt5.QtCore import QThread, pyqtSignal
 
 # Local Imports
+import Configuration
 import RippleAnalysis
 import PositionAnalysis
 import RippleDefinitions as RiD
 
 MODULE_IDENTIFIER = "[GraphicsHandler] "
+ANIMATION_INTERVAL = 20
 
 def normalizeData(in_data):
     # TODO: Might need tiling of data if there are multiple dimensions
@@ -150,14 +163,17 @@ class GraphicsManager(Process):
 
     __N_POSITION_ELEMENTS_TO_PLOT = 100
     __N_SPIKES_TO_PLOT = 2000
-    __N_ANIMATION_FRAMES = 5000
+    __N_ANIMATION_FRAMES = 50000
     __PLACE_FIELD_REFRESH_RATE = 1
+    __PLOT_REFRESH_RATE = 0.05
     __PEAK_LFP_AMPLITUDE = 3000
-    __CLUSTERS_TO_PLOT = [1]
-    __MAX_FIRING_RATE = 100
+    __CLUSTERS_TO_PLOT = Configuration.EXPERIMENT_DAY_20190307__ALL_INTERESTING_CLUSTERS
+    __N_SUBPLOT_COLS = int(3)
+    __N_SUBPLOT_ROWS = int(1)
+    __MAX_FIRING_RATE = 40.0
     __RIPPLE_DETECTION_TIMEOUT = 1.0
-    def __init__(self, ripple_buffers, spike_listener, position_estimator, \
-            place_field_handler, ripple_trigger_thread, ripple_trigger_condition, \
+    def __init__(self, ripple_buffers, calib_plot_buffers, spike_listener, position_estimator, \
+            place_field_handler, ripple_trigger_thread, ripple_trigger_condition, calib_trigger_condition, \
             shared_place_fields, clusters=None):
         """
         Graphical Manager for all the processes
@@ -171,13 +187,36 @@ class GraphicsManager(Process):
         Process.__init__(self)
 
         # Graphics windows
-        self._command_window = tkinter.Tk()
-        tkinter.Label(self._command_window, text="Enter command to execute...").pack()
-        self._key_entry = tkinter.Entry(self._command_window)
-        self._key_entry.bind("<Return>", self.process_command)
-        self._key_entry.pack()
-        exit_button = tkinter.Button(self._command_window, text='Quit', command=self.kill_gui)
-        exit_button.pack()
+        self.widget  = QDialog()
+        self.figure  = Figure(figsize=(12,16))
+        self.canvas  = FigureCanvas(self.figure)
+        plot_grid    = gridspec.GridSpec(2, 2)
+        self.toolbar = NavigationToolbar(self.canvas, self.widget)
+        self._rd_ax = self.figure.add_subplot(plot_grid[0])
+        self._pf_ax = self.figure.add_subplot(plot_grid[1])
+        self._cp_ax = self.figure.add_subplot(plot_grid[3])
+
+        # This is tricky because right now we are using this as an array to
+        # store multiple axes, each plotting a different unit.
+        self._spk_pos_ax = self.figure.add_subplot(plot_grid[2])
+
+        # Selecting individual units
+        self.unit_selection = QComboBox()
+        # self.unit_selection.currentIndexChanged.connect(self.refresh)
+        # Add next and prev buttons to look at individual cells.
+        self.next_unit_button = QPushButton('Next')
+        self.next_unit_button.clicked.connect(self.NextUnit)
+        self.prev_unit_button = QPushButton('Prev')
+        self.prev_unit_button.clicked.connect(self.PrevUnit)
+
+        # Selecting individual tetrodes
+        self.tetrode_selection = QComboBox()
+        # self.tetrode_selection.currentIndexChanged.connect(self.refresh)
+        # Add next and prev buttons to look at individual cells.
+        self.next_tet_button = QPushButton('Next')
+        self.next_tet_button.clicked.connect(self.NextTetrode)
+        self.prev_tet_button = QPushButton('Prev')
+        self.prev_tet_button.clicked.connect(self.PrevTetrode)
 
         self._keep_running = Event()
         self._spike_listener = spike_listener
@@ -185,9 +224,12 @@ class GraphicsManager(Process):
         self._place_field_handler = place_field_handler
         self._ripple_trigger_thread = ripple_trigger_thread
         self._ripple_trigger_condition = ripple_trigger_condition
+        self._calib_trigger_condition = calib_trigger_condition
         if clusters is None:
-            self._n_clusters = self._spike_listener.get_n_clusters()
-            self._clusters = range(self._n_clusters)
+            self._n_total_clusters = self._spike_listener.get_n_clusters()
+            # These are the clusters we are going to plot
+            self._n_clusters = len(self.__CLUSTERS_TO_PLOT)
+            self._clusters = self.__CLUSTERS_TO_PLOT
             self._tetrodes = self._spike_listener.get_tetrodes()
             self._n_tetrodes = len(self._tetrodes)
         else:
@@ -198,67 +240,161 @@ class GraphicsManager(Process):
         self._cluster_colormap = colormap.magma(np.linspace(0, 1, self._n_clusters))
 
         # Large arrays that are shared across processes
-        self._new_ripple_frame_availale = threading.Event()
         self._shared_raw_lfp_buffer = np.reshape(np.frombuffer(ripple_buffers[0], dtype='double'), (self._n_tetrodes, RiD.LFP_BUFFER_LENGTH))
         self._shared_ripple_power_buffer = np.reshape(np.frombuffer(ripple_buffers[1], dtype='double'), (self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH))
-        self._shared_place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), (self._n_clusters, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
+        self._shared_place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), (self._n_total_clusters, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
+
+        self._calib_lock = threading.Lock()
+        self._shared_calib_plot_means = np.reshape(np.frombuffer(calib_plot_buffers[0], dtype='double'), (RiD.CALIB_PLOT_BUFFER_LENGTH))
+        self._shared_calib_plot_std_errs = np.reshape(np.frombuffer(calib_plot_buffers[1], dtype='double'), (RiD.CALIB_PLOT_BUFFER_LENGTH))
 
         # Local copies of the shared data that can be used at a leisurely pace
+        self._lfp_lock = threading.Lock()
         self._lfp_tpts = np.linspace(0, RiD.LFP_BUFFER_TIME, RiD.LFP_BUFFER_LENGTH)
         self._ripple_power_tpts = np.linspace(0, RiD.LFP_BUFFER_TIME, RiD.RIPPLE_POWER_BUFFER_LENGTH)
         self._local_lfp_buffer = np.zeros((self._n_tetrodes, RiD.LFP_BUFFER_LENGTH), dtype='double')
         self._local_ripple_power_buffer = np.zeros((self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH), dtype='double')
+
+        self._pf_lock = threading.Lock()
         self._most_recent_pf = np.zeros((PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]), \
                 dtype='float')
 
+        self._spk_cnt_tpts = np.linspace(0, RiD.CALIB_PLOT_BUFFER_TIME, RiD.CALIB_PLOT_BUFFER_LENGTH)
+        self._local_spk_cnt_buffer = np.zeros((RiD.CALIB_PLOT_BUFFER_LENGTH), dtype='double')
+        self._local_spk_cnt_stderr_buffer = np.zeros((RiD.CALIB_PLOT_BUFFER_LENGTH), dtype='double')
+
         # Automatically keep only a fixed number of entries in this buffer... Useful for plotting
         self._pos_timestamps = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
+        self._pos_lock = threading.Lock()
         self._pos_x = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._pos_y = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
         self._speed = deque([], self.__N_POSITION_ELEMENTS_TO_PLOT)
-        self._spk_clusters = deque([], self.__N_SPIKES_TO_PLOT)
-        self._spk_timestamps = deque([], self.__N_SPIKES_TO_PLOT)
-        self._spk_pos_x = deque([], self.__N_SPIKES_TO_PLOT)
-        self._spk_pos_y = deque([], self.__N_SPIKES_TO_PLOT)
+
+        # Maintain a separate deque for each cluster to plot
+        self._spike_lock = threading.Lock()
+        self._spk_pos_x = []
+        self._spk_pos_y = []
+        for cl_idx in range(self._n_clusters):
+            self._spk_pos_x.append(deque([], self.__N_SPIKES_TO_PLOT))
+            self._spk_pos_y.append(deque([], self.__N_SPIKES_TO_PLOT))
 
         # Figure/Animation element. So far the following have been included
         # Ripple detection
         # Place Fields
         # Position/Spikes overalaid
-        self._rd_fig = None
-        self._pf_fig = None
-        self._pos_fig = None
-        self._rd_ax = None
-        self._pf_ax = None
-        self._spk_pos_ax = None
-        self._rd_frame = []
-        self._spk_pos_frame = []
-        self._pf_frame = []
-        self._anim_objs = []
-        self._thread_list = []
+        self.__N_SUBPLOT_ROWS = int(np.ceil((self._n_clusters/self.__N_SUBPLOT_COLS)))
+        self._rd_frame = list()
+        self._spk_pos_frame = list()
+        self._pf_frame = list()
+        self._cp_frame = list()
+        self._anim_objs = list()
+        self._thread_list = list()
 
         # Communication buffers
         self._position_buffer = self._position_estimator.get_position_buffer_connection()
         self._spike_buffer = self._place_field_handler.get_spike_place_buffer_connection(self.__CLUSTERS_TO_PLOT)
-        logging.info(MODULE_IDENTIFIER + "Graphics interface started.")
-    
-    def kill_gui(self):
-        self._command_window.quit()
-        try:
-            plt.close(self._pos_fig)
-            plt.close(self._pf_fig)
-            plt.close(self._rd_fig)
-        except Exception as err:
-            logging.warning(MODULE_IDENTIFIER + "Error closing figure window")
-            print(err)
-        finally:
-            # Clean up
-            del self._pf_fig
-            del self._pos_fig
-            del self._anim_objs
-        self._command_window.destroy()
-        self._keep_running.clear()
 
+        # Launch a thread for fetching position data constantly
+        # Add options to only start some of these threads
+        self._thread_list = list()
+        self._thread_list.append(threading.Thread(name="PositionFetcher", daemon=True, \
+                target=self.fetch_position_and_update_frames))
+        self._thread_list.append(threading.Thread(name="SpikeFetcher", daemon=True, \
+                target=self.fetch_spikes_and_update_frames))
+        self._thread_list.append(threading.Thread(name="PlaceFieldFetched", daemon=True, \
+                target=self.fetch_place_fields))
+        self._thread_list.append(threading.Thread(name="RippleFrameFetcher", daemon=True, \
+                target=self.fetch_incident_ripple))
+        self._thread_list.append(threading.Thread(name="CalibPlotFetcher", daemon=True, \
+                target=self.fetch_calibration_plot))
+
+        # Create thread locks to update arrays that are being read for updating frames.
+
+        logging.info(MODULE_IDENTIFIER + "Graphics interface started.")
+        self.setLayout()
+        self.clearAxes()
+
+        # Start the animation for Spike-Position figure, place field figure
+        self.initialize_ripple_detection_fig()
+        self.initialize_calib_plot_fig()
+        self.initialize_spike_pos_fig()
+        self.initialize_place_field_fig()
+        self.pauseAnimation()
+        self._keep_running.set()
+        for p__thread in self._thread_list:
+            p__thread.start()
+
+        print(MODULE_IDENTIFIER + 'Animation plots initialized.')
+
+
+    def setLayout(self):
+        parent_layout_box = QVBoxLayout()
+        parent_layout_box.addWidget(self.toolbar)
+        parent_layout_box.addWidget(self.canvas)
+        parent_layout_box.addStretch(1)
+
+        # Controls for looking at individual units
+        vbox_unit_buttons = QVBoxLayout()
+        vbox_unit_buttons.addWidget(self.unit_selection)
+        vbox_unit_buttons.addWidget(self.next_unit_button)
+        vbox_unit_buttons.addWidget(self.prev_unit_button)
+        vbox_unit_buttons.addWidget(self.tetrode_selection)
+        vbox_unit_buttons.addWidget(self.next_tet_button)
+        vbox_unit_buttons.addWidget(self.prev_tet_button)
+        vbox_unit_buttons.addStretch(1)
+        parent_layout_box.addLayout(vbox_unit_buttons)
+        QDialog.setLayout(self.widget, parent_layout_box)
+
+    def NextUnit(self):
+        QtHelperUtils.display_warning('Function not implemented!')
+
+    def PrevUnit(self):
+        QtHelperUtils.display_warning('Function not implemented!')
+
+    def NextTetrode(self):
+        QtHelperUtils.display_warning('Function not implemented!')
+
+    def PrevTetrode(self):
+        QtHelperUtils.display_warning('Function not implemented!')
+
+    def clearAxes(self):
+        # Ripple detection axis
+        self._rd_ax.cla()
+        self._rd_ax.set_xlabel("Time (s)")
+        self._rd_ax.set_ylabel("EEG (uV)")
+        self._rd_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
+        self._rd_ax.set_ylim((-1.0, 1.0))
+        self._rd_ax.grid(True)
+
+        # Calibration plot
+        self._cp_ax.cla()
+        self._cp_ax.set_xlabel("Time (s)")
+        self._cp_ax.set_ylabel("Spike Rate (spks/5ms)")
+        self._cp_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
+        self._cp_ax.set_ylim((0.0, 20.0))
+        self._cp_ax.grid(True)
+
+        # Place field
+        self._pf_ax.cla()
+        self._pf_ax.set_xlabel("x (bin)")
+        self._pf_ax.set_ylabel("y (bin)")
+        self._pf_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
+        self._pf_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
+        self._pf_ax.grid(True)
+
+        # Spikes (from a single cell) and position
+        self._spk_pos_ax.cla()
+        self._spk_pos_ax.set_xlabel("x (bin)")
+        self._spk_pos_ax.set_ylabel("y (bin)")
+        self._spk_pos_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
+        self._spk_pos_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
+        self._spk_pos_ax.grid(True)
+
+        self.canvas.draw()
+
+    def kill_gui(self):
+        self._keep_running.clear()
+        
     def update_ripple_detection_frame(self, step=0):
         """
         Function used to show a ripple frame whenever a ripple is trigerred.
@@ -269,25 +405,41 @@ class GraphicsManager(Process):
         # NOTE: This call blocks access to ripple_trigger_condition for
         # __RIPPLE_DETECTION_TIMEOUT, which could be a long while. Don't let
         # this block any important functionality.
-        if self._rd_ax is not None:
+        with self._lfp_lock:
             self._rd_frame[0].set_data(self._lfp_tpts, self._local_lfp_buffer[0,:]/self.__PEAK_LFP_AMPLITUDE)
-            self._rd_frame[1].set_data(self._ripple_power_tpts, -0.5 + (self._local_ripple_power_buffer[0,:] - RippleAnalysis.D_MEAN_RIPPLE_POWER)/(2 * RippleAnalysis.D_STD_RIPPLE_POWER * RiD.RIPPLE_POWER_THRESHOLD))
-            return self._rd_frame
+            self._rd_frame[1].set_data(self._ripple_power_tpts, -0.5 + (self._local_ripple_power_buffer[0,:] \
+                    - RippleAnalysis.D_MEAN_RIPPLE_POWER)/(2 * RippleAnalysis.D_STD_RIPPLE_POWER * RiD.RIPPLE_POWER_THRESHOLD))
+        return self._rd_frame
+
+    def update_calib_plot_frame(self, step=0):
+        """
+        Function used to show a ripple frame whenever a ripple is trigerred.
+        This is a little different from the other frame update functions as it
+        does not continuously update the frame but only when a ripple is triggerred.
+        """
+        
+        # NOTE: This call blocks access to ripple_trigger_condition for
+        # __RIPPLE_DETECTION_TIMEOUT, which could be a long while. Don't let
+        # this block any important functionality.
+        with self._calib_lock:
+            self._cp_frame[0].set_data(self._spk_cnt_tpts, self._local_spk_cnt_buffer)
+            self._cp_frame[1].set_data(self._spk_cnt_tpts, self._local_spk_cnt_buffer + self._local_spk_cnt_stderr_buffer)
+            self._cp_frame[2].set_data(self._spk_cnt_tpts, self._local_spk_cnt_buffer - self._local_spk_cnt_stderr_buffer)
+        return self._cp_frame
 
     def update_position_and_spike_frame(self, step=0):
         """
         Function used for animating the current position of the animal.
         """
-        if  self._spk_pos_ax is not None:
-            # print(self._pos_x)
-            # print(self._pos_y)
-            # TODO: Add colors based on which cluster the spikes are coming from
-            self._spk_pos_frame[0].set_data((self._spk_pos_x, self._spk_pos_y))
-            # self._spk_pos_frame[0].set_color(self._spk_clusters)
-            self._spk_pos_frame[1].set_data((self._pos_x, self._pos_y))
+        cl_idx = max(self.unit_selection.currentIndex(), 0)
+        with self._spike_lock:
+            self._spk_pos_frame[0].set_data((self._spk_pos_x[cl_idx], self._spk_pos_y[cl_idx]))
+
+        with self._pos_lock:
+            self._spk_pos_frame[-2].set_data((self._pos_x, self._pos_y))
             if len(self._speed) > 0:
-                self._spk_pos_frame[2].set_text('speed = %.2fcm/s'%self._speed[-1])
-            return self._spk_pos_frame
+                self._spk_pos_frame[-1].set_text('speed = %.2fcm/s'%self._speed[-1])
+        return self._spk_pos_frame
 
     def update_place_field_frame(self, step=0):
         """
@@ -297,143 +449,179 @@ class GraphicsManager(Process):
         :step: Animation iteration
         :returns: Animation frames to be plotted.
         """
-        if self._pf_ax is not None:
-            # print("Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._most_recent_pf), np.mean(self._most_recent_pf)))
-            # min_fr = np.min(self._most_recent_pf)
-            # max_fr = np.max(self._most_recent_pf)
+        # print("Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._most_recent_pf), np.mean(self._most_recent_pf)))
+        # min_fr = np.min(self._most_recent_pf)
+        # max_fr = np.max(self._most_recent_pf)
+        with self._pf_lock:
             self._pf_frame[0].set_array(self._most_recent_pf.T)
-            return self._pf_frame
-
+        return self._pf_frame
+        
     def fetch_incident_ripple(self):
         """
         Fetch raw LFP data and ripple power data.
         """
+        logging.info(MODULE_IDENTIFIER + "Ripple frame pipe opened.")
         while self._keep_running.is_set():
             with self._ripple_trigger_condition:
                 ripple_triggered = self._ripple_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
 
             if ripple_triggered:
-                np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
-                np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
+                with self._lfp_lock:
+                    np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
+                    np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
                 # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
+            else:
+                time.sleep(self.__RIPPLE_DETECTION_TIMEOUT)
         logging.info(MODULE_IDENTIFIER + "Ripple frame pipe closed.")
+
+    def fetch_calibration_plot(self):
+        """
+        Fetch raw LFP data and ripple power data.
+        """
+        logging.info(MODULE_IDENTIFIER + "Calibration pipe opened.")
+        while self._keep_running.is_set():
+            with self._calib_trigger_condition:
+                ripple_triggered = self._calib_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
+
+            if ripple_triggered:
+                with self._calib_lock:
+                    np.copyto(self._local_spk_cnt_buffer, self._shared_calib_plot_means)
+                    np.copyto(self._local_spk_cnt_stderr_buffer, self._shared_calib_plot_std_errs)
+            else:
+                time.sleep(self.__RIPPLE_DETECTION_TIMEOUT)
+        logging.info(MODULE_IDENTIFIER + "Calibration pipe closed.")
 
     def fetch_place_fields(self):
         """
         Fetch place field data from place field handler.
         """
+        logging.info(MODULE_IDENTIFIER + "Place Field pipe opened.")
         while self._keep_running.is_set():
             time.sleep(self.__PLACE_FIELD_REFRESH_RATE)
             # Request place field handler to pause place field calculation
             # while we fetch the data
             self._place_field_handler.submit_immediate_request()
             # np.copyto(self._most_recent_pf, self._shared_place_fields[self.__CLUSTERS_TO_PLOT[0], :, :])
-            np.mean(self._shared_place_fields, out=self._most_recent_pf, axis=0)
-            # logging.debug(MODULE_IDENTIFIER + "Fetched place fields. Peak FR: %.2f, Mean FR: %.2f"%\
-            #         (np.max(self._shared_place_fields), np.mean(self._shared_place_fields)))
+            with self._pf_lock:
+                np.mean(self._shared_place_fields, out=self._most_recent_pf, axis=0)
             # Release the request that paused place field computation
             self._place_field_handler.end_immediate_request()
         logging.info(MODULE_IDENTIFIER + "Place Field pipe closed.")
 
     def fetch_spikes_and_update_frames(self):
+        logging.info(MODULE_IDENTIFIER + "Spike pipe opened.")
         while self._keep_running.is_set():
             if self._spike_buffer.poll():
                 spike_data = self._spike_buffer.recv()
-                # TODO: collect all spikes for a cluster
-                if spike_data[0] in self.__CLUSTERS_TO_PLOT:
-                    self._spk_pos_x.append(spike_data[1])
-                    self._spk_pos_y.append(spike_data[2])
-                    self._spk_timestamps.append(spike_data[3])
-                # logging.debug(MODULE_IDENTIFIER + "Fetched spike from cluster: %d, in bin (%d, %d). TS: %d"%spike_data)
+                # TODO: This is a little inefficient. For every spike we get,
+                # we check to see if it is in the clusters of interest and then
+                # find its  
+                if spike_data[0] in self._clusters:
+                    data_idx = self._clusters.index(spike_data[0])
+                    with self._spike_lock:
+                        self._spk_pos_x[data_idx].append(spike_data[1])
+                        self._spk_pos_y[data_idx].append(spike_data[2])
+                logging.debug(MODULE_IDENTIFIER + "Fetched spike from cluster: %d, in bin (%d, %d). TS: %d"%spike_data)
+            else:
+                time.sleep(self.__PLOT_REFRESH_RATE)
         logging.info(MODULE_IDENTIFIER + "Spike pipe closed.")
 
     def fetch_position_and_update_frames(self):
+        logging.info(MODULE_IDENTIFIER + "Position pipe opened.")
         while self._keep_running.is_set():
             if self._position_buffer.poll():
                 position_data = self._position_buffer.recv()
-                self._pos_timestamps.append(position_data[0])
-                self._pos_x.append(position_data[1])
-                self._pos_y.append(position_data[2])
-                self._speed.append(position_data[3])
-                # logging.debug(MODULE_IDENTIFIER + "Fetched Position data... (%d, %d), v: %.2fcm/s"% \
-                #       (position_data[1],position_data[2], position_data[3]))
+                with self._pos_lock:
+                    self._pos_timestamps.append(position_data[0])
+                    self._pos_x.append(position_data[1])
+                    self._pos_y.append(position_data[2])
+                    self._speed.append(position_data[3])
+                # print(self)
+                # print(self._pos_x)
+                # print(self._pos_y)
+                logging.debug(MODULE_IDENTIFIER + "Fetched Position data... (%d, %d), v: %.2fcm/s"% \
+                      (position_data[1],position_data[2], position_data[3]))
+            else:
+                time.sleep(self.__PLOT_REFRESH_RATE)
         logging.info(MODULE_IDENTIFIER + "Position pipe closed.")
 
-    def process_command(self, key_in):
-        user_input = self._key_entry.get()
-        if user_input == 's':
-            print('Pausing ripple interruption.')
-            self._ripple_trigger_thread.disable()
-        elif user_input == 'r':
-            print('Resuming ripple interruption.')
-            self._ripple_trigger_thread.enable()
-        self._key_entry.delete(0, tkinter.END)
-        pass
+    def pauseAnimation(self):
+        """
+        Pause all animation sources.
+        """
+        for ao in self._anim_objs:
+            ao.event_source.stop()
+    
+    def playAnimation(self):
+        """
+        Play all animation sources.
+        """
+        for ao in self._anim_objs:
+            ao.event_source.start()
 
     def initialize_ripple_detection_fig(self):
         """
         Initialize figure window for showing raw LFP and ripple power.
         :returns: TODO
         """
-        self._rd_fig = plt.figure()
-        self._rd_ax = plt.axes()
-        self._rd_ax.set_xlabel("Time (s)")
-        self._rd_ax.set_ylabel("EEG (uV)")
-        self._rd_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
-        self._rd_ax.set_ylim((-1.0, 1.0))
-        self._rd_ax.grid(True)
-
-        lfp_frame, = plt.plot([], [], animated=True)
-        ripple_power_frame, = plt.plot([], [], animated=True)
+        lfp_frame, = self._rd_ax.plot([], [], animated=True)
+        ripple_power_frame, = self._rd_ax.plot([], [], animated=True)
         self._rd_frame.append(lfp_frame)
         self._rd_frame.append(ripple_power_frame)
 
         # Create animation object for showing the EEG
-        anim_obj = animation.FuncAnimation(self._rd_fig, self.update_ripple_detection_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
+        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_ripple_detection_frame, frames=np.arange(self.__N_ANIMATION_FRAMES), \
+                interval=ANIMATION_INTERVAL, blit=True, repeat=True)
+        logging.info(MODULE_IDENTIFIER + 'Ripple detection frame created!')
+        self._anim_objs.append(anim_obj)
+
+    def initialize_calib_plot_fig(self):
+        """
+        Initialize figure window for showing raw LFP and ripple power.
+        :returns: TODO
+        """
+        spk_cnt_frame, = self._cp_ax.plot([], [], animated=True)
+        spk_cnt_plus_sterr_frame, = self._cp_ax.plot([], [], animated=True)
+        spk_cnt_minus_sterr_frame, = self._cp_ax.plot([], [], animated=True)
+        self._cp_frame.append(spk_cnt_frame)
+        self._cp_frame.append(spk_cnt_plus_sterr_frame)
+        self._cp_frame.append(spk_cnt_minus_sterr_frame)
+
+        # Create animation object for showing the EEG
+        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_calib_plot_frame, frames=np.arange(self.__N_ANIMATION_FRAMES), \
+                interval=ANIMATION_INTERVAL, blit=True, repeat=True)
+        logging.info(MODULE_IDENTIFIER + 'Spike calibration frame created!')
         self._anim_objs.append(anim_obj)
 
     def initialize_spike_pos_fig(self):
         """
         Initialize figure window for showing spikes overlaid on position
         """
-        self._pos_fig = plt.figure()
-        self._spk_pos_ax  = plt.axes()
-        self._spk_pos_ax.set_xlabel("x (bin)")
-        self._spk_pos_ax.set_ylabel("y (bin)")
-        self._spk_pos_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
-        self._spk_pos_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
-        self._spk_pos_ax.grid(True)
-
-        # Create graphics entries for the actual position and also each of the spike clusters
-        pos_frame, = plt.plot([], [], animated=True)
-        spk_frame, = plt.plot([], [], linestyle='None', marker='o', alpha=0.4, animated=True)
-        # vel_frame  = plt.text(30.0, 10.0, 'speed = 0 cm/s', transform=self._spk_pos_ax.transAxes)
-        vel_frame  = plt.text(40.0, 2.0, 'speed = 0cm/s')
+        # TODO: Deal with this to only plot spikes from the unit we are interested in.
+        spk_frame, = self._spk_pos_ax.plot([], [], linestyle='None', marker='o', alpha=0.4, animated=True)
+        pos_frame, = self._spk_pos_ax.plot([], [], animated=True)
+        vel_frame  = self._spk_pos_ax.text(40.0, 2.0, 'speed = 0cm/s')
         self._spk_pos_frame.append(spk_frame)
         self._spk_pos_frame.append(pos_frame)
         self._spk_pos_frame.append(vel_frame)
 
-        anim_obj = animation.FuncAnimation(self._pos_fig, self.update_position_and_spike_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
+        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_position_and_spike_frame, \
+                frames=np.arange(self.__N_ANIMATION_FRAMES), interval=ANIMATION_INTERVAL, blit=True, repeat=True)
+        logging.info(MODULE_IDENTIFIER + 'Spike-Position frame created!')
         self._anim_objs.append(anim_obj)
 
     def initialize_place_field_fig(self):
         """
         Initialize figure window for dynamically showing place fields.
         """
-        self._pf_fig = plt.figure()
-        self._pf_ax = plt.axes()
-        self._pf_ax.set_xlabel("x (bin)")
-        self._pf_ax.set_ylabel("y (bin)")
-        self._pf_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
-        self._pf_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
-        self._pf_ax.grid(True)
-
         pf_heatmap = self._pf_ax.imshow(np.zeros((PositionAnalysis.N_POSITION_BINS[0], \
                 PositionAnalysis.N_POSITION_BINS[1]), dtype='float'), vmin=0, \
                 vmax=self.__MAX_FIRING_RATE, animated=True)
         plt.colorbar(pf_heatmap)
         self._pf_frame.append(pf_heatmap)
-        anim_obj = animation.FuncAnimation(self._pf_fig, self.update_place_field_frame, frames=self.__N_ANIMATION_FRAMES, interval=5, blit=True)
+        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_place_field_frame, \
+                frames=np.arange(self.__N_ANIMATION_FRAMES), interval=ANIMATION_INTERVAL, blit=True, repeat=True)
+        logging.info(MODULE_IDENTIFIER + 'Place field frame created!')
         self._anim_objs.append(anim_obj)
 
     def run(self):
@@ -442,38 +630,24 @@ class GraphicsManager(Process):
         in separate threads.
         """
 
+        """
         self._keep_running.set()
 
-        # Create a command window to take user inputs
-        # gui_handler = threading.Thread(name="CommandWindow", daemon=True, \
-        #         target=self._command_window.mainloop)
+        for p__thread in self._thread_list:
+            p__thread.start()
+        """
 
-        # Launch a thread for fetching position data constantly
-        # TODO: Making these threads stoppable is too much of a pain!
-        position_fetcher = threading.Thread(name="PositionFetcher", daemon=True, \
-                target=self.fetch_position_and_update_frames)
-        spike_fetcher = threading.Thread(name="SpikeFetcher", daemon=True, \
-                target=self.fetch_spikes_and_update_frames)
-        place_field_fetcher = threading.Thread(name="PlaceFieldFetched", daemon=True, \
-                target=self.fetch_place_fields)
-        ripple_frame_fetcher = threading.Thread(name="RippleFrameFetcher", daemon=True, \
-                target=self.fetch_incident_ripple)
-
-        position_fetcher.start()
-        spike_fetcher.start()
-        place_field_fetcher.start()
-        ripple_frame_fetcher.start()
-
-        # Start the animation for Spike-Position figure, place field figure
-        self.initialize_ripple_detection_fig()
-        self.initialize_spike_pos_fig()
-        self.initialize_place_field_fig()
-        plt.show()
+        # Start all the animation sources.
+        self.playAnimation()
 
         # This is a blocking command... After you exit this, everything will end.
-        self._command_window.mainloop()
-        position_fetcher.join()
-        spike_fetcher.join()
-        place_field_fetcher.join()
-        ripple_frame_fetcher.join()
+        while self._keep_running.is_set():
+            time.sleep(1.0)
+
+        # Stop all the animation sources.
+        self.pauseAnimation()
+
+        # Join all the fetcher threads.
+        for p__thread in self._thread_list:
+            p__thread.join()
         logging.info(MODULE_IDENTIFIER + "Closed GUI and display pipes")

@@ -1,4 +1,7 @@
 *.pr
+*.npy
+*.csv
 *.log
 *.swp
+*.trodesClusters
 ripple_interruption_out__*.txt
