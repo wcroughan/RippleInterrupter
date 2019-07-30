@@ -354,17 +354,42 @@ class GraphicsManager(Process):
         parent_layout_box.addLayout(hbox_unit_and_tet_controls)
         QDialog.setLayout(self.widget, parent_layout_box)
 
+    def setClusterIdentities(self, cluster_identity_map):
+        # Take a cluster identity map and use it to populate the tetrodes and units.
+        pass
+
+    def setUnitList(self, unit_list):
+        # Take the list of units and set them as the current list of units to be looked at.
+        unit_id_strings = [str(unit_id) for unit_id in unit_list]
+        self.unit_selection.addItems(unit_id_strings)
+
+    def setTetrodeList(self, tetrode_list):
+        tetrode_id_strings = [str(tet_id) for tet_id in tetrode_list]
+        self.tetrode_selection.addItems(tetrode_id_strings)
+
     def NextUnit(self):
-        QtHelperUtils.display_warning('Function not implemented!')
+        current_unit = self.unit_selection.currentIndex()
+        # print(MODULE_IDENTIFIER + 'Current Unit: %d'%current_unit)
+        if current_unit < self.unit_selection.count()-1:
+            self.unit_selection.setCurrentIndex(current_unit+1)
 
     def PrevUnit(self):
-        QtHelperUtils.display_warning('Function not implemented!')
+        current_unit = self.unit_selection.currentIndex()
+        # print(MODULE_IDENTIFIER + 'Current Unit: %d'%current_unit)
+        if current_unit > 0:
+            self.unit_selection.setCurrentIndex(current_unit-1)
 
     def NextTetrode(self):
-        QtHelperUtils.display_warning('Function not implemented!')
+        current_tet = self.tetrode_selection.currentIndex()
+        # print(MODULE_IDENTIFIER + 'Current Tetrode: %d'%current_tet)
+        if current_tet < self.tetrode_selection.count()-1:
+            self.tetrode_selection.setCurrentIndex(current_tet+1)
 
     def PrevTetrode(self):
-        QtHelperUtils.display_warning('Function not implemented!')
+        current_tet = self.tetrode_selection.currentIndex()
+        # print(MODULE_IDENTIFIER + 'Current Tetrode: %d'%current_tet)
+        if current_tet > 0:
+            self.tetrode_selection.setCurrentIndex(current_tet-1)
 
     def clearAxes(self):
         # Ripple detection axis

@@ -268,6 +268,9 @@ class CommandWindow(QMainWindow):
                     self.shared_ripple_buffer), (self.shared_calib_plot_means, self.shared_calib_plot_std_errs),\
                     self.spike_listener, self.position_estimator, self.place_field_handler, self.ripple_trigger,\
                     self.show_trigger, self.calib_trigger, self.shared_place_fields)
+
+            # Load the tetrode and cluster information into the respective menus.
+            self.graphical_interface.setTetrodeList(self.cluster_identity_map.keys())
         except Exception as err:
             print(err)
             return
@@ -299,8 +302,6 @@ class CommandWindow(QMainWindow):
         if __debug__:
             QtHelperUtils.display_information(MODULE_IDENTIFIER + 'Read cluster identity map.')
         print(self.cluster_identity_map)
-
-        # Load the tetrode and cluster information into the respective menus.
 
         # Uncomment to let the user select a file
         # n_units, self.cluster_identity_map = SpikeAnalysis.readClusterFile(tetrodes=tetrodes_of_interest)
