@@ -129,6 +129,10 @@ class CommandWindow(QMainWindow):
     def plotBayesianEstimate(self):
         QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
 
+    # Show ripple stats (current as well as history) for tetrodes
+    def showRippleStats(self):
+        QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
+
     def disconnectAndQuit(self):
         if self.graphical_interface is not None:
             self.graphical_interface.kill_gui()
@@ -187,10 +191,14 @@ class CommandWindow(QMainWindow):
         file_menu.addAction(quit_action)
 
         # =============== PLOT MENU =============== 
-        plot_menu = menu_bar.addMenu('&Plot')
-        plot_bayesian_estimate = plot_menu.addAction('&Bayesian Estimate')
+        output_menu = menu_bar.addMenu('&Output')
+        plot_bayesian_estimate = output_menu.addAction('&Bayesian Estimate')
         plot_bayesian_estimate.setStatusTip('Plot bayesian estimate')
         plot_bayesian_estimate.triggered.connect(self.plotBayesianEstimate)
+
+        print_ripple_stats = output_menu.addAction('&Ripple Statistics')
+        print_ripple_stats.setStatusTip('Show ripple stats')
+        print_ripple_stats.triggered.connect(self.showRippleStats)
 
         # =============== SERIAL MENU =============== 
         serial_menu = menu_bar.addMenu('&Serial')
