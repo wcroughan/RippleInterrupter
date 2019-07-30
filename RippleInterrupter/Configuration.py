@@ -45,7 +45,7 @@ def read_cluster_file(filename=None, tetrodes=None):
         return (0, {})
 
     if __debug__:
-        print(MODULE_IDENTIFIER, 'Read cluster file ' + filename)
+        print(MODULE_IDENTIFIER + 'Read cluster file ' + filename)
 
     # The file is organized as:
     # [ROOT] SpikeSortInfo

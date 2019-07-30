@@ -338,11 +338,20 @@ class GraphicsManager(Process):
         vbox_unit_buttons.addWidget(self.unit_selection)
         vbox_unit_buttons.addWidget(self.next_unit_button)
         vbox_unit_buttons.addWidget(self.prev_unit_button)
-        vbox_unit_buttons.addWidget(self.tetrode_selection)
-        vbox_unit_buttons.addWidget(self.next_tet_button)
-        vbox_unit_buttons.addWidget(self.prev_tet_button)
-        vbox_unit_buttons.addStretch(1)
-        parent_layout_box.addLayout(vbox_unit_buttons)
+
+        # Controls for looking at individual tetrodes for LFP
+        vbox_tetrode_buttons = QVBoxLayout()
+        vbox_tetrode_buttons.addWidget(self.tetrode_selection)
+        vbox_tetrode_buttons.addWidget(self.next_tet_button)
+        vbox_tetrode_buttons.addWidget(self.prev_tet_button)
+
+        # Put the tetrode and unit buttons together
+        hbox_unit_and_tet_controls = QHBoxLayout()
+        hbox_unit_and_tet_controls.addStretch(1)
+        hbox_unit_and_tet_controls.addLayout(vbox_unit_buttons)
+        hbox_unit_and_tet_controls.addLayout(vbox_tetrode_buttons)
+
+        parent_layout_box.addLayout(hbox_unit_and_tet_controls)
         QDialog.setLayout(self.widget, parent_layout_box)
 
     def NextUnit(self):

@@ -89,7 +89,7 @@ class CommandWindow(QMainWindow):
         self.graphical_interface = None
 
         # Launch the main graphical interface as a widget
-        self.setGeometry(100, 100, 1000, 800)
+        self.setGeometry(100, 100, 800, 1200)
 
         # enable custom window hint
         self.setWindowFlags(self.windowFlags() | QtCore.Qt.CustomizeWindowHint)
@@ -299,6 +299,8 @@ class CommandWindow(QMainWindow):
         if __debug__:
             QtHelperUtils.display_information(MODULE_IDENTIFIER + 'Read cluster identity map.')
         print(self.cluster_identity_map)
+
+        # Load the tetrode and cluster information into the respective menus.
 
         # Uncomment to let the user select a file
         # n_units, self.cluster_identity_map = SpikeAnalysis.readClusterFile(tetrodes=tetrodes_of_interest)
