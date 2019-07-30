@@ -10,6 +10,7 @@ from multiprocessing import Queue, RawArray, Condition
 
 # PyQt imports
 from PyQt5.QtWidgets import QMainWindow, QAction, qApp, QApplication
+from PyQt5 import QtCore
 
 # Local imports
 import Logger
@@ -26,6 +27,10 @@ import CalibrationPlot
 
 MODULE_IDENTIFIER = "[OnlineInterruption] "
 DEFAULT_RIPPLE_TRIGGERING = True
+DEFAULT_SERIAL_ENABLED = False
+DEFAULT_STIM_MODE_MANUAL_ENABLED = True
+DEFAULT_STIM_MODE_POSITION_ENABLED = False
+DEFAULT_STIM_MODE_RIPPLE_ENABLED = False
 
 class CommandWindow(QMainWindow):
 
@@ -84,7 +89,13 @@ class CommandWindow(QMainWindow):
         self.graphical_interface = None
 
         # Launch the main graphical interface as a widget
-        self.setGeometry(100, 100, 1200, 1200)
+        self.setGeometry(100, 100, 1000, 800)
+
+        # enable custom window hint
+        self.setWindowFlags(self.windowFlags() | QtCore.Qt.CustomizeWindowHint)
+
+        # disable (but not hide) close button
+        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowCloseButtonHint)
 
     # Functions for saving data
     def saveFields(self):
@@ -95,6 +106,23 @@ class CommandWindow(QMainWindow):
 
     # Functions for loading data
     def loadFields(self):
+        QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
+
+    # Set up the serial port
+    def enableSerialPort(self):
+        QtHelperUtils.display_information(MODULE_IDENTIFIER + 'Enabling serial port.')
+        # TODO: To the information statement above, add a line telling which
+        # port is currently being used.
+
+        QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
+
+    def testSingleSerialPulse(self):
+        # TODO: Send a single pulse on the serial port to test port functionality.
+        QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
+
+    def testContinuousSerialPulse(self):
+        # TODO: Send a series of pulses on the serial port to monitor the
+        # hardware and test if it is working.
         QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
 
     # Setting plot areas
@@ -163,6 +191,35 @@ class CommandWindow(QMainWindow):
         plot_bayesian_estimate = plot_menu.addAction('&Bayesian Estimate')
         plot_bayesian_estimate.setStatusTip('Plot bayesian estimate')
         plot_bayesian_estimate.triggered.connect(self.plotBayesianEstimate)
+
+        # =============== SERIAL MENU =============== 
+        serial_menu = menu_bar.addMenu('&Serial')
+        enable_serial_port = serial_menu.addAction('&Enable Port')
+        enable_serial_port.setStatusTip('Enable default serial port.')
+        enable_serial_port.triggered.connect(self.enableSerialPort)
+        enable_serial_port.setChecked(DEFAULT_SERIAL_ENABLED)
+
+        test_single_pulse = serial_menu.addAction('Test &Single')
+        test_single_pulse.setStatusTip('Send single biphasic pulse on serial port.')
+        test_single_pulse.triggered.connect(self.testSingleSerialPulse)
+
+        test_continuous_pulse = serial_menu.addAction('Test &Continuous')
+        test_continuous_pulse.setStatusTip('Send a stream of biphasic pulses on the serial port.')
+        test_continuous_pulse.triggered.connect(self.testContinuousSerialPulse)
+
+        # =============== STIM MENU =============== 
+        stimulation_menu = menu_bar.addMenu('&Stimulation')
+        stim_mode_manual = stimulation_menu.addAction('&Manual')
+        stim_mode_manual.setStatusTip('Set stimulation mode to manual.')
+        stim_mode_manual.setChecked(DEFAULT_STIM_MODE_MANUAL_ENABLED)
+
+        stim_mode_position = stimulation_menu.addAction('&Position')
+        stim_mode_position.setStatusTip('Use position and velocity to simulate.')
+        stim_mode_position.setChecked(DEFAULT_STIM_MODE_POSITION_ENABLED)
+
+        stim_mode_ripple = stimulation_menu.addAction('&Ripple')
+        stim_mode_ripple.setStatusTip('Stimulate on Sharp-Wave Ripples.')
+        stim_mode_ripple.setChecked(DEFAULT_STIM_MODE_RIPPLE_ENABLED)
 
         # =============== PREF MENU =============== 
         preferences_menu = menu_bar.addMenu('&Preferences')
