@@ -11,6 +11,8 @@ DEFAULT_PORT = '/dev/ttyS0'
 MODULE_IDENTIFIER = "[SerialPort] "
 REALLY_SEND_STIM = False
 
+REALLY_STIM = False
+
 class BiphasicPort(serial.Serial):
     """
     Serial port set up for biphasic pulse communication
