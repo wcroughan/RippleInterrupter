@@ -6,7 +6,9 @@ import ctypes
 import numpy as np
 import logging
 import cProfile
+import collections
 from multiprocessing import Queue, RawArray, Condition
+from multiprocessing import Pipe, Lock, Event, Value
 
 # PyQt imports
 from PyQt5.QtWidgets import QMainWindow, QAction, qApp, QApplication
@@ -19,6 +21,7 @@ import QtHelperUtils
 import Configuration
 import Visualization
 import SpikeAnalysis
+import ThreadExtension
 import RippleAnalysis
 import PositionAnalysis
 import TrodesInterface
@@ -93,24 +96,24 @@ class StimulationSynchronizer(ThreadExtension.StoppableProcess):
             if self._serial_port.getStatus():
                 stim_start_time = time.time()
                 current_time = time.time()
-                while current_time - stim_start_time < Config.MANUAL_STIM_DURATION
+                while (current_time - stim_start_time < Config.MANUAL_STIM_DURATION):
                     self._serial_port.sendBiphasicPulse()
                     time.sleep(Config.MANUAL_STIM_INTER_PULSE_INTERVAL)
                     current_time = time.time()
                     # TODO: Add the last spike/trodes timestamp to this data.
-                    logging.info(CLASS_IDENTIFIER + "Delivered STIM at %.2f"current_time)
+                    logging.info(CLASS_IDENTIFIER + "Delivered STIM at %.2f"%current_time)
             else:
                 QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Port disbled!')
         else:
             QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Port undefined!')
 
-    def enableRippleDisruption(self):
+    def enable(self):
         self._enable_synchrnoizer.acquire()
         self._is_disabled.value = False
         logging.info(self.CLASS_IDENTIFIER + "Ripple disruption ENABLED.")
         self._enable_synchrnoizer.release()
 
-    def disableRippleDisruption(self):
+    def disable(self):
         self._enable_synchrnoizer.acquire()
         self._is_disabled.value = True
         logging.info(self.CLASS_IDENTIFIER + "Ripple disruption DISABLED.")
@@ -267,11 +270,17 @@ class CommandWindow(QMainWindow):
         # Launch the main graphical interface as a widget
         self.setGeometry(100, 100, 900, 1200)
 
+        """
+        # The 2 lines below remove the CLOSE button on the window.
         # enable custom window hint
         self.setWindowFlags(self.windowFlags() | QtCore.Qt.CustomizeWindowHint)
 
         # disable (but not hide) close button
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowCloseButtonHint)
+        """
+
+    def closeEvent(self, event):
+        self.disconnectAndQuit()
 
     # Functions for saving data
     def saveFields(self):
@@ -319,7 +328,7 @@ class CommandWindow(QMainWindow):
     def enableSerialPort(self, state):
         # TODO: To the information statement above, add a line telling which
         # port is currently being used.
-        if state
+        if state:
             QtHelperUtils.display_information(MODULE_IDENTIFIER + 'Enabling serial port.')
             self.ripple_trigger.enableSerial()
         else:

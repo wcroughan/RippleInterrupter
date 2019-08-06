@@ -16,7 +16,7 @@ class BiphasicPort(serial.Serial):
     """
 
     def __init__(self, port=DEFAULT_PORT, baud=BAUDRATE):
-        self._is_enabled = FAlse;
+        self._is_enabled = False;
         serial.Serial.__init__(self, port, baud, timeout=0, stopbits=serial.STOPBITS_ONE, \
                 bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE)
         logging.info(MODULE_IDENTIFIER + "Serial port initialized.")
