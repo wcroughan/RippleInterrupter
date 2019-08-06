@@ -552,7 +552,7 @@ class CommandWindow(QMainWindow):
         Load cluster information from a cluster file.
         """
         # Uncomment to use a hardcoded file
-        cluster_filename = "./config/full_config20190304.trodesClusters"
+        cluster_filename = "./config/full_config20190307.trodesClusters"
         # cluster_filename = "open_field_full_config20190220_172702.trodesClusters"
         cluster_config = Configuration.read_cluster_file(cluster_filename, self.tetrodes_of_interest)
         if cluster_config is not None:
