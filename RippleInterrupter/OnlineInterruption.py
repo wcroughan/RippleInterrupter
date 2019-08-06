@@ -11,7 +11,7 @@ from multiprocessing import Queue, RawArray, Condition
 from multiprocessing import Pipe, Lock, Event, Value
 
 # PyQt imports
-from PyQt5.QtWidgets import QMainWindow, QAction, qApp, QApplication
+from PyQt5.QtWidgets import QMainWindow, QAction, qApp, QApplication, QMessageBox
 from PyQt5 import QtCore
 
 # Local imports
@@ -30,7 +30,14 @@ import RippleDefinitions as RiD
 import CalibrationPlot
 
 MODULE_IDENTIFIER = "[OnlineInterruption] "
-DEFAULT_RIPPLE_TRIGGERING = True
+# User selection choices for what they want to see on the screen
+DEFAULT_LFP_CHOICE      = True
+DEFAULT_SPIKES_CHOICE   = True
+DEFAULT_POSITION_CHOICE = True
+DEFAULT_FIELD_CHOICE    = True
+DEFAULT_STIMULATION_CHOICE = False
+
+# Choices in functionality
 DEFAULT_SERIAL_ENABLED = False
 DEFAULT_STIM_MODE_MANUAL_ENABLED = True
 DEFAULT_STIM_MODE_POSITION_ENABLED = False
@@ -451,18 +458,46 @@ class CommandWindow(QMainWindow):
         stim_mode_ripple.setChecked(DEFAULT_STIM_MODE_RIPPLE_ENABLED)
         stim_mode_ripple.triggered.connect(self.rippleStimTrigger)
 
-        # =============== PREF MENU =============== 
-        preferences_menu = menu_bar.addMenu('&Preferences')
-        ripple_trigger_setting = preferences_menu.addAction('&Increase Speed')
-        ripple_trigger_setting.setStatusTip('Enable trigerring ripples')
-        ripple_trigger_setting.setChecked(DEFAULT_RIPPLE_TRIGGERING)
-        ripple_trigger_setting.triggered.connect(self.setRippleTrigger)
+    def getProcessingArgs(self):
+        processing_args = list()
+        processing_args.append("Local Field Potential (LFP)")
+        processing_args.append("Spike Data")
+        processing_args.append("Position Data")
+        processing_args.append("Place Field")
+        processing_args.append("Stimulation")
+        user_choices = QtHelperUtils.CheckBoxWidget(processing_args, message="Select position processing options.").exec_()
+        user_processing_choices = dict()
+        user_processing_choices['lfp']      = DEFAULT_LFP_CHOICE
+        user_processing_choices['spikes']   = DEFAULT_SPIKES_CHOICE
+        user_processing_choices['position'] = DEFAULT_POSITION_CHOICE
+        user_processing_choices['field']    = DEFAULT_FIELD_CHOICE
+        user_processing_choices['stim']     = DEFAULT_STIMULATION_CHOICE
+        if user_choices[0] == QMessageBox.Ok:
+            if 0 in user_choices[1]:
+                user_processing_choices['lfp'] = True
+            else:
+                user_processing_choices['lfp'] = False
 
-    def setRippleTrigger(self, state):
-        if state:
-            self.ripple_trigger.enable()
-        else:
-            self.ripple_trigger.disable()
+            if 1 in user_choices[1]:
+                user_processing_choices['spikes'] = True
+            else:
+                user_processing_choices['spikes'] = False
+
+            if 2 in user_choices[1]:
+                user_processing_choices['position'] = True
+            else:
+                user_processing_choices['position'] = False
+
+            if 3 in user_choices[1]:
+                user_processing_choices['field'] = True
+            else:
+                user_processing_choices['field'] = False
+
+            if 4 in user_choices[1]:
+                user_processing_choices['stim'] = True
+            else:
+                user_processing_choices['stim'] = False
+        return user_processing_choices
 
     def connectSpikeGadgets(self):
         """
@@ -477,22 +512,27 @@ class CommandWindow(QMainWindow):
         if not self.cluster_identity_map:
             self.loadClusterFile()
 
+        # Use preferences to selectively start the desired threads
+        user_processing_choices = self.getProcessingArgs()
         try:
-            # TODO: Use preferences to selectively start the desired threads
-            # LFP Threads
-            self.initLFPThreads()
+            if user_processing_choices['lfp']:
+                # LFP Threads
+                self.initLFPThreads()
 
-            # Position data
-            self.position_estimator  = PositionAnalysis.PositionEstimator(self.sg_client)
+            if user_processing_choices['position']:
+                # Position data
+                self.position_estimator  = PositionAnalysis.PositionEstimator(self.sg_client)
 
-            # Spike data
-            self.initSpikeThreads()
+            if user_processing_choices['spikes']:
+                # Spike data
+                self.initSpikeThreads()
 
-            # Calibration data
-            self.initCalibrationThreads()
+                # Calibration data
+                self.initCalibrationThreads()
 
-            # Ripple triggered actions
-            self.initRippleTriggerThreads()
+            if user_processing_choices['stim']:
+                # Ripple triggered actions
+                self.initRippleTriggerThreads()
 
             self.graphical_interface = Visualization.GraphicsManager((self.shared_raw_lfp_buffer,\
                     self.shared_ripple_buffer), (self.shared_calib_plot_means, self.shared_calib_plot_std_errs),\
@@ -595,10 +635,6 @@ class CommandWindow(QMainWindow):
             print(err)
             return
 
-        if DEFAULT_RIPPLE_TRIGGERING:
-            self.ripple_trigger.enable()
-        else:
-            self.ripple_trigger.disable()
         self.statusBar().showMessage('Streaming!')
         if __debug__:
             self.code_profiler.enable()

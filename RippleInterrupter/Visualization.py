@@ -193,8 +193,8 @@ class GraphicsManager(Process):
         plot_grid    = gridspec.GridSpec(2, 2)
         self.toolbar = NavigationToolbar(self.canvas, self.widget)
         self._rd_ax = self.figure.add_subplot(plot_grid[0])
-        self._pf_ax = self.figure.add_subplot(plot_grid[1])
-        self._cp_ax = self.figure.add_subplot(plot_grid[3])
+        self._pf_ax = self.figure.add_subplot(plot_grid[3])
+        self._cp_ax = self.figure.add_subplot(plot_grid[1])
 
         # This is tricky because right now we are using this as an array to
         # store multiple axes, each plotting a different unit.
