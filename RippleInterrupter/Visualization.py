@@ -272,11 +272,7 @@ class GraphicsManager(Process):
 
         # Maintain a separate deque for each cluster to plot
         self._spike_lock = threading.Lock()
-        self._spk_pos_x = []
-        self._spk_pos_y = []
-        for cl_idx in range(self._n_clusters):
-            self._spk_pos_x.append(deque([], self.__N_SPIKES_TO_PLOT))
-            self._spk_pos_y.append(deque([], self.__N_SPIKES_TO_PLOT))
+        self.initSpikeDeque()
 
         # Figure/Animation element. So far the following have been included
         # Ripple detection
@@ -327,6 +323,13 @@ class GraphicsManager(Process):
         print(MODULE_IDENTIFIER + 'Animation plots initialized.')
 
 
+    def initSpikeDeque(self):
+        self._spk_pos_x = []
+        self._spk_pos_y = []
+        for cl_idx in range(self._n_clusters):
+            self._spk_pos_x.append(deque([], self.__N_SPIKES_TO_PLOT))
+            self._spk_pos_y.append(deque([], self.__N_SPIKES_TO_PLOT))
+
     def setLayout(self):
         parent_layout_box = QVBoxLayout()
         parent_layout_box.addWidget(self.toolbar)
@@ -363,6 +366,11 @@ class GraphicsManager(Process):
         # print(unit_list)
         unit_id_strings = [str(unit_id) for unit_id in unit_list]
         self.unit_selection.addItems(unit_id_strings)
+
+        # Update the cluster information
+        self._n_clusters = len(unit_list)
+        self._clusters = unit_list
+        self.initSpikeDeque()
 
     def setTetrodeList(self, tetrode_list):
         tetrode_id_strings = [str(tet_id) for tet_id in tetrode_list]
