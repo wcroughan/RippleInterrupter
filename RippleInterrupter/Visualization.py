@@ -360,6 +360,7 @@ class GraphicsManager(Process):
 
     def setUnitList(self, unit_list):
         # Take the list of units and set them as the current list of units to be looked at.
+        # print(unit_list)
         unit_id_strings = [str(unit_id) for unit_id in unit_list]
         self.unit_selection.addItems(unit_id_strings)
 

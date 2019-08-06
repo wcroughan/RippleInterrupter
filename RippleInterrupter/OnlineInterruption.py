@@ -541,6 +541,14 @@ class CommandWindow(QMainWindow):
 
             # Load the tetrode and cluster information into the respective menus.
             self.graphical_interface.setTetrodeList(self.cluster_identity_map.keys())
+
+            # Get a list of all the units that we have in the data-set
+            session_unit_list = list()
+            for tetrode in self.cluster_identity_map.keys():
+                tetrode_units = self.cluster_identity_map[tetrode].values()
+                session_unit_list.extend(tetrode_units)
+            self.graphical_interface.setUnitList(session_unit_list)
+
         except Exception as err:
             print(err)
             return
