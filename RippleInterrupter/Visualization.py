@@ -382,14 +382,16 @@ class GraphicsManager(Process):
     def NextTetrode(self):
         current_tet = self.tetrode_selection.currentIndex()
         # print(MODULE_IDENTIFIER + 'Current Tetrode: %d'%current_tet)
-        if current_tet < self.tetrode_selection.count()-1:
-            self.tetrode_selection.setCurrentIndex(current_tet+1)
+        with self._lfp_lock:
+            if current_tet < self.tetrode_selection.count()-1:
+                self.tetrode_selection.setCurrentIndex(current_tet+1)
 
     def PrevTetrode(self):
         current_tet = self.tetrode_selection.currentIndex()
         # print(MODULE_IDENTIFIER + 'Current Tetrode: %d'%current_tet)
-        if current_tet > 0:
-            self.tetrode_selection.setCurrentIndex(current_tet-1)
+        with self._lfp_lock:
+            if current_tet > 0:
+                self.tetrode_selection.setCurrentIndex(current_tet-1)
 
     def clearAxes(self):
         # Ripple detection axis
@@ -435,13 +437,14 @@ class GraphicsManager(Process):
         This is a little different from the other frame update functions as it
         does not continuously update the frame but only when a ripple is triggerred.
         """
-        
+
         # NOTE: This call blocks access to ripple_trigger_condition for
         # __RIPPLE_DETECTION_TIMEOUT, which could be a long while. Don't let
         # this block any important functionality.
         with self._lfp_lock:
-            self._rd_frame[0].set_data(self._lfp_tpts, self._local_lfp_buffer[0,:]/self.__PEAK_LFP_AMPLITUDE)
-            self._rd_frame[1].set_data(self._ripple_power_tpts, -0.5 + (self._local_ripple_power_buffer[0,:] \
+            current_tetrode_selection = self.tetrode_selection.currentIndex()
+            self._rd_frame[0].set_data(self._lfp_tpts, self._local_lfp_buffer[current_tetrode_selection,:]/self.__PEAK_LFP_AMPLITUDE)
+            self._rd_frame[1].set_data(self._ripple_power_tpts, -0.5 + (self._local_ripple_power_buffer[current_tetrode_selection,:] \
                     - RippleAnalysis.D_MEAN_RIPPLE_POWER)/(2 * RippleAnalysis.D_STD_RIPPLE_POWER * RiD.RIPPLE_POWER_THRESHOLD))
         return self._rd_frame
 
