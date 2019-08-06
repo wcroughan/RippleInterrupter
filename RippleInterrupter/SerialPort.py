@@ -9,9 +9,6 @@ import logging
 BAUDRATE     = 9600
 DEFAULT_PORT = '/dev/ttyS0'
 MODULE_IDENTIFIER = "[SerialPort] "
-REALLY_SEND_STIM = False
-
-REALLY_STIM = False
 
 class BiphasicPort(serial.Serial):
     """
@@ -19,13 +16,13 @@ class BiphasicPort(serial.Serial):
     """
 
     def __init__(self, port=DEFAULT_PORT, baud=BAUDRATE):
-        if REALLY_SEND_STIM:
-            serial.Serial.__init__(self, port, baud, timeout=0, stopbits=serial.STOPBITS_ONE, \
-                    bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE)
-            logging.info(MODULE_IDENTIFIER + "Serial port initialized.")
+        self._is_enabled = FAlse;
+        serial.Serial.__init__(self, port, baud, timeout=0, stopbits=serial.STOPBITS_ONE, \
+                bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE)
+        logging.info(MODULE_IDENTIFIER + "Serial port initialized.")
 
     def sendBiphasicPulse(self):
-        if REALLY_SEND_STIM:
+        if self._is_enabled:
             self.setDTR(True)
             time.sleep(0.0002)
             self.setDTR(False)
@@ -35,4 +32,20 @@ class BiphasicPort(serial.Serial):
             self.setRTS(False)
             time.sleep(0.001)
             logging.info(MODULE_IDENTIFIER + "Biphasic pulse delivered.")
-        return
+        else:
+            logging.info(MODULE_IDENTIFIER + "WARNING! Attempted Biphasic pulse without enabling device! Ignoring!")
+
+    def getStatus(self):
+        return self._is_enabled
+
+    def enable(self):
+        """
+        Enable the serial port (remove pin values from defaults)
+        """
+        self._is_enabled = True
+
+    def disable(self):
+        """
+        Disable serial port (allow pin values to be changed by outside input).
+        """
+        self._is_enabled = False

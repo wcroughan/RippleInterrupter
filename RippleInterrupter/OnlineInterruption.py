@@ -14,6 +14,7 @@ from PyQt5 import QtCore
 
 # Local imports
 import Logger
+import SerialPort
 import QtHelperUtils
 import Configuration
 import Visualization
@@ -32,8 +33,183 @@ DEFAULT_STIM_MODE_MANUAL_ENABLED = True
 DEFAULT_STIM_MODE_POSITION_ENABLED = False
 DEFAULT_STIM_MODE_RIPPLE_ENABLED = False
 
-class CommandWindow(QMainWindow):
+class StimulationSynchronizer(ThreadExtension.StoppableProcess):
+    """
+    Waits for a stimulation events to be detected and processes downstream changes for
+    analyzing spike contents.
+    """
 
+    # Wait for 10ms while checking if the event flag is set.
+    _EVENT_TIMEOUT = 1.0
+    _SPIKE_BUFFER_SIZE = 200
+    CLASS_IDENTIFIER = "[StimulationSynchronizer] "
+
+    def __init__(self, sync_event, spike_listener, position_estimator, place_field_handler):
+        """TODO: to be defined1. """
+        ThreadExtension.StoppableProcess.__init__(self)
+        self._sync_event = sync_event
+        self._spike_buffer = collections.deque(maxlen=self._SPIKE_BUFFER_SIZE)
+        self._spike_histogram = collections.Counter()
+        self._spike_buffer_connection = spike_listener.get_spike_buffer_connection()
+        self._position_buffer_connection = position_estimator.get_position_buffer_connection()
+        self._place_field_handler = place_field_handler
+        self._position_access = Lock()
+        self._spike_access = Lock()
+        # TODO: This functionality should be moved to the parent class
+        self._enable_synchrnoizer = Lock()
+        self._clusters_of_interest = [Configuration.EXPERIMENT_DAY_20190307__INTERESTING_CLUSTERS_A[:], \
+                Configuration.EXPERIMENT_DAY_20190307__INTERESTING_CLUSTERS_B[:]]
+        print(self._clusters_of_interest)
+        self._is_disabled = Value("b", True)
+
+        # Position data at the time ripple is triggered
+        self._pos_x = -1
+        self._pos_y = -1
+        self._most_recent_speed = 0
+        self._most_recent_pos_timestamp = 0
+        self._serial_port = None
+        try:
+            self._serial_port = SerialPort.BiphasicPort()
+        except Exception as err:
+            logging.warning("Unable to open Serial port.")
+            print(err)
+        logging.info(self.CLASS_IDENTIFIER + "Started Stimulation Synchronization thread.")
+
+    def enableSerial(self):
+        if self._serial_port is not None:
+            self._serial_port.enable()
+
+    def disableSerial(self):
+        if self._serial_port is not None:
+            self._serial_port.disable()
+
+    def startManualStimulation(self):
+        """
+        Stimulate irrespective of the recording events and conditions for
+        duration and period specified by the configuration.
+        """
+        # First make sure that the serial port is well defined and enabled
+        if self._serial_port is not None:
+            if self._serial_port.getStatus():
+                stim_start_time = time.time()
+                current_time = time.time()
+                while current_time - stim_start_time < Config.MANUAL_STIM_DURATION
+                    self._serial_port.sendBiphasicPulse()
+                    time.sleep(Config.MANUAL_STIM_INTER_PULSE_INTERVAL)
+                    current_time = time.time()
+                    # TODO: Add the last spike/trodes timestamp to this data.
+                    logging.info(CLASS_IDENTIFIER + "Delivered STIM at %.2f"current_time)
+            else:
+                QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Port disbled!')
+        else:
+            QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Port undefined!')
+
+    def enableRippleDisruption(self):
+        self._enable_synchrnoizer.acquire()
+        self._is_disabled.value = False
+        logging.info(self.CLASS_IDENTIFIER + "Ripple disruption ENABLED.")
+        self._enable_synchrnoizer.release()
+
+    def disableRippleDisruption(self):
+        self._enable_synchrnoizer.acquire()
+        self._is_disabled.value = True
+        logging.info(self.CLASS_IDENTIFIER + "Ripple disruption DISABLED.")
+        self._enable_synchrnoizer.release()
+
+    def fetch_current_velocity(self):
+        """
+        Get recent velocity (and position) and use that to determine if the
+        animal was running when the current ripple was detected.
+        """
+        while not self.req_stop():
+            if self._position_buffer_connection.poll():
+                position_data = self._position_buffer_connection.recv()
+                with self._position_access:
+                    self._most_recent_pos_timestamp = position_data[0]
+                    self._most_recent_speed = position_data[3]
+                    self._pos_x = position_data[1]
+                    self._pos_y = position_data[2]
+            else:
+                time.sleep(0.005)
+
+    def fetch_most_recent_spike(self):
+        """
+        Get the most recent spike and put it in the rotating spike buffer
+        (keeps track of the last self._SPIKE_BUFFER_SIZE spikes.)
+        """
+        while not self.req_stop():
+            if self._spike_buffer_connection.poll():
+                # NOTE: spike_data received here is a tuple (cluster identity, trodes timestamp)
+                spike_data = self._spike_buffer_connection.recv()
+                with self._spike_access:
+                    if len(self._spike_buffer) == self._SPIKE_BUFFER_SIZE:
+                        removed_spike = self._spike_buffer.popleft()
+                        self._spike_histogram[removed_spike[0]] -= 1
+                    spike_cluster = spike_data[0]
+                    if (spike_cluster in self._clusters_of_interest[0]) or \
+                            (spike_cluster in self._clusters_of_interest[1]):
+                        # NOTE: If this starts taking too long, can switch to default dictionary
+                        self._spike_buffer.append(spike_data)
+                        self._spike_histogram[spike_cluster] += 1
+            else:
+                # NOTE: Making the thread sleep for 5ms might not hurt but we
+                # will have to find out.
+                time.sleep(0.005)
+
+    def run(self):
+        # Create a thread that fetches and keeps track of the last few spikes.
+        spike_fetcher = threading.Thread(name="SpikeFetcher", daemon=True, \
+                target=self.fetch_most_recent_spike)
+        velocity_fetcher = threading.Thread(name="VelocityFetcher", daemon=True, \
+                target=self.fetch_current_velocity)
+
+        spike_fetcher.start()
+        velocity_fetcher.start()
+        while not self.req_stop():
+            # Check if the process has been enabled
+            self._enable_synchrnoizer.acquire()
+            current_state = self._is_disabled.value
+            self._enable_synchrnoizer.release()
+            if current_state:
+                logging.debug(self.CLASS_IDENTIFIER + "Process sleeping")
+                time.sleep(0.1)
+                continue
+
+            logging.debug(self.CLASS_IDENTIFIER + "Waiting for ripple trigger...")
+            with self._sync_event:
+                thread_notified = self._sync_event.wait(self._EVENT_TIMEOUT)
+
+            if thread_notified:
+                # TODO: Only include spikes that occurred a specific amount of time before now.
+                with self._position_access:
+                    # If the animal is running faster than our speed threshold, ignore the ripple
+                    if self._most_recent_speed < RiD.MOVE_VELOCITY_THRESOLD:
+                        self._serial_port.sendBiphasicPulse()
+                        print(self.CLASS_IDENTIFIER + "Ripple tiggered. Loc (%d, %d), V %.2fcm/s" \
+                                %(self._pos_x, self._pos_y, self._most_recent_speed))
+                        logging.info(self.CLASS_IDENTIFIER + "Ripple tiggered. Loc (%d, %d), V %.2fcm/s" \
+                                %(self._pos_x, self._pos_y, self._most_recent_speed))
+                        self._serial_port.sendBiphasicPulse()
+
+                    with self._spike_access:
+                        if len(self._spike_buffer) > 0:
+                            # By default, returns 10 most frequent entries
+                            most_spiking_unit = self._spike_histogram.most_common()[0][0]
+                            most_recent_spike_time = self._spike_buffer[-1][1]
+                            logging.info(self.CLASS_IDENTIFIER + "Most recent spike at %d"%most_recent_spike_time)
+                            print(self._spike_histogram)
+                        else:
+                            logging.debug(self.CLASS_IDENTIFIER + "Spike buffer empty!")
+
+                # DEBUGGING: Print spike count from each of the clusters
+                # print(self._place_field_handler.get_peak_firing_location(most_spiking_unit))
+
+        logging.info(self.CLASS_IDENTIFIER + "Main process exited.")
+        spike_fetcher.join()
+        velocity_fetcher.join()
+        logging.info(self.CLASS_IDENTIFIER + "Helper threads exited.")
+
+class CommandWindow(QMainWindow):
     """
     Parent window for running all the programs
     """
@@ -89,7 +265,7 @@ class CommandWindow(QMainWindow):
         self.graphical_interface = None
 
         # Launch the main graphical interface as a widget
-        self.setGeometry(100, 100, 800, 1200)
+        self.setGeometry(100, 100, 900, 1200)
 
         # enable custom window hint
         self.setWindowFlags(self.windowFlags() | QtCore.Qt.CustomizeWindowHint)
@@ -108,13 +284,47 @@ class CommandWindow(QMainWindow):
     def loadFields(self):
         QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
 
+    ############################# STIMULATION TRIGGERS #############################
+    # Set up the different stimulation methods here. The three different
+    # methods that we plan to use right now are:
+    #   1. Manual Trigger - Trigger for a fixed duration immediately after the
+    #       menu is selected.
+    #   2. Position Trigger - Allow the user to select a position and velocity
+    #       cutoff within which stimulation will be activated.
+    #   3. Ripple Trigger - The good old, trigger on Sharp-Wave ripples in the
+    #   Hippocampus. It can be tricky to eliminate noise, whose broadband power
+    #   can also be seen in the ripple band.
+    #
+    #   TODO: For ripple power, also incorporate a reference channel which DOES
+    #       NOT HAVE SWRs
+    ################################################################################
+
+    def manualStimTrigger(self):
+        QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
+
+    def positionStimTrigger(self, state):
+        QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
+
+    def rippleStimTrigger(self, state):
+        QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
+
+    ############################# SERIAL FUNCTIONALITY #############################
+    # Add functions that let you access and test the serial port in a
+    # convenient way. This allows you to safely enable/disable the serial port
+    # and test the stimulating electrode's status by sending a single pulse OR
+    # a series of pulses.
+    ################################################################################
+
     # Set up the serial port
-    def enableSerialPort(self):
-        QtHelperUtils.display_information(MODULE_IDENTIFIER + 'Enabling serial port.')
+    def enableSerialPort(self, state):
         # TODO: To the information statement above, add a line telling which
         # port is currently being used.
-
-        QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
+        if state
+            QtHelperUtils.display_information(MODULE_IDENTIFIER + 'Enabling serial port.')
+            self.ripple_trigger.enableSerial()
+        else:
+            QtHelperUtils.display_information(MODULE_IDENTIFIER + 'Disabling serial port.')
+            self.ripple_trigger.disableSerial()
 
     def testSingleSerialPulse(self):
         # TODO: Send a single pulse on the serial port to test port functionality.
@@ -219,15 +429,18 @@ class CommandWindow(QMainWindow):
         stimulation_menu = menu_bar.addMenu('&Stimulation')
         stim_mode_manual = stimulation_menu.addAction('&Manual')
         stim_mode_manual.setStatusTip('Set stimulation mode to manual.')
-        stim_mode_manual.setChecked(DEFAULT_STIM_MODE_MANUAL_ENABLED)
+        stim_mode_manual.triggered.connect(self.manualStimTrigger)
+        stim_mode_manual.setShortcut('Ctrl+M')
 
         stim_mode_position = stimulation_menu.addAction('&Position')
         stim_mode_position.setStatusTip('Use position and velocity to simulate.')
         stim_mode_position.setChecked(DEFAULT_STIM_MODE_POSITION_ENABLED)
+        stim_mode_position.triggered.connect(self.positionStimTrigger)
 
         stim_mode_ripple = stimulation_menu.addAction('&Ripple')
         stim_mode_ripple.setStatusTip('Stimulate on Sharp-Wave Ripples.')
         stim_mode_ripple.setChecked(DEFAULT_STIM_MODE_RIPPLE_ENABLED)
+        stim_mode_ripple.triggered.connect(self.rippleStimTrigger)
 
         # =============== PREF MENU =============== 
         preferences_menu = menu_bar.addMenu('&Preferences')
@@ -389,7 +602,7 @@ class CommandWindow(QMainWindow):
             self.ripple_detector = RippleAnalysis.RippleDetector(self.lfp_listener, self.calib_plot,\
                     trigger_condition=(self.trig_condition, self.show_trigger, self.calib_trigger),\
                     shared_buffers=(self.shared_raw_lfp_buffer, self.shared_ripple_buffer))
-            self.ripple_trigger = RippleAnalysis.RippleSynchronizer(self.trig_condition, self.spike_listener,\
+            self.ripple_trigger = StimulationSynchronizer(self.trig_condition, self.spike_listener,\
                     self.position_estimator, self.place_field_handler)
         except Exception as err:
             QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start ripple trigger threads(s).')
@@ -440,6 +653,7 @@ class CommandWindow(QMainWindow):
             QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start calibration thread.')
             print(err)
             return
+
 def main():
     # Start logging before anything else
     log_file_prefix = "replay_disruption_log"

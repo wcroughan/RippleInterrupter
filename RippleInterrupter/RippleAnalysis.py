@@ -72,6 +72,14 @@ class RippleSynchronizer(ThreadExtension.StoppableProcess):
             print(err)
         logging.info(self.CLASS_IDENTIFIER + "Started Ripple Synchronization thread.")
 
+    def enableSerial(self):
+        if self._serial_port is not None:
+            self._serial_port.enable()
+
+    def disableSerial(self):
+        if self._serial_port is not None:
+            self._serial_port.disable()
+
     def enable(self):
         self._enable_synchrnoizer.acquire()
         self._is_disabled.value = False
