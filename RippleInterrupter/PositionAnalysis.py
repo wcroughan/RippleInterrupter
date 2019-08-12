@@ -174,7 +174,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
 
                     prev_x_bin = curr_x_bin
                     prev_y_bin = curr_y_bin
-                    logging.info(MODULE_IDENTIFIER + "Position Started (%d, %d)"%(curr_x_bin, curr_y_bin))
+                    logging.info(MODULE_IDENTIFIER + "Position Started (%d, %d, TS: %d)"%(curr_x_bin, curr_y_bin, current_timestamp))
                     prev_step_timestamp = copy(current_timestamp)
                 elif ((curr_x_bin != prev_x_bin) or (curr_y_bin != prev_y_bin)):
                     time_spent_in_prev_bin = current_timestamp - prev_step_timestamp

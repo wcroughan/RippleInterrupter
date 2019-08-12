@@ -30,161 +30,6 @@ MODULE_IDENTIFIER = "[RippleAnalysis] "
 D_MEAN_RIPPLE_POWER = 80.0
 D_STD_RIPPLE_POWER = 55.0
 
-class RippleSynchronizer(ThreadExtension.StoppableProcess):
-    """
-    Waits for a ripple to be detected and processes downstream changes for
-    analyzing spike contents.
-    """
-
-    # Wait for 10ms while checking if the event flag is set.
-    _EVENT_TIMEOUT = 1.0
-    _SPIKE_BUFFER_SIZE = 200
-    CLASS_IDENTIFIER = "[RippleSynchronizer] "
-
-    def __init__(self, sync_event, spike_listener, position_estimator, place_field_handler):
-        """TODO: to be defined1. """
-        ThreadExtension.StoppableProcess.__init__(self)
-        self._sync_event = sync_event
-        self._spike_buffer = collections.deque(maxlen=self._SPIKE_BUFFER_SIZE)
-        self._spike_histogram = collections.Counter()
-        self._spike_buffer_connection = spike_listener.get_spike_buffer_connection()
-        self._position_buffer_connection = position_estimator.get_position_buffer_connection()
-        self._place_field_handler = place_field_handler
-        self._position_access = Lock()
-        self._spike_access = Lock()
-        # TODO: This functionality should be moved to the parent class
-        self._enable_synchrnoizer = Lock()
-        self._clusters_of_interest = [Configuration.EXPERIMENT_DAY_20190307__INTERESTING_CLUSTERS_A[:], \
-                Configuration.EXPERIMENT_DAY_20190307__INTERESTING_CLUSTERS_B[:]]
-        print(self._clusters_of_interest)
-        self._is_disabled = Value("b", True)
-
-        # Position data at the time ripple is triggered
-        self._pos_x = -1
-        self._pos_y = -1
-        self._most_recent_speed = 0
-        self._most_recent_pos_timestamp = 0
-        self._serial_port = None
-        try:
-            self._serial_port = SerialPort.BiphasicPort()
-        except Exception as err:
-            logging.warning("Unable to open Serial port.")
-            print(err)
-        logging.info(self.CLASS_IDENTIFIER + "Started Ripple Synchronization thread.")
-
-    def enableSerial(self):
-        if self._serial_port is not None:
-            self._serial_port.enable()
-
-    def disableSerial(self):
-        if self._serial_port is not None:
-            self._serial_port.disable()
-
-    def enable(self):
-        self._enable_synchrnoizer.acquire()
-        self._is_disabled.value = False
-        logging.info(self.CLASS_IDENTIFIER + "Ripple disruption ENABLED.")
-        self._enable_synchrnoizer.release()
-
-    def disable(self):
-        self._enable_synchrnoizer.acquire()
-        self._is_disabled.value = True
-        logging.info(self.CLASS_IDENTIFIER + "Ripple disruption DISABLED.")
-        self._enable_synchrnoizer.release()
-
-    def fetch_current_velocity(self):
-        """
-        Get recent velocity (and position) and use that to determine if the
-        animal was running when the current ripple was detected.
-        """
-        while not self.req_stop():
-            if self._position_buffer_connection.poll():
-                position_data = self._position_buffer_connection.recv()
-                with self._position_access:
-                    self._most_recent_pos_timestamp = position_data[0]
-                    self._most_recent_speed = position_data[3]
-                    self._pos_x = position_data[1]
-                    self._pos_y = position_data[2]
-            else:
-                time.sleep(0.005)
-
-    def fetch_most_recent_spike(self):
-        """
-        Get the most recent spike and put it in the rotating spike buffer
-        (keeps track of the last self._SPIKE_BUFFER_SIZE spikes.)
-        """
-        while not self.req_stop():
-            if self._spike_buffer_connection.poll():
-                # NOTE: spike_data received here is a tuple (cluster identity, trodes timestamp)
-                spike_data = self._spike_buffer_connection.recv()
-                with self._spike_access:
-                    if len(self._spike_buffer) == self._SPIKE_BUFFER_SIZE:
-                        removed_spike = self._spike_buffer.popleft()
-                        self._spike_histogram[removed_spike[0]] -= 1
-                    spike_cluster = spike_data[0]
-                    if (spike_cluster in self._clusters_of_interest[0]) or \
-                            (spike_cluster in self._clusters_of_interest[1]):
-                        # NOTE: If this starts taking too long, can switch to default dictionary
-                        self._spike_buffer.append(spike_data)
-                        self._spike_histogram[spike_cluster] += 1
-            else:
-                # NOTE: Making the thread sleep for 5ms might not hurt but we
-                # will have to find out.
-                time.sleep(0.005)
-
-    def run(self):
-        # Create a thread that fetches and keeps track of the last few spikes.
-        spike_fetcher = threading.Thread(name="SpikeFetcher", daemon=True, \
-                target=self.fetch_most_recent_spike)
-        velocity_fetcher = threading.Thread(name="VelocityFetcher", daemon=True, \
-                target=self.fetch_current_velocity)
-
-        spike_fetcher.start()
-        velocity_fetcher.start()
-        while not self.req_stop():
-            # Check if the process has been enabled
-            self._enable_synchrnoizer.acquire()
-            current_state = self._is_disabled.value
-            self._enable_synchrnoizer.release()
-            if current_state:
-                logging.debug(self.CLASS_IDENTIFIER + "Process sleeping")
-                time.sleep(0.1)
-                continue
-
-            logging.debug(self.CLASS_IDENTIFIER + "Waiting for ripple trigger...")
-            with self._sync_event:
-                thread_notified = self._sync_event.wait(self._EVENT_TIMEOUT)
-
-            if thread_notified:
-                # TODO: Only include spikes that occurred a specific amount of time before now.
-                with self._position_access:
-                    # If the animal is running faster than our speed threshold, ignore the ripple
-                    if self._most_recent_speed < RiD.MOVE_VELOCITY_THRESOLD:
-                        self._serial_port.sendBiphasicPulse()
-                        print(self.CLASS_IDENTIFIER + "Ripple tiggered. Loc (%d, %d), V %.2fcm/s" \
-                                %(self._pos_x, self._pos_y, self._most_recent_speed))
-                        logging.info(self.CLASS_IDENTIFIER + "Ripple tiggered. Loc (%d, %d), V %.2fcm/s" \
-                                %(self._pos_x, self._pos_y, self._most_recent_speed))
-                        self._serial_port.sendBiphasicPulse()
-
-                    with self._spike_access:
-                        if len(self._spike_buffer) > 0:
-                            # By default, returns 10 most frequent entries
-                            most_spiking_unit = self._spike_histogram.most_common()[0][0]
-                            most_recent_spike_time = self._spike_buffer[-1][1]
-                            logging.info(self.CLASS_IDENTIFIER + "Most recent spike at %d"%most_recent_spike_time)
-                            print(self._spike_histogram)
-                        else:
-                            logging.debug(self.CLASS_IDENTIFIER + "Spike buffer empty!")
-
-                # DEBUGGING: Print spike count from each of the clusters
-                # print(self._place_field_handler.get_peak_firing_location(most_spiking_unit))
-
-        logging.info(self.CLASS_IDENTIFIER + "Main process exited.")
-        spike_fetcher.join()
-        velocity_fetcher.join()
-        logging.info(self.CLASS_IDENTIFIER + "Helper threads exited.")
-
 class LFPListener(ThreadExtension.StoppableThread):
     """
     Thread that listens to the LFP stream and continuously fetches LFP timestamps and data
@@ -243,11 +88,12 @@ class LFPListener(ThreadExtension.StoppableThread):
             else:
                 down_time = 0.0
             for frame_idx in range(n_lfp_frames):
+                frame_time = time.time()
                 timestamp = self._lfp_stream.getData()
                 n_frames_fetched += 1
                 # print(self.CLASS_IDENTIFIER + "Fetched %d frames"%n_frames_fetched)
                 if self._lfp_producer is not None:
-                    self._lfp_producer.send((timestamp.trodes_timestamp, self._lfp_buffer[:], time.time()))
+                    self._lfp_producer.send((timestamp.trodes_timestamp, self._lfp_buffer[:], frame_time))
                     # logging.debug(self.CLASS_IDENTIFIER + "LFP Frame at %d sent out for ripple analysis."%timestamp.trodes_timestamp)
 
         if __debug__:
@@ -400,9 +246,9 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                                 curr_wall_time = time.time()
                                 ripple_unseen_LFP = True
                                 ripple_unseen_calib = True
-                                logging.info(MODULE_IDENTIFIER + "Detected ripple, notified with lag of %.2f ms"%(curr_wall_time-frame_time))
+                                logging.info(MODULE_IDENTIFIER + "Detected ripple, notified with lag of %.6f ms"%(curr_wall_time-frame_time))
                             logging.info(MODULE_IDENTIFIER + "Detected ripple at %.2f, TS: %d. Peak Strength: %.2f"% \
-                                    (curr_time, timestamp, np.max(power_to_baseline_ratio)))
+                                    (frame_time, timestamp, np.max(power_to_baseline_ratio)))
                     if ((curr_time - prev_ripple) > RiD.LFP_BUFFER_TIME/2) and ripple_unseen_LFP:
                         ripple_unseen_LFP = False
                         # Copy data over for visualization
