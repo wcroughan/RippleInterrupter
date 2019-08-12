@@ -4,4 +4,5 @@
 *.log
 *.swp
 *.trodesClusters
+*.ripple_events
 ripple_interruption_out__*.txt
