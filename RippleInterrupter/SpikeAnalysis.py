@@ -167,12 +167,20 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                 # print("Spike from cluster %d, in bin (%d, %d)"%(spk_cl, current_posbin_x, current_posbin_y))
                 # print(current_posbin_y)
 
-                if curr_speed > RiD.MOVE_VELOCITY_THRESOLD:
-                    # Get the next spike
-                    while self._spike_buffer.poll():
-                        (spk_cl, spk_time) = self._spike_buffer.recv()
-                        logging.debug(self.CLASS_IDENTIFIER + "Received spike from %d at %d"%(spk_cl, spk_time))
+                # Get the next spike
+                while self._spike_buffer.poll():
+                    (spk_cl, spk_time) = self._spike_buffer.recv()
+                    logging.debug(self.CLASS_IDENTIFIER + "Received spike from %d at %d"%(spk_cl, spk_time))
 
+                    spike_position_lag = float(spk_time) - float(curr_postime)
+                    if (spike_position_lag > self._ALLOWED_TIMESTAMPS_LAG):
+                        logging.info(self.CLASS_IDENTIFIER + "Position lagging spikes by %d timestamps. S.%d, P.%d"%(spike_position_lag, spk_time, curr_postime))
+                        break
+                    elif (curr_speed < RiD.MOVE_VELOCITY_THRESOLD):
+                        logging.debug(self.CLASS_IDENTIFIER + "Spike at %d skipped, speed %.2fcm/s below threshold"%(spk_time, curr_speed))
+                        break
+                    else:
+                        pf_update_spk_iter += 1
                         self._nspks_in_bin[spk_cl, curr_posbin_x, curr_posbin_y] += 1
                         # Send this to the visualization pipeline to see how spike are being reported
                         if spk_cl in self._requested_clusters:
@@ -180,17 +188,8 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                                 pipe_in.send((spk_cl, curr_posbin_x, curr_posbin_y, spk_time))
                             logging.debug(self.CLASS_IDENTIFIER + "Spike at %d sent out to listeners"%spk_time)
 
-                        pf_update_spk_iter += 1
-                        spike_position_lag = float(spk_time) - float(curr_postime)
-                        if (spike_position_lag > self._ALLOWED_TIMESTAMPS_LAG):
-                            logging.info(self.CLASS_IDENTIFIER + "Position lagging spikes by %d timestamps. S.%d, P.%d"%(spike_position_lag, spk_time, curr_postime))
-                            curr_speed = 0
-                            break
-
-                        if self._csv_writer:
-                            self._csv_writer.writerow([spk_cl, spk_time, curr_posbin_x, curr_posbin_y, curr_speed])
-                else:
-                    logging.debug(self.CLASS_IDENTIFIER + "Spike at %d skipped, speed %.2fcm/s below threshold"%(spk_time, curr_speed))
+                    if self._csv_writer:
+                        self._csv_writer.writerow([spk_cl, spk_time, curr_posbin_x, curr_posbin_y, curr_speed])
 
                 # If spike timestamp starts leading position timestamps by too
                 # much, wait for position timestamps to catch up. This
