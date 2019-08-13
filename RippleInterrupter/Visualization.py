@@ -547,9 +547,12 @@ class GraphicsManager(Process):
             # Request place field handler to pause place field calculation
             # while we fetch the data
             self._place_field_handler.submit_immediate_request()
-            # np.copyto(self._most_recent_pf, self._shared_place_fields[self.__CLUSTERS_TO_PLOT[0], :, :])
             with self._pf_lock:
-                np.mean(self._shared_place_fields, out=self._most_recent_pf, axis=0)
+                # Uncomment this line to get an average of all the place fields
+                # np.mean(self._shared_place_fields, out=self._most_recent_pf, axis=0)
+
+                # Uncomment to look at the place field of the selected unit
+                np.copyto(self._most_recent_pf, self._shared_place_fields[self.unit_selection.currentIndex(), :, :])
             # Release the request that paused place field computation
             self._place_field_handler.end_immediate_request()
         logging.info(MODULE_IDENTIFIER + "Place Field pipe closed.")
