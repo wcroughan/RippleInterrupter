@@ -247,7 +247,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                                 ripple_unseen_LFP = True
                                 ripple_unseen_calib = True
                                 logging.info(MODULE_IDENTIFIER + "Detected ripple, notified with lag of %.6fs"%(curr_wall_time-frame_time))
-                            logging.info(MODULE_IDENTIFIER + "Detected ripple at %.2f, TS: %d. Peak Strength: %.2f"% \
+                            logging.info(MODULE_IDENTIFIER + "Detected ripple at %.6f, TS: %d. Peak Strength: %.2f"% \
                                     (frame_time, timestamp, np.max(power_to_baseline_ratio)))
                     if ((curr_time - prev_ripple) > RiD.LFP_BUFFER_TIME/2) and ripple_unseen_LFP:
                         ripple_unseen_LFP = False

@@ -39,9 +39,9 @@ DEFAULT_STIMULATION_CHOICE = False
 
 # Choices in functionality
 DEFAULT_SERIAL_ENABLED = False
-DEFAULT_STIM_MODE_MANUAL_ENABLED = True
+DEFAULT_STIM_MODE_MANUAL_ENABLED = False
 DEFAULT_STIM_MODE_POSITION_ENABLED = False
-DEFAULT_STIM_MODE_RIPPLE_ENABLED = False
+DEFAULT_STIM_MODE_RIPPLE_ENABLED = True
 
 class StimulationSynchronizer(ThreadExtension.StoppableProcess):
     """
@@ -54,7 +54,7 @@ class StimulationSynchronizer(ThreadExtension.StoppableProcess):
     _SPIKE_BUFFER_SIZE = 200
     CLASS_IDENTIFIER = "[StimulationSynchronizer] "
 
-    def __init__(self, sync_event, spike_listener, position_estimator, place_field_handler):
+    def __init__(self, sync_event, spike_listener, position_estimator, place_field_handler, sg_client=None):
         """TODO: to be defined1. """
         ThreadExtension.StoppableProcess.__init__(self)
         self._sync_event = sync_event
@@ -63,6 +63,7 @@ class StimulationSynchronizer(ThreadExtension.StoppableProcess):
         self._spike_buffer_connection = spike_listener.get_spike_buffer_connection()
         self._position_buffer_connection = position_estimator.get_position_buffer_connection()
         self._place_field_handler = place_field_handler
+        self._sg_client = sg_client
         self._position_access = Lock()
         self._spike_access = Lock()
         # TODO: This functionality should be moved to the parent class
@@ -81,7 +82,7 @@ class StimulationSynchronizer(ThreadExtension.StoppableProcess):
         try:
             self._serial_port = SerialPort.BiphasicPort()
         except Exception as err:
-            logging.warning("Unable to open Serial port.")
+            logging.warning(self.CLASS_IDENTIFIER + "Unable to open Serial port.")
             print(err)
         logging.info(self.CLASS_IDENTIFIER + "Started Stimulation Synchronization thread.")
 
@@ -197,9 +198,9 @@ class StimulationSynchronizer(ThreadExtension.StoppableProcess):
                         self._serial_port.sendBiphasicPulse()
                         print(self.CLASS_IDENTIFIER + "Ripple tiggered. Loc (%d, %d), V %.2fcm/s" \
                                 %(self._pos_x, self._pos_y, self._most_recent_speed))
-                        logging.info(self.CLASS_IDENTIFIER + "Ripple tiggered. Loc (%d, %d), V %.2fcm/s" \
-                                %(self._pos_x, self._pos_y, self._most_recent_speed))
-                        self._serial_port.sendBiphasicPulse()
+                        # trodes_timestamp = self._sg_client.latestTrodesTimestamp()
+                        logging.info(self.CLASS_IDENTIFIER + "Ripple tiggered. Loc (%d, %d), V %.2fcm/s. Time: %.6f" \
+                                %(self._pos_x, self._pos_y, self._most_recent_speed, time.perf_counter()))
 
                     with self._spike_access:
                         if len(self._spike_buffer) > 0:
@@ -229,13 +230,15 @@ class CommandWindow(QMainWindow):
         QMainWindow.__init__(self)
         self.setWindowTitle('Spike Processor')
         self.statusBar().showMessage('Connect to SpikeGadgets.')
+        self.stim_mode_position = None
+        self.stim_mode_ripple = None
         self.setupMenus()
 
         # TODO: None of the thread classes have any clean up at the end... TBD
         if __debug__:
             # Create code profiler
             self.code_profiler = cProfile.Profile()
-            profile_prefix = "replay_disruption_profile"
+            profile_prefix = "stimulation_profile"
             self.profile_filename = time.strftime(profile_prefix + "_%Y%m%d_%H%M%S.pr")
 
         # Tetrode info fields
@@ -319,10 +322,15 @@ class CommandWindow(QMainWindow):
         QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
 
     def positionStimTrigger(self, state):
-        QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
+        self.stim_mode_position.setChecked(not state)
+        # QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
 
     def rippleStimTrigger(self, state):
-        QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
+        self.stim_mode_ripple.setChecked(not state)
+        if state:
+            self.ripple_trigger.disable()
+        else:
+            self.ripple_trigger.enable()
 
     ############################# SERIAL FUNCTIONALITY #############################
     # Add functions that let you access and test the serial port in a
@@ -448,15 +456,18 @@ class CommandWindow(QMainWindow):
         stim_mode_manual.triggered.connect(self.manualStimTrigger)
         stim_mode_manual.setShortcut('Ctrl+M')
 
-        stim_mode_position = stimulation_menu.addAction('&Position')
-        stim_mode_position.setStatusTip('Use position and velocity to simulate.')
-        stim_mode_position.setChecked(DEFAULT_STIM_MODE_POSITION_ENABLED)
-        stim_mode_position.triggered.connect(self.positionStimTrigger)
+        self.stim_mode_position = QAction('&Position', self, checkable=True)
+        self.stim_mode_position.setStatusTip('Use position and velocity to simulate.')
+        self.stim_mode_position.setChecked(DEFAULT_STIM_MODE_POSITION_ENABLED)
+        self.stim_mode_position.triggered.connect(self.positionStimTrigger)
 
-        stim_mode_ripple = stimulation_menu.addAction('&Ripple')
-        stim_mode_ripple.setStatusTip('Stimulate on Sharp-Wave Ripples.')
-        stim_mode_ripple.setChecked(DEFAULT_STIM_MODE_RIPPLE_ENABLED)
-        stim_mode_ripple.triggered.connect(self.rippleStimTrigger)
+        self.stim_mode_ripple = QAction('&Ripple', self, checkable=True)
+        self.stim_mode_ripple.setStatusTip('Stimulate on Sharp-Wave Ripples.')
+        self.stim_mode_ripple.setChecked(DEFAULT_STIM_MODE_RIPPLE_ENABLED)
+        self.stim_mode_ripple.triggered.connect(self.rippleStimTrigger)
+
+        stimulation_menu.addAction(self.stim_mode_position)
+        stimulation_menu.addAction(self.stim_mode_ripple)
 
     def getProcessingArgs(self):
         processing_args = list()
@@ -638,6 +649,11 @@ class CommandWindow(QMainWindow):
             self.place_field_handler.start()
             self.ripple_trigger.start()
             self.calib_plot.start()
+
+            # Select disruption mode
+            self.rippleStimTrigger(not DEFAULT_STIM_MODE_RIPPLE_ENABLED)
+            self.positionStimTrigger(not DEFAULT_STIM_MODE_POSITION_ENABLED)
+
         except Exception as err:
             QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to stream. Check connection to client!')
             print(err)
@@ -656,7 +672,7 @@ class CommandWindow(QMainWindow):
                     trigger_condition=(self.trig_condition, self.show_trigger, self.calib_trigger),\
                     shared_buffers=(self.shared_raw_lfp_buffer, self.shared_ripple_buffer))
             self.ripple_trigger = StimulationSynchronizer(self.trig_condition, self.spike_listener,\
-                    self.position_estimator, self.place_field_handler)
+                    self.position_estimator, self.place_field_handler, self.sg_client)
         except Exception as err:
             QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start ripple trigger threads(s).')
             print(err)
