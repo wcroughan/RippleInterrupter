@@ -715,8 +715,12 @@ def main():
         logging.basicConfig(filename=log_filename, format="%(asctime)s.%(msecs)03d:%(message)s", \
                 level=logging.DEBUG, datefmt="%H:%M:%S")
     else:
+        """
         logging.basicConfig(filename=log_filename, format="%(asctime)s.%(msecs)03d:%(message)s", \
                 level=logging.INFO, datefmt="%H:%M:%S")
+        """
+        logging.basicConfig(filename=log_filename, format="%(asctime)s.%(msecs)03d:%(message)s", \
+                level=logging.DEBUG, datefmt="%H:%M:%S")
     logging.debug(MODULE_IDENTIFIER + "Starting Log file at " + time.ctime())
 
     qt_args = list()

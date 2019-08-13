@@ -88,7 +88,7 @@ class LFPListener(ThreadExtension.StoppableThread):
             else:
                 down_time = 0.0
             for frame_idx in range(n_lfp_frames):
-                frame_time = time.time()
+                frame_time = time.perf_counter()
                 timestamp = self._lfp_stream.getData()
                 n_frames_fetched += 1
                 # print(self.CLASS_IDENTIFIER + "Fetched %d frames"%n_frames_fetched)
@@ -191,7 +191,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         ripple_unseen_calib = False
         prev_ripple = -np.Inf
         curr_time   = 0.0
-        start_wall_time = time.time()
+        start_wall_time = time.perf_counter()
         curr_wall_time = start_wall_time
 
         # Keep track of the total time for which nothing was received
@@ -243,10 +243,10 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                             with self._trigger_condition:
                                 # First trigger interruption and all time critical operations
                                 self._trigger_condition.notify()
-                                curr_wall_time = time.time()
+                                curr_wall_time = time.perf_counter()
                                 ripple_unseen_LFP = True
                                 ripple_unseen_calib = True
-                                logging.info(MODULE_IDENTIFIER + "Detected ripple, notified with lag of %.6f ms"%(curr_wall_time-frame_time))
+                                logging.info(MODULE_IDENTIFIER + "Detected ripple, notified with lag of %.6fs"%(curr_wall_time-frame_time))
                             logging.info(MODULE_IDENTIFIER + "Detected ripple at %.2f, TS: %d. Peak Strength: %.2f"% \
                                     (frame_time, timestamp, np.max(power_to_baseline_ratio)))
                     if ((curr_time - prev_ripple) > RiD.LFP_BUFFER_TIME/2) and ripple_unseen_LFP:
@@ -278,7 +278,7 @@ Code below here is from the previous iterations where we were using a single
 file to detect and disrupt all ripples based on the LFP on a single tetrode.
 """
 def writeLogFile(trodes_timestamps, ripple_events, wall_ripple_times, interrupt_events):
-    outf = open(os.getcwd() + "/ripple_interruption_out__" +str(time.time()) + ".txt", "w")
+    outf = open(os.getcwd() + "/ripple_interruption_out__" +str(time.perf_counter()) + ".txt", "w")
 
     # First write out the ripples
     outf.write("Detected Ripple Events...\n")
@@ -381,7 +381,7 @@ def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
 
     wait_for_user_input = input("Press Enter to start!")
     start_time  = 0.0
-    start_wall_time = time.time()
+    start_wall_time = time.perf_counter()
     interruption_iter = -1
     is_first_ripple = True
     while (iter_idx < N_DATA_SAMPLES):
@@ -434,7 +434,7 @@ def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
                             current_time = float(iter_idx)/float(RiD.LFP_FREQUENCY)
                             if ((current_time - prev_ripple) > RiD.RIPPLE_REFRACTORY_PERIOD):
                                 prev_ripple = current_time
-                                current_wall_time = time.time() - start_wall_time
+                                current_wall_time = time.perf_counter() - start_wall_time
                                 time_lag = (current_wall_time - current_time)
                                 if interrupt_ripples:
                                     ser.sendBiphasicPulse()
