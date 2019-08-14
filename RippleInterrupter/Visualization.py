@@ -191,15 +191,58 @@ class GraphicsManager(Process):
         self.widget  = QDialog()
         self.figure  = Figure(figsize=(12,16))
         self.canvas  = FigureCanvas(self.figure)
-        plot_grid    = gridspec.GridSpec(2, 2)
-        self.toolbar = NavigationToolbar(self.canvas, self.widget)
-        self._rd_ax = self.figure.add_subplot(plot_grid[0])
-        self._pf_ax = self.figure.add_subplot(plot_grid[3])
-        self._cp_ax = self.figure.add_subplot(plot_grid[1])
 
-        # This is tricky because right now we are using this as an array to
-        # store multiple axes, each plotting a different unit.
-        self._spk_pos_ax = self.figure.add_subplot(plot_grid[2])
+        # Count the number of requested features
+        n_features_to_show = 0
+        if ripple_buffers is not None:
+            # Ripple data needs to be shown
+            n_features_to_show += 1
+
+        if calib_plot_buffers is not None:
+            n_features_to_show += 1
+
+        if position_estimator is not None:
+            n_features_to_show += 1
+
+        if place_field_handler is not None:
+            n_features_to_show += 1
+
+        # The layout of the application can be different based on what features
+        # are being requested
+        if n_features_to_show == 1:
+            plot_grid = gridspec.GridSpec(1, 1)
+        elif n_features_to_show == 2:
+            plot_grid = gridspec.GridSpec(1, 2)
+        elif n_features_to_show == 3:
+            plot_grid = gridspec.GridSpec(1, 3)
+        elif n_features_to_show == 4:
+            plot_grid = gridspec.GridSpec(2, 2)
+
+        self.toolbar = NavigationToolbar(self.canvas, self.widget)
+        current_grid_place = 0
+        if ripple_buffers is not None:
+            self._rd_ax = self.figure.add_subplot(plot_grid[current_grid_place])
+            current_grid_place += 1
+        else:
+            self._rd_ax = None
+
+        if calib_plot_buffers is not None:
+            self._cp_ax = self.figure.add_subplot(plot_grid[current_grid_place])
+            current_grid_place += 1
+        else:
+            self._cp_ax = None
+
+        if position_estimator is not None:
+            self._spk_pos_ax = self.figure.add_subplot(plot_grid[current_grid_place])
+            current_grid_place += 1
+        else:
+            self._spk_pos_ax = None
+
+        if place_field_handler is not None:
+            self._pf_ax = self.figure.add_subplot(plot_grid[current_grid_place])
+            current_grid_place += 1
+        else:
+            self._pf_ax = None
 
         # Selecting individual units
         self.unit_selection = QComboBox()
@@ -428,36 +471,40 @@ class GraphicsManager(Process):
 
     def clearAxes(self):
         # Ripple detection axis
-        self._rd_ax.cla()
-        self._rd_ax.set_xlabel("Time (s)")
-        self._rd_ax.set_ylabel("EEG (uV)")
-        self._rd_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
-        self._rd_ax.set_ylim((-1.0, 1.0))
-        self._rd_ax.grid(True)
+        if self._rd_ax is not None:
+            self._rd_ax.cla()
+            self._rd_ax.set_xlabel("Time (s)")
+            self._rd_ax.set_ylabel("EEG (uV)")
+            self._rd_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
+            self._rd_ax.set_ylim((-1.0, 1.0))
+            self._rd_ax.grid(True)
 
         # Calibration plot
-        self._cp_ax.cla()
-        self._cp_ax.set_xlabel("Time (s)")
-        self._cp_ax.set_ylabel("Spike Rate (spks/5ms)")
-        self._cp_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
-        self._cp_ax.set_ylim((0.0, 20.0))
-        self._cp_ax.grid(True)
+        if self._cp_ax is not None:
+            self._cp_ax.cla()
+            self._cp_ax.set_xlabel("Time (s)")
+            self._cp_ax.set_ylabel("Spike Rate (spks/5ms)")
+            self._cp_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
+            self._cp_ax.set_ylim((0.0, 20.0))
+            self._cp_ax.grid(True)
 
         # Place field
-        self._pf_ax.cla()
-        self._pf_ax.set_xlabel("x (bin)")
-        self._pf_ax.set_ylabel("y (bin)")
-        self._pf_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
-        self._pf_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
-        self._pf_ax.grid(True)
+        if self._pf_ax is not None:
+            self._pf_ax.cla()
+            self._pf_ax.set_xlabel("x (bin)")
+            self._pf_ax.set_ylabel("y (bin)")
+            self._pf_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
+            self._pf_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
+            self._pf_ax.grid(True)
 
         # Spikes (from a single cell) and position
-        self._spk_pos_ax.cla()
-        self._spk_pos_ax.set_xlabel("x (bin)")
-        self._spk_pos_ax.set_ylabel("y (bin)")
-        self._spk_pos_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
-        self._spk_pos_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
-        self._spk_pos_ax.grid(True)
+        if self._spk_pos_ax is not None:
+            self._spk_pos_ax.cla()
+            self._spk_pos_ax.set_xlabel("x (bin)")
+            self._spk_pos_ax.set_ylabel("y (bin)")
+            self._spk_pos_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
+            self._spk_pos_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
+            self._spk_pos_ax.grid(True)
 
         self.canvas.draw()
 
@@ -637,6 +684,9 @@ class GraphicsManager(Process):
         Initialize figure window for showing raw LFP and ripple power.
         :returns: TODO
         """
+        if self._rd_ax is None:
+            return
+
         lfp_frame, = self._rd_ax.plot([], [], animated=True)
         ripple_power_frame, = self._rd_ax.plot([], [], animated=True)
         self._rd_frame.append(lfp_frame)
@@ -653,6 +703,9 @@ class GraphicsManager(Process):
         Initialize figure window for showing raw LFP and ripple power.
         :returns: TODO
         """
+        if self._cp_ax is None:
+            return
+
         spk_cnt_frame, = self._cp_ax.plot([], [], animated=True)
         spk_cnt_plus_sterr_frame, = self._cp_ax.plot([], [], animated=True)
         spk_cnt_minus_sterr_frame, = self._cp_ax.plot([], [], animated=True)
@@ -670,7 +723,9 @@ class GraphicsManager(Process):
         """
         Initialize figure window for showing spikes overlaid on position
         """
-        # TODO: Deal with this to only plot spikes from the unit we are interested in.
+        if self._spk_pos_ax is None:
+            return
+
         spk_frame, = self._spk_pos_ax.plot([], [], linestyle='None', marker='o', alpha=0.4, animated=True)
         pos_frame, = self._spk_pos_ax.plot([], [], animated=True)
         vel_frame  = self._spk_pos_ax.text(40.0, 2.0, 'speed = 0cm/s')
@@ -687,6 +742,9 @@ class GraphicsManager(Process):
         """
         Initialize figure window for dynamically showing place fields.
         """
+        if self._pf_ax is None:
+            return
+
         pf_heatmap = self._pf_ax.imshow(np.zeros((PositionAnalysis.N_POSITION_BINS[0], \
                 PositionAnalysis.N_POSITION_BINS[1]), dtype='float'), vmin=0, \
                 vmax=self.__MAX_FIRING_RATE, animated=True)
