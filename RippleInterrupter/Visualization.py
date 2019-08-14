@@ -169,7 +169,6 @@ class GraphicsManager(Process):
     __PEAK_LFP_AMPLITUDE = 3000
     __CLUSTERS_TO_PLOT = Configuration.EXPERIMENT_DAY_20190307__ALL_INTERESTING_CLUSTERS
     __N_SUBPLOT_COLS = int(3)
-    __N_SUBPLOT_ROWS = int(1)
     __MAX_FIRING_RATE = 40.0
     __RIPPLE_DETECTION_TIMEOUT = 1.0
 
@@ -269,27 +268,33 @@ class GraphicsManager(Process):
         self._ripple_trigger_thread = ripple_trigger_thread
         self._ripple_trigger_condition = ripple_trigger_condition
         self._calib_trigger_condition = calib_trigger_condition
-        if (clusters is None) and (self._spike_listener is not None):
-            self._n_total_clusters = self._spike_listener.get_n_clusters()
-            # These are the clusters we are going to plot
-            self._n_clusters = len(self.__CLUSTERS_TO_PLOT)
-            self._clusters = self.__CLUSTERS_TO_PLOT
-            self._tetrodes = self._spike_listener.get_tetrodes()
-            self._n_tetrodes = len(self._tetrodes)
-        else:
-            # TODO: Fetch indices for these clusters
-            self._n_clusters = 0
-            self._clusters = None
-            self._tetrodes = list()
-            self._n_tetrodes = 0
-            pass
-        self._cluster_colormap = colormap.magma(np.linspace(0, 1, self._n_clusters))
 
+        # Look at spikes if we are going to be getting them
+        if (self._spike_listener is not None):
+            self._n_total_clusters = self._spike_listener.get_n_clusters()
+            self._n_tetrodes = len(self._tetrodes)
+            if clusters is None:
+                # These are the clusters we are going to plot
+                self._n_clusters = len(self.__CLUSTERS_TO_PLOT)
+                self._clusters = self.__CLUSTERS_TO_PLOT
+            else:
+                self._n_clusters = len(clusters)
+                self._clusters = clusters
+        else:
+            self._n_clusters = 0
+            self._clusters = list()
+            self._n_total_clusters = 0
+            self._n_tetrodes = 0
+
+        self._cluster_colormap = colormap.magma(np.linspace(0, 1, self._n_clusters))
         # Create a list of threads depending on the requeseted features.
         self._thread_list = list()
 
         # Enable Ripple Buffer and corresponding thread if requested
-        if ripple_buffers is not None:
+        if ripple_buffers[0] is not None:
+            # If we are not getting spike data, then this needs to be updated using the LFP BUFFER
+            if self._n_tetrodes == 0:
+                self._n_tetrodes = int(len(ripple_buffers[0])/RiD.LFP_BUFFER_LENGTH)
             self._shared_raw_lfp_buffer = np.reshape(np.frombuffer(ripple_buffers[0], dtype='double'), \
                     (self._n_tetrodes, RiD.LFP_BUFFER_LENGTH))
             self._shared_ripple_power_buffer = np.reshape(np.frombuffer(ripple_buffers[1], dtype='double'), \
@@ -324,7 +329,7 @@ class GraphicsManager(Process):
 
         # Enable spike calibration plots if requested
         self._calib_lock = threading.Lock()
-        if calib_plot_buffers is not None: 
+        if calib_plot_buffers[0] is not None: 
             self._shared_calib_plot_means = np.reshape(np.frombuffer(calib_plot_buffers[0], dtype='double'), \
                     (RiD.CALIB_PLOT_BUFFER_LENGTH))
             self._shared_calib_plot_std_errs = np.reshape(np.frombuffer(calib_plot_buffers[1], dtype='double'), \
@@ -336,10 +341,11 @@ class GraphicsManager(Process):
             self._shared_calib_plot_means = None
             self._shared_calib_plot_std_errs = None
 
+        print("Pass 1")
         # Local copies of the shared data that can be used at a leisurely pace
         self._lfp_lock = threading.Lock()
-        self._lfp_tpts = np.linspace(0, RiD.LFP_BUFFER_TIME, RiD.LFP_BUFFER_LENGTH)
-        self._ripple_power_tpts = np.linspace(0, RiD.LFP_BUFFER_TIME, RiD.RIPPLE_POWER_BUFFER_LENGTH)
+        self._lfp_tpts = np.linspace(-0.5 * RiD.LFP_BUFFER_TIME, 0.5 * RiD.LFP_BUFFER_TIME, RiD.LFP_BUFFER_LENGTH)
+        self._ripple_power_tpts = np.linspace(-0.5 * RiD.LFP_BUFFER_TIME, 0.5 * RiD.LFP_BUFFER_TIME, RiD.RIPPLE_POWER_BUFFER_LENGTH)
         self._local_lfp_buffer = np.zeros((self._n_tetrodes, RiD.LFP_BUFFER_LENGTH), dtype='double')
         self._local_ripple_power_buffer = np.zeros((self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH), dtype='double')
 
@@ -366,7 +372,6 @@ class GraphicsManager(Process):
         # Ripple detection
         # Place Fields
         # Position/Spikes overalaid
-        self.__N_SUBPLOT_ROWS = int(np.ceil((self._n_clusters/self.__N_SUBPLOT_COLS)))
         self._rd_frame = list()
         self._spk_pos_frame = list()
         self._pf_frame = list()
@@ -475,7 +480,7 @@ class GraphicsManager(Process):
             self._rd_ax.cla()
             self._rd_ax.set_xlabel("Time (s)")
             self._rd_ax.set_ylabel("EEG (uV)")
-            self._rd_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
+            self._rd_ax.set_xlim((-0.5 * RiD.LFP_BUFFER_TIME, 0.5 * RiD.LFP_BUFFER_TIME))
             self._rd_ax.set_ylim((-1.0, 1.0))
             self._rd_ax.grid(True)
 
@@ -484,7 +489,7 @@ class GraphicsManager(Process):
             self._cp_ax.cla()
             self._cp_ax.set_xlabel("Time (s)")
             self._cp_ax.set_ylabel("Spike Rate (spks/5ms)")
-            self._cp_ax.set_xlim((0.0, RiD.LFP_BUFFER_TIME))
+            self._cp_ax.set_xlim((-0.5 * RiD.LFP_BUFFER_TIME, 0.5 * RiD.LFP_BUFFER_TIME))
             self._cp_ax.set_ylim((0.0, 20.0))
             self._cp_ax.grid(True)
 

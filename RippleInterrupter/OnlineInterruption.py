@@ -32,9 +32,9 @@ import CalibrationPlot
 MODULE_IDENTIFIER = "[OnlineInterruption] "
 # User selection choices for what they want to see on the screen
 DEFAULT_LFP_CHOICE      = True
-DEFAULT_SPIKES_CHOICE   = True
-DEFAULT_POSITION_CHOICE = True
-DEFAULT_FIELD_CHOICE    = True
+DEFAULT_SPIKES_CHOICE   = False
+DEFAULT_POSITION_CHOICE = False
+DEFAULT_FIELD_CHOICE    = False
 DEFAULT_STIMULATION_CHOICE = False
 
 # Choices in functionality
