@@ -132,7 +132,6 @@ class PositionEstimator(ThreadExtension.StoppableThread):
         prev_x_bin = -1
         prev_y_bin = -1
         last_velocity = 0
-        thread_start_time = time.time()
 
         # TODO: Because it will not be possible to get the correct first time
         # stamp, we will have to ignore the first data entry obtained here.
@@ -156,7 +155,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
             else:
                 down_time = 0.0
 
-            for frame_idx in range(n_available_frames):
+            for _ in range(n_available_frames):
                 self._position_consumer.readData(self._data_field)
                 current_timestamp = self._data_field['timestamp']
                 (curr_x_bin, curr_y_bin) = self.getXYBin()
@@ -226,3 +225,4 @@ class PositionEstimator(ThreadExtension.StoppableThread):
         if __debug__:
             code_profiler.disable()
             code_profiler.dump_stats(profile_filename)
+        logging.info(MODULE_IDENTIFIER + "Position data collection Stopped")

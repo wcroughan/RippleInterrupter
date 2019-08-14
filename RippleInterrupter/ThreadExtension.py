@@ -18,6 +18,9 @@ class StoppableThread(threading.Thread):
     def req_stop(self):
         return self._stop_event.is_set()
 
+    def reset(self):
+        self._stop_event.clear()
+
     def join(self, timeout=None):
         # For all implementations of this class, need to extend the join method
         # to log the time at which thread ended.
@@ -43,6 +46,9 @@ class StoppableProcess(multiprocessing.Process):
 
     def req_stop(self):
         return self._stop_event.is_set()
+
+    def reset(self):
+        self._stop_event.clear()
 
     def join(self, timeout=None):
         # For all implementations of this class, need to extend the join method

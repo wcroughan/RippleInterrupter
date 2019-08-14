@@ -4,33 +4,51 @@ import multiprocessing
 import numpy as np
 
 # Local imports
+import RippleDefinitions
 import SpikeAnalysis
 import PositionAnalysis
 import StimHardware
 import ThreadExtension
+
+# Size of the decoding window and the window size
+# Cut 1: We are only focusing on behavioral time-scale decoding. There will not
+# be a sliding window. We will just look at the posterior across disjoint
+# decoding windows.
+DECODING_TIME_WINDOW = 0.050
+DECODING_WINDOW_SLIDE = 0.050
+POSTERIOR_BUFFER_SIZE = 100
 
 class BayesianEstimator(ThreadExtension.StoppableProcess):
     """
     When a ripple trigger arrives, switches to replay decoding immediately.
     """
 
-    def __init__(self, spike_sender, place_field_provider):
+    def __init__(self, spike_sender, place_field_provider, shared_place_fields):
         """TODO: to be defined1. """
         ThreadExtension.StoppableProcess.__init__(self)
         # Hoping that everything in python is pass by reference. Place fields
         # is a giant array! Both spike buffer and place fields are shared
         # resources.
-        self.prob_buffer_size = 100
-        self.time_bin_width = int(0.01 * 30000) #trodes samples at 30kHz, so this is 10ms
+        self.prob_buffer_size = POSTERIOR_BUFFER_SIZE
+        self.time_bin_width = int(DECODING_TIME_WINDOW * RippleDefinitions.SPIKE_SAMPLING_FREQ) #trodes samples at 30kHz, so this is 10ms
         self.nspks_until_get_new_pf = 50
         self.num_return_time_bins = 10
 
         self._spike_buffer = spike_sender.get_spike_buffer_connection()
         #self._log_place_fields = place_field_provider.get_log_place_fields()
         self._place_field_provider = place_field_provider
+
+        n_units = spike_sender.get_n_clusters()
+        self._shared_place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), \
+            (n_units, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
+        self._most_recent_pf = np.zeros((n_units, PositionAnalysis.N_POSITION_BINS[0], \
+            PositionAnalysis.N_POSITION_BINS[1]), dtype='float')
+
+        # TODO: Might have to move to a fixed sized deque at a later point.
+        # Right now, it seems, as soon as the posterior buffer is full, we
+        # erase everything and start writing stuff from the first available
+        # array entry.
         self._bin_times = np.zeros((1,self.prob_buffer_size))
-        self._done_exp_output_flag = [True for i in range(self.prob_buffer_size)]
-        self._need_exp_output_flag = [False for i in range(self.prob_buffer_size)]
         self.time_bin = 0
         
         self._log_probs_out = np.zeros((self.prob_buffer_size, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
@@ -44,20 +62,26 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
 
         while True:
             if spk_iter >= self.nspks_until_get_new_pf:
-                (self._log_place_fields, self._correction_factor) = self._place_field_provider.get_place_fields()
+                self._place_field_provider.submit_immediate_request()
+                np.log(self._place_field_provider.get_place_fields(), out=self._most_recent_pf)
+                self._place_field_provider.end_immediate_request()
                 spk_iter = 0
             
             how_far_back = -1
 
             with self._output_lock:
-                while not self._request_made and self._spike_buffer.poll():
+                while (not self._request_made) and self._spike_buffer.poll():
                     #get the next spike
                     (spk_cl, spk_time) = self._spike_buffer.recv()
 
-                    self.time_bin = (spk_time // time_bin_width) % self.prob_buffer_size
-                    if spk_time > self._bin_times[self.time_bin] + time_bin_width:
+                    self.time_bin = (spk_time // self.time_bin_width) % self.prob_buffer_size
+
+                    # If the timestamp of the new spike indicates that we need
+                    # to change the current time-bin for which we are
+                    # calculating the posterior.
+                    if spk_time > self._bin_times[self.time_bin] + self.time_bin_width:
                         #update bin times
-                        new_time = time_bin_width * (spk_time // time_bin_width)
+                        new_time = self.time_bin_width * (spk_time // self.time_bin_width)
                         this_bin = self.time_bin
                         while self._bin_times[this_bin] < new_time:
                             self._bin_times[this_bin] = new_time
@@ -67,7 +91,7 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
                             this_bin -= 1
                             if this_bin == -1:
                                 this_bin = self.prob_buffer_size - 1
-                            new_time -= time_bin_width
+                            new_time -= self.time_bin_width
 
                             how_far_back = this_bin
 
@@ -76,6 +100,7 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
                     self._log_probs_out[self.time_bin,:,:] += self._log_place_fields[spk_cl,:,:]
                     spk_iter += 1
 
+                # TODO: This bit of the code might have to be re-written.
                 if how_far_back != -1:
                     upd_bin = how_far_back
                     if upd_bin == this_bin:

@@ -219,6 +219,7 @@ class StimulationSynchronizer(ThreadExtension.StoppableProcess):
         spike_fetcher.join()
         velocity_fetcher.join()
         logging.info(self.CLASS_IDENTIFIER + "Helper threads exited.")
+        logging.info(MODULE_IDENTIFIER + "Stimulation event synchronizer Stopped")
 
 class CommandWindow(QMainWindow):
     """
@@ -275,7 +276,12 @@ class CommandWindow(QMainWindow):
         self.ripple_detector     = None
         self.position_estimator  = None
         self.place_field_handler = None
+        self.bayesian_estimator  = None
         self.graphical_interface = None
+
+        # Put all the processes in a list so that we don't have to deal with
+        # each of them by name when starting/stopping streaming.
+        self.active_processes    = list()
 
         # Launch the main graphical interface as a widget
         self.setGeometry(100, 100, 900, 1200)
@@ -368,9 +374,20 @@ class CommandWindow(QMainWindow):
         QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
 
     def disconnectAndQuit(self):
+        QtHelperUtils.display_information(MODULE_IDENTIFIER + 'Quitting Program!')
         if self.graphical_interface is not None:
             self.graphical_interface.kill_gui()
-        self.stopThreads()
+
+        if self.data_streaming:
+            self.stopThreads()
+
+        try:
+            self.sg_client.closeConnections()
+        except Exception as err:
+            print(MODULE_IDENTIFIER + "Unable to close connection to Trodes. Not that it won't throw seg fault in your face anyways!")
+            print(err)
+
+        print(MODULE_IDENTIFIER + "Program finished. Exiting.")
         qApp.quit()
 
     def setupMenus(self):
@@ -514,6 +531,10 @@ class CommandWindow(QMainWindow):
         """
         Connect to Trodes client.
         """
+        if self.sg_client is not None:
+            QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Already connected to Trodes! Try restarting to re-connect.')
+            return
+
         try:
             self.sg_client = TrodesInterface.SGClient("ReplayInterruption")
         except Exception as err:
@@ -615,33 +636,30 @@ class CommandWindow(QMainWindow):
             if __debug__:
                 self.code_profiler.disable()
                 self.code_profiler.dump_stats(self.profile_filename)
-            logging.info(MODULE_IDENTIFIER + "GUI terminated")
+            """
+            # Moving away from shutting individual threads down to stopping a list of specified threads.
             self.spike_listener.join()
-            logging.info(MODULE_IDENTIFIER  + "Spike Listener Stopped")
             self.position_estimator.join()
-            logging.info(MODULE_IDENTIFIER + "Position data collection Stopped")
             self.place_field_handler.join()
-            logging.info(MODULE_IDENTIFIER + "Place field builder Stopped")
             self.lfp_listener.join()
-            logging.info(MODULE_IDENTIFIER + "Spike calibration plot Stopped.")
             self.calib_plot.join()
-            logging.info(MODULE_IDENTIFIER + "LFP listener Stopped")
             self.ripple_detector.join()
-            logging.info(MODULE_IDENTIFIER + "Ripple detector Stopped")
             self.ripple_trigger.join()
-            logging.info(MODULE_IDENTIFIER + "Ripple event synchronizer Stopped")
-            self.sg_client.closeConnections()
+            """
+            for requested_process in self.active_processes:
+                requested_process.join()
+
         except Exception as err:
             logging.debug(MODULE_IDENTIFIER + "Caught Interrupt while exiting...")
             print(err)
-        print(MODULE_IDENTIFIER + "Program finished. Exiting.")
 
     def startThreads(self):
         """
         Start all the processing thread.
         """
         try:
-            self.graphical_interface.start()
+            """
+            # This was the old way of dealing with each process individually - leading to BUGS!!!
             self.position_estimator.start()
             self.lfp_listener.start()
             self.ripple_detector.start()
@@ -649,6 +667,10 @@ class CommandWindow(QMainWindow):
             self.place_field_handler.start()
             self.ripple_trigger.start()
             self.calib_plot.start()
+            """
+            self.graphical_interface.start()
+            for requested_process in self.active_processes:
+                requested_process.start()
 
             # Select disruption mode
             self.rippleStimTrigger(not DEFAULT_STIM_MODE_RIPPLE_ENABLED)
@@ -687,6 +709,7 @@ class CommandWindow(QMainWindow):
         try:
             tetrode_argument = [str(tet) for tet in self.tetrodes_of_interest]
             self.lfp_listener = RippleAnalysis.LFPListener(self.sg_client, tetrode_argument)
+            self.active_processes.append(self.lfp_listener)
         except Exception as err:
             QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start LFP thread(s).')
             print(err)
@@ -702,6 +725,13 @@ class CommandWindow(QMainWindow):
             self.spike_listener = SpikeAnalysis.SpikeDetector(self.sg_client, self.cluster_identity_map)
             self.place_field_handler = SpikeAnalysis.PlaceFieldHandler(self.position_estimator,\
                     self.spike_listener, self.shared_place_fields)
+            self.bayesian_estimator = PositionDecoding.BayesianEstimator(self.spike_listener, \
+                self.place_field_handler, self.shared_place_fields)
+
+            # Update the active process list
+            self.active_processes.append(self.spike_listener)
+            self.active_processes.append(self.place_field_handler)
+            self.active_processes.append(self.bayesian_estimator)
         except Exception as err:
             QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start spike thread(s).')
             print(err)
@@ -718,6 +748,7 @@ class CommandWindow(QMainWindow):
             self.calib_plot = CalibrationPlot.CalibrationPlot(self.sg_client, (self.shared_calib_plot_means,\
                     self.shared_calib_plot_std_errs, self.shared_calib_plot_spike_count_buffer),\
                     self.spike_listener, self.calib_plot_condition)
+            self.active_processes.append(self.calib_plot)
         except Exception as err:
             QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start calibration thread.')
             print(err)

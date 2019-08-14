@@ -699,4 +699,4 @@ class GraphicsManager(Process):
         # Join all the fetcher threads.
         for p__thread in self._thread_list:
             p__thread.join()
-        logging.info(MODULE_IDENTIFIER + "Closed GUI and display pipes")
+        logging.info(MODULE_IDENTIFIER + "Terminated GUI and display pipes")

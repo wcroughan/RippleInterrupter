@@ -62,6 +62,7 @@ class CalibrationPlot(ThreadExtension.StoppableProcess):
 
                     self._spike_count_online[m_bin] += 1
                     self.spk_iter += 1
+        logging.info(self.CLASS_IDENTIFIER + "Spike calibration plot Stopped.")
 
     def update_shared_buffer(self, trodes_ts):
         with self._buffer_lock:

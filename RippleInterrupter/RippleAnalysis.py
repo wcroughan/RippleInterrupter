@@ -99,6 +99,7 @@ class LFPListener(ThreadExtension.StoppableThread):
         if __debug__:
             code_profiler.disable()
             code_profiler.dump_stats(profile_filename)
+        logging.info(MODULE_IDENTIFIER + "LFP listener Stopped")
 
 class RippleDetector(ThreadExtension.StoppableProcess):
     """

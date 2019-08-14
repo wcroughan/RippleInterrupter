@@ -100,7 +100,6 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         prev_posbin_y = 0
         prev_posbin_x = 0
         prev_postime = np.Inf
-        last_postime = 0
         curr_speed = 0
         spk_time = 0
 
@@ -119,7 +118,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                 time.sleep(0.001)
                 continue
 
-            # BUG: If position thread is lagging, it will send the position at
+            # BUG [FIXED]: If position thread is lagging, it will send the position at
             # a later time but we will keep filling the spikes at the oldest
             # position bin we ever saw. We need to wait for the position thread
             # to catch up.
@@ -136,8 +135,8 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                 # assumption. It would only cause the few spikes that come late
                 # to be assigned to the next place bin the animal is in
 
-                #if it's after our most recent position update, try and read the next position
-                #keep reading positions until our position data is ahead of our spike data
+                # If it's after our most recent position update, try and read the next position
+                # keep reading positions until our position data is ahead of our spike data
                 if self._position_buffer.poll():
                     (curr_postime, curr_posbin_x, curr_posbin_y, curr_speed) = self._position_buffer.recv()
                     logging.debug(self.CLASS_IDENTIFIER + "Received new position (%d, %d) at %d"%(curr_posbin_x, curr_posbin_y, curr_postime))
@@ -213,6 +212,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
             self._csv_file.close()
             # Dump all the calculated place fields in a file
             np.save(self._place_field_filename, self._place_fields)
+        logging.info(MODULE_IDENTIFIER + "Place field builder Stopped")
 
     def submit_immediate_request(self):
         """
