@@ -51,23 +51,26 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
         self._bin_times = np.zeros((1,self.prob_buffer_size))
         self.time_bin = 0
         
+        self._request_made = False
         self._log_probs_out = np.zeros((self.prob_buffer_size, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
         self._probs_out = np.add(np.zeros_like(self._log_probs_out), 1.0 / (PositionAnalysis.N_POSITION_BINS[0] + PositionAnalysis.N_POSITION_BINS[1]))
-
         self._output_lock = multiprocessing.Condition()
 
 
     def run(self):
         spk_iter = self.nspks_until_get_new_pf + 1
 
-        while True:
+        while not self.req_stop():
             if spk_iter >= self.nspks_until_get_new_pf:
                 self._place_field_provider.submit_immediate_request()
-                np.log(self._place_field_provider.get_place_fields(), out=self._most_recent_pf)
+                np.log(self._shared_place_fields, out=self._most_recent_pf)
                 self._place_field_provider.end_immediate_request()
                 spk_iter = 0
             
             how_far_back = -1
+
+            # Not running this for now... Too much to DEBUG
+            return
 
             with self._output_lock:
                 while (not self._request_made) and self._spike_buffer.poll():
