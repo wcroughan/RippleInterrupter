@@ -172,6 +172,7 @@ class GraphicsManager(Process):
     __N_SUBPLOT_ROWS = int(1)
     __MAX_FIRING_RATE = 40.0
     __RIPPLE_DETECTION_TIMEOUT = 1.0
+
     def __init__(self, ripple_buffers, calib_plot_buffers, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_thread, ripple_trigger_condition, calib_trigger_condition, \
             shared_place_fields, clusters=None):
@@ -225,7 +226,7 @@ class GraphicsManager(Process):
         self._ripple_trigger_thread = ripple_trigger_thread
         self._ripple_trigger_condition = ripple_trigger_condition
         self._calib_trigger_condition = calib_trigger_condition
-        if clusters is None:
+        if (clusters is None) and (self._spike_listener is not None):
             self._n_total_clusters = self._spike_listener.get_n_clusters()
             # These are the clusters we are going to plot
             self._n_clusters = len(self.__CLUSTERS_TO_PLOT)
@@ -239,14 +240,53 @@ class GraphicsManager(Process):
             pass
         self._cluster_colormap = colormap.magma(np.linspace(0, 1, self._n_clusters))
 
-        # Large arrays that are shared across processes
-        self._shared_raw_lfp_buffer = np.reshape(np.frombuffer(ripple_buffers[0], dtype='double'), (self._n_tetrodes, RiD.LFP_BUFFER_LENGTH))
-        self._shared_ripple_power_buffer = np.reshape(np.frombuffer(ripple_buffers[1], dtype='double'), (self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH))
-        self._shared_place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), (self._n_total_clusters, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
+        # Create a list of threads depending on the requeseted features.
+        self._thread_list = list()
 
+        # Enable Ripple Buffer and corresponding thread if requested
+        if ripple_buffers is not None:
+            self._shared_raw_lfp_buffer = np.reshape(np.frombuffer(ripple_buffers[0], dtype='double'), \
+                    (self._n_tetrodes, RiD.LFP_BUFFER_LENGTH))
+            self._shared_ripple_power_buffer = np.reshape(np.frombuffer(ripple_buffers[1], dtype='double'), \
+                    (self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH))
+            self._thread_list.append(threading.Thread(name="RippleFrameFetcher", daemon=True, \
+                    target=self.fetch_incident_ripple))
+        else:
+            self._shared_raw_lfp_buffer = None
+            self._shared_ripple_power_buffer = None
+
+        # Enable position data and thread if requested
+        if self._position_estimator is not None:
+            self._position_buffer = self._position_estimator.get_position_buffer_connection()
+            self._thread_list.append(threading.Thread(name="PositionFetcher", daemon=True, \
+                    target=self.fetch_position_and_update_frames))
+
+        # Enable place field handler if requested
+        if (self._place_field_handler is not None) and (shared_place_fields is not None):
+            self._spike_buffer = self._place_field_handler.get_spike_place_buffer_connection(self.__CLUSTERS_TO_PLOT)
+            self._thread_list.append(threading.Thread(name="SpikeFetcher", daemon=True, \
+                    target=self.fetch_spikes_and_update_frames))
+            self._thread_list.append(threading.Thread(name="PlaceFieldFetched", daemon=True, \
+                    target=self.fetch_place_fields))
+        
+            self._shared_place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), \
+                    (self._n_total_clusters, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
+        else:
+            self._shared_place_fields = None
+
+
+        # Enable spike calibration plots if requested
         self._calib_lock = threading.Lock()
-        self._shared_calib_plot_means = np.reshape(np.frombuffer(calib_plot_buffers[0], dtype='double'), (RiD.CALIB_PLOT_BUFFER_LENGTH))
-        self._shared_calib_plot_std_errs = np.reshape(np.frombuffer(calib_plot_buffers[1], dtype='double'), (RiD.CALIB_PLOT_BUFFER_LENGTH))
+        if calib_plot_buffers is not None: 
+            self._shared_calib_plot_means = np.reshape(np.frombuffer(calib_plot_buffers[0], dtype='double'), \
+                    (RiD.CALIB_PLOT_BUFFER_LENGTH))
+            self._shared_calib_plot_std_errs = np.reshape(np.frombuffer(calib_plot_buffers[1], dtype='double'), \
+                    (RiD.CALIB_PLOT_BUFFER_LENGTH))
+            self._thread_list.append(threading.Thread(name="CalibPlotFetcher", daemon=True, \
+                    target=self.fetch_calibration_plot))
+        else:
+            self._shared_calib_plot_means = None
+            self._shared_calib_plot_std_errs = None
 
         # Local copies of the shared data that can be used at a leisurely pace
         self._lfp_lock = threading.Lock()
@@ -284,27 +324,6 @@ class GraphicsManager(Process):
         self._pf_frame = list()
         self._cp_frame = list()
         self._anim_objs = list()
-        self._thread_list = list()
-
-        # Communication buffers
-        self._position_buffer = self._position_estimator.get_position_buffer_connection()
-        self._spike_buffer = self._place_field_handler.get_spike_place_buffer_connection(self.__CLUSTERS_TO_PLOT)
-
-        # Launch a thread for fetching position data constantly
-        # Add options to only start some of these threads
-        self._thread_list = list()
-        self._thread_list.append(threading.Thread(name="PositionFetcher", daemon=True, \
-                target=self.fetch_position_and_update_frames))
-        self._thread_list.append(threading.Thread(name="SpikeFetcher", daemon=True, \
-                target=self.fetch_spikes_and_update_frames))
-        self._thread_list.append(threading.Thread(name="PlaceFieldFetched", daemon=True, \
-                target=self.fetch_place_fields))
-        self._thread_list.append(threading.Thread(name="RippleFrameFetcher", daemon=True, \
-                target=self.fetch_incident_ripple))
-        self._thread_list.append(threading.Thread(name="CalibPlotFetcher", daemon=True, \
-                target=self.fetch_calibration_plot))
-
-        # Create thread locks to update arrays that are being read for updating frames.
 
         logging.info(MODULE_IDENTIFIER + "Graphics interface started.")
         self.setLayout()
@@ -315,11 +334,11 @@ class GraphicsManager(Process):
         self.initialize_calib_plot_fig()
         self.initialize_spike_pos_fig()
         self.initialize_place_field_fig()
+
         self.pauseAnimation()
         self._keep_running.set()
         for p__thread in self._thread_list:
             p__thread.start()
-
         print(MODULE_IDENTIFIER + 'Animation plots initialized.')
 
 
