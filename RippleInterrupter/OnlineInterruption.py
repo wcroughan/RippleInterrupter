@@ -566,7 +566,8 @@ class CommandWindow(QMainWindow):
                 # Calibration data
                 self.initCalibrationThreads()
 
-            if user_processing_choices['field']:
+            # Place fields depend on Spike and Position threads being present
+            if user_processing_choices['position'] and user_processing_choices['spikes'] and user_processing_choices['field']:
                 print(MODULE_IDENTIFIER + "Starting Place field processing Threads.")
                 self.initPlaceFieldThreads()
 
