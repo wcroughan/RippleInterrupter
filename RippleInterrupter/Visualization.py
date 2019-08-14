@@ -237,6 +237,8 @@ class GraphicsManager(Process):
             # TODO: Fetch indices for these clusters
             self._n_clusters = 0
             self._clusters = None
+            self._tetrodes = list()
+            self._n_tetrodes = 0
             pass
         self._cluster_colormap = colormap.magma(np.linspace(0, 1, self._n_clusters))
 
@@ -251,6 +253,7 @@ class GraphicsManager(Process):
                     (self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH))
             self._thread_list.append(threading.Thread(name="RippleFrameFetcher", daemon=True, \
                     target=self.fetch_incident_ripple))
+            logging.info(MODULE_IDENTIFIER + "Added Ripple threads to Graphics pipeline.")
         else:
             self._shared_raw_lfp_buffer = None
             self._shared_ripple_power_buffer = None
@@ -260,6 +263,7 @@ class GraphicsManager(Process):
             self._position_buffer = self._position_estimator.get_position_buffer_connection()
             self._thread_list.append(threading.Thread(name="PositionFetcher", daemon=True, \
                     target=self.fetch_position_and_update_frames))
+            logging.info(MODULE_IDENTIFIER + "Added Position threads to Graphics pipeline.")
 
         # Enable place field handler if requested
         if (self._place_field_handler is not None) and (shared_place_fields is not None):
@@ -268,9 +272,9 @@ class GraphicsManager(Process):
                     target=self.fetch_spikes_and_update_frames))
             self._thread_list.append(threading.Thread(name="PlaceFieldFetched", daemon=True, \
                     target=self.fetch_place_fields))
-        
             self._shared_place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), \
                     (self._n_total_clusters, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
+            logging.info(MODULE_IDENTIFIER + "Added Spike/Place-Field threads to Graphics pipeline.")
         else:
             self._shared_place_fields = None
 
@@ -284,6 +288,7 @@ class GraphicsManager(Process):
                     (RiD.CALIB_PLOT_BUFFER_LENGTH))
             self._thread_list.append(threading.Thread(name="CalibPlotFetcher", daemon=True, \
                     target=self.fetch_calibration_plot))
+            logging.info(MODULE_IDENTIFIER + "Added Calibration threads to Graphics pipeline.")
         else:
             self._shared_calib_plot_means = None
             self._shared_calib_plot_std_errs = None

@@ -548,23 +548,40 @@ class CommandWindow(QMainWindow):
         user_processing_choices = self.getProcessingArgs()
         try:
             if user_processing_choices['lfp']:
+                print(MODULE_IDENTIFIER + "Starting LFP data Threads.")
                 # LFP Threads
                 self.initLFPThreads()
 
             if user_processing_choices['position']:
                 # Position data
+                print(MODULE_IDENTIFIER + "Starting Position data Threads.")
                 self.position_estimator  = PositionAnalysis.PositionEstimator(self.sg_client)
 
             if user_processing_choices['spikes']:
+                print(MODULE_IDENTIFIER + "Starting Spike data/processing Threads.")
+
                 # Spike data
                 self.initSpikeThreads()
 
                 # Calibration data
                 self.initCalibrationThreads()
 
-            if user_processing_choices['stim']:
+            if user_processing_choices['field']:
+                print(MODULE_IDENTIFIER + "Starting Place field processing Threads.")
+                self.initPlaceFieldThreads()
+
+            if user_processing_choices['lfp']:
                 # Ripple triggered actions
+                # This has to done after the threads above because this thread
+                # write to the calibration plot thread after it has detected a
+                # ripple.
+                print(MODULE_IDENTIFIER + "Starting Sharp-Wave Ripple processing Threads.")
                 self.initRippleTriggerThreads()
+
+            if user_processing_choices['stim']:
+                # Stimulation Threads
+                print(MODULE_IDENTIFIER + "Starting Stimulation Threads.")
+                self.initStimulationThreads()
 
             self.graphical_interface = Visualization.GraphicsManager((self.shared_raw_lfp_buffer,\
                     self.shared_ripple_buffer), (self.shared_calib_plot_means, self.shared_calib_plot_std_errs),\
@@ -672,9 +689,10 @@ class CommandWindow(QMainWindow):
             for requested_process in self.active_processes:
                 requested_process.start()
 
-            # Select disruption mode
-            self.rippleStimTrigger(not DEFAULT_STIM_MODE_RIPPLE_ENABLED)
-            self.positionStimTrigger(not DEFAULT_STIM_MODE_POSITION_ENABLED)
+            if self.ripple_trigger is not None:
+                # Select disruption mode
+                self.rippleStimTrigger(not DEFAULT_STIM_MODE_RIPPLE_ENABLED)
+                self.positionStimTrigger(not DEFAULT_STIM_MODE_POSITION_ENABLED)
 
         except Exception as err:
             QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to stream. Check connection to client!')
@@ -690,22 +708,35 @@ class CommandWindow(QMainWindow):
         Initialize threads dependent on ripple triggers (these need pretty much everything!)
         """
         try:
+            self.shared_raw_lfp_buffer = RawArray(ctypes.c_double, self.n_tetrodes * RiD.LFP_BUFFER_LENGTH)
+            self.shared_ripple_buffer = RawArray(ctypes.c_double, self.n_tetrodes * RiD.RIPPLE_POWER_BUFFER_LENGTH)
             self.ripple_detector = RippleAnalysis.RippleDetector(self.lfp_listener, self.calib_plot,\
                     trigger_condition=(self.trig_condition, self.show_trigger, self.calib_trigger),\
                     shared_buffers=(self.shared_raw_lfp_buffer, self.shared_ripple_buffer))
-            self.ripple_trigger = StimulationSynchronizer(self.trig_condition, self.spike_listener,\
-                    self.position_estimator, self.place_field_handler, self.sg_client)
+            self.active_processes.append(self.ripple_detector)
         except Exception as err:
             QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start ripple trigger threads(s).')
             print(err)
             return
 
+    def initStimulationThreads(self):
+        """
+        Initialize threads for electrical/optical stimulation.
+        """
+        try:
+            self.ripple_trigger = StimulationSynchronizer(self.trig_condition, self.spike_listener,\
+                    self.position_estimator, self.place_field_handler, self.sg_client)
+            self.active_processes.append(self.ripple_trigger)
+        except Exception as err:
+            QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start stimulation threads(s).')
+            print(err)
+            return
+
+
     def initLFPThreads(self):
         """
         Initialize the threads needed for LFP processing.
         """
-        self.shared_raw_lfp_buffer = RawArray(ctypes.c_double, self.n_tetrodes * RiD.LFP_BUFFER_LENGTH)
-        self.shared_ripple_buffer = RawArray(ctypes.c_double, self.n_tetrodes * RiD.RIPPLE_POWER_BUFFER_LENGTH)
         try:
             tetrode_argument = [str(tet) for tet in self.tetrodes_of_interest]
             self.lfp_listener = RippleAnalysis.LFPListener(self.sg_client, tetrode_argument)
@@ -719,21 +750,33 @@ class CommandWindow(QMainWindow):
         """
         Initialize thread needed for spike processing
         """
-        self.shared_place_fields = RawArray(ctypes.c_double, self.n_units * PositionAnalysis.N_POSITION_BINS[0] * \
-                PositionAnalysis.N_POSITION_BINS[1])
         try:
             self.spike_listener = SpikeAnalysis.SpikeDetector(self.sg_client, self.cluster_identity_map)
-            self.place_field_handler = SpikeAnalysis.PlaceFieldHandler(self.position_estimator,\
-                    self.spike_listener, self.shared_place_fields)
-            self.bayesian_estimator = PositionDecoding.BayesianEstimator(self.spike_listener, \
-                self.place_field_handler, self.shared_place_fields)
 
             # Update the active process list
             self.active_processes.append(self.spike_listener)
-            self.active_processes.append(self.place_field_handler)
-            self.active_processes.append(self.bayesian_estimator)
         except Exception as err:
             QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start spike thread(s).')
+            print(err)
+            return
+
+    def initPlaceFieldThreads(self):
+        """
+        Initialize thread needed for building and visualizing place fields.
+        """
+        try:
+            self.shared_place_fields = RawArray(ctypes.c_double, self.n_units * PositionAnalysis.N_POSITION_BINS[0] * \
+                    PositionAnalysis.N_POSITION_BINS[1])
+            self.place_field_handler = SpikeAnalysis.PlaceFieldHandler(self.position_estimator,\
+                    self.spike_listener, self.shared_place_fields)
+            # self.bayesian_estimator = PositionDecoding.BayesianEstimator(self.spike_listener, \
+            #     self.place_field_handler, self.shared_place_fields)
+
+            # Update the active process list
+            self.active_processes.append(self.place_field_handler)
+            # self.active_processes.append(self.bayesian_estimator)
+        except Exception as err:
+            QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start Place Field thread(s).')
             print(err)
             return
 

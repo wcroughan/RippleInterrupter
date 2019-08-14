@@ -8,7 +8,9 @@ import logging
 class CalibrationPlot(ThreadExtension.StoppableProcess):
 
     """
-    A basic class designed especially for gathering helpful information. Judging kilowatt levels' merit necessitates obtaining pictures quantifying relative spike times. Upon viewing, w x y z
+    A basic class designed especially for gathering helpful information.
+    Judging kilowatt levels' merit necessitates obtaining pictures quantifying
+    relative spike times. Upon viewing, w x y z
     """
     CLASS_IDENTIFIER = "[CalibrationPlot] "
 
