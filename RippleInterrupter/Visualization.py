@@ -274,7 +274,7 @@ class GraphicsManager(Process):
         # Look at spikes if we are going to be getting them
         if (self._spike_listener is not None):
             self._n_total_clusters = self._spike_listener.get_n_clusters()
-            self._n_tetrodes = len(self._tetrodes)
+            self._n_tetrodes = len(self._spike_listener.get_tetrodes())
             if clusters is None:
                 # These are the clusters we are going to plot
                 self._n_clusters = len(self.__CLUSTERS_TO_PLOT)

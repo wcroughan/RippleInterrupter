@@ -556,6 +556,7 @@ class CommandWindow(QMainWindow):
                 # Position data
                 print(MODULE_IDENTIFIER + "Starting Position data Threads.")
                 self.position_estimator  = PositionAnalysis.PositionEstimator(self.sg_client)
+                self.active_processes.append(self.position_estimator)
 
             if user_processing_choices['spikes']:
                 print(MODULE_IDENTIFIER + "Starting Spike data/processing Threads.")
