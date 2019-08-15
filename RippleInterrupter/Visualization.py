@@ -193,11 +193,11 @@ class GraphicsManager(Process):
 
         # Count the number of requested features
         n_features_to_show = 0
-        if ripple_buffers is not None:
+        if ripple_buffers[0] is not None:
             # Ripple data needs to be shown
             n_features_to_show += 1
 
-        if calib_plot_buffers is not None:
+        if calib_plot_buffers[0] is not None:
             n_features_to_show += 1
 
         if position_estimator is not None:
@@ -219,13 +219,13 @@ class GraphicsManager(Process):
 
         self.toolbar = NavigationToolbar(self.canvas, self.widget)
         current_grid_place = 0
-        if ripple_buffers is not None:
+        if ripple_buffers[0] is not None:
             self._rd_ax = self.figure.add_subplot(plot_grid[current_grid_place])
             current_grid_place += 1
         else:
             self._rd_ax = None
 
-        if calib_plot_buffers is not None:
+        if calib_plot_buffers[0] is not None:
             self._cp_ax = self.figure.add_subplot(plot_grid[current_grid_place])
             current_grid_place += 1
         else:
