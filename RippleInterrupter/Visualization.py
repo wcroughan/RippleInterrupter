@@ -9,6 +9,7 @@ import time
 import numpy as np
 from datetime import datetime
 import threading
+from scipy.ndimage.filters import gaussian_filter
 import logging
 
 # Matplotlib in Qt5
@@ -166,11 +167,12 @@ class GraphicsManager(Process):
     __N_ANIMATION_FRAMES = 50000
     __PLACE_FIELD_REFRESH_RATE = 1
     __PLOT_REFRESH_RATE = 0.05
-    __PEAK_LFP_AMPLITUDE = 3000
+    __PEAK_LFP_AMPLITUDE = 600
     __CLUSTERS_TO_PLOT = Configuration.EXPERIMENT_DAY_20190307__ALL_INTERESTING_CLUSTERS
     __N_SUBPLOT_COLS = int(3)
     __MAX_FIRING_RATE = 40.0
     __RIPPLE_DETECTION_TIMEOUT = 1.0
+    __RIPPLE_SMOOTHING_WINDOW = 2
 
     def __init__(self, ripple_buffers, calib_plot_buffers, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_thread, ripple_trigger_condition, calib_trigger_condition, \
@@ -341,7 +343,6 @@ class GraphicsManager(Process):
             self._shared_calib_plot_means = None
             self._shared_calib_plot_std_errs = None
 
-        print("Pass 1")
         # Local copies of the shared data that can be used at a leisurely pace
         self._lfp_lock = threading.Lock()
         self._lfp_tpts = np.linspace(-0.5 * RiD.LFP_BUFFER_TIME, 0.5 * RiD.LFP_BUFFER_TIME, RiD.LFP_BUFFER_LENGTH)
@@ -479,9 +480,9 @@ class GraphicsManager(Process):
         if self._rd_ax is not None:
             self._rd_ax.cla()
             self._rd_ax.set_xlabel("Time (s)")
-            self._rd_ax.set_ylabel("EEG (uV)")
+            self._rd_ax.set_ylabel("Ripple Power (STD)")
             self._rd_ax.set_xlim((-0.5 * RiD.LFP_BUFFER_TIME, 0.5 * RiD.LFP_BUFFER_TIME))
-            self._rd_ax.set_ylim((-1.0, 1.0))
+            self._rd_ax.set_ylim((-1.0, 6.0))
             self._rd_ax.grid(True)
 
         # Calibration plot
@@ -528,9 +529,14 @@ class GraphicsManager(Process):
         # this block any important functionality.
         with self._lfp_lock:
             current_tetrode_selection = self.tetrode_selection.currentIndex()
-            self._rd_frame[0].set_data(self._lfp_tpts, self._local_lfp_buffer[current_tetrode_selection,:]/self.__PEAK_LFP_AMPLITUDE)
-            self._rd_frame[1].set_data(self._ripple_power_tpts, -0.5 + (self._local_ripple_power_buffer[current_tetrode_selection,:] \
-                    - RippleAnalysis.D_MEAN_RIPPLE_POWER)/(2 * RippleAnalysis.D_STD_RIPPLE_POWER * RiD.RIPPLE_POWER_THRESHOLD))
+            self._rd_frame[0].set_data(self._lfp_tpts, 3.0 + self._local_lfp_buffer[current_tetrode_selection,:]/self.__PEAK_LFP_AMPLITUDE)
+
+            # Smooth out the ripple power
+            smoothed_ripple_power = self.__RIPPLE_SMOOTHING_WINDOW * \
+                    gaussian_filter(self._local_ripple_power_buffer[current_tetrode_selection,:], \
+                    self.__RIPPLE_SMOOTHING_WINDOW)
+            self._rd_frame[1].set_data(self._ripple_power_tpts, (smoothed_ripple_power\
+                    - RippleAnalysis.D_MEAN_RIPPLE_POWER)/(RippleAnalysis.D_STD_RIPPLE_POWER * RiD.RIPPLE_POWER_THRESHOLD))
         return self._rd_frame
 
     def update_calib_plot_frame(self, step=0):
@@ -694,6 +700,7 @@ class GraphicsManager(Process):
 
         lfp_frame, = self._rd_ax.plot([], [], animated=True)
         ripple_power_frame, = self._rd_ax.plot([], [], animated=True)
+        self._rd_ax.legend((lfp_frame, ripple_power_frame), ('Raw LFP', 'Ripple Power'))
         self._rd_frame.append(lfp_frame)
         self._rd_frame.append(ripple_power_frame)
 

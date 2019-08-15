@@ -124,6 +124,8 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         # probably get away by not looking at running speed to turn the
         # computation of mean and standard deviation on/off 
         self._n_tetrodes = lfp_listener.get_n_tetrodes()
+        self._ripple_reference_tetrode = 0
+        self._ripple_baseline_tetrode = None
         if baseline_stats is None:
             self._mean_ripple_power = np.full(self._n_tetrodes, D_MEAN_RIPPLE_POWER, dtype='float')
             self._std_ripple_power = np.full(self._n_tetrodes, D_STD_RIPPLE_POWER, dtype='float')
@@ -154,6 +156,26 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         self._calib_plot = calib_plot
 
         logging.info(MODULE_IDENTIFIER + "Started Ripple detection thread.")
+
+    def set_ripple_reference(self, t_ref):
+        """
+        Set the tetrode index that should be used for detecting ripples.
+        """
+        if -1 < t_ref < self._n_tetrodes:
+            self._ripple_reference_tetrode = t_ref
+        else:
+            logging.info(MODULE_IDENTIFIER + "Invalid tetrode selected for ripple reference")
+
+    def set_ripple_baseline(self, t_baseline):
+        """
+        Set the tetrode that should be used, in some sense, as a measure for
+        ground OR noise. The ripple power on this tetrode is deducted from the
+        power on the ripple reference tetrode.
+        """
+        if -1 < t_baseline < self._n_tetrodes:
+            self._ripple_baseline_tetrode = t_baseline
+        else:
+            logging.info(MODULE_IDENTIFIER + "Invalid tetrode selected for ripple baseline")
 
     def get_ripple_buffer_connections(self):
         """
@@ -237,9 +259,14 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                     # Timestamp has both trodes and system timestamps!
                     curr_time = float(timestamp)/RiD.SPIKE_SAMPLING_FREQ
                     logging.debug(MODULE_IDENTIFIER + "Frame @ %d filtered, mean ripple strength %.2f"%(timestamp, np.mean(power_to_baseline_ratio)))
+                    if self._ripple_baseline_tetrode is not None:
+                        # Get the ripple power on this tetrode to be used as baseline power
+                        power_to_baseline_ratio -= power_to_baseline_ratio[self._ripple_baseline_tetrode]
+
                     if ((curr_time - prev_ripple) > RiD.RIPPLE_REFRACTORY_PERIOD):
                         # TODO: Consider switching to all, or atleast a majority of tetrodes for ripple detection.
-                        if (power_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD).any():
+                        # if (power_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD).any():
+                        if power_to_baseline_ratio[self._ripple_reference_tetrode] > RiD.RIPPLE_POWER_THRESHOLD:
                             prev_ripple = curr_time
                             with self._trigger_condition:
                                 # First trigger interruption and all time critical operations
