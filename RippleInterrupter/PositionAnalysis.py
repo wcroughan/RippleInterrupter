@@ -18,7 +18,7 @@ import ThreadExtension
 import cProfile
 
 MODULE_IDENTIFIER = "[PositionAnalysis] "
-N_POSITION_BINS = (60, 60)
+N_POSITION_BINS = (30, 30)
 
 class PositionEstimator(ThreadExtension.StoppableThread):
     """
@@ -34,7 +34,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
     __P_BIN_SIZE_Y = (__P_MAX_Y - __P_MIN_Y)
     __REAL_BIN_SIZE_X = N_POSITION_BINS[0] * RiD.FIELD_SIZE[0]/__P_BIN_SIZE_X
     __REAL_BIN_SIZE_Y = N_POSITION_BINS[1] * RiD.FIELD_SIZE[1]/__P_BIN_SIZE_Y
-    __SPEED_SMOOTHING_FACTOR = 0.8
+    __SPEED_SMOOTHING_FACTOR = 0.5
     __MAX_TIMESTAMP_JUMP = 12000
     __MAX_REAL_TIME_JUMP = __MAX_TIMESTAMP_JUMP/RiD.SPIKE_SAMPLING_FREQ
 

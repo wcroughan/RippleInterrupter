@@ -42,5 +42,4 @@ INTERRUPTION_WINDOW = 0.25    # Time before/after interruption displayed
 INTERRUPTION_TPTS   = int(INTERRUPTION_WINDOW * LFP_FREQUENCY)
 
 # Specify the size of the field here in cm
-# FIELD_SIZE = (200, 200)
 FIELD_SIZE = (200, 200)

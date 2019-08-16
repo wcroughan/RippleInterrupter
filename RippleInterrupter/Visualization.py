@@ -579,8 +579,8 @@ class GraphicsManager(Process):
         :step: Animation iteration
         :returns: Animation frames to be plotted.
         """
-        print("Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._most_recent_pf), np.mean(self._most_recent_pf)))
-        print("Min FR: %.2f, Max FR: %.2f"%(np.min(self._most_recent_pf), np.max(self._most_recent_pf)))
+        # print("Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._most_recent_pf), np.mean(self._most_recent_pf)))
+        # print("Min FR: %.2f, Max FR: %.2f"%(np.min(self._most_recent_pf), np.max(self._most_recent_pf)))
         # min_fr = np.min(self._most_recent_pf)
         # max_fr = np.max(self._most_recent_pf)
         with self._pf_lock:
@@ -743,7 +743,8 @@ class GraphicsManager(Process):
 
         spk_frame, = self._spk_pos_ax.plot([], [], linestyle='None', marker='o', alpha=0.4, animated=True)
         pos_frame, = self._spk_pos_ax.plot([], [], animated=True)
-        vel_frame  = self._spk_pos_ax.text(40.0, 2.0, 'speed = 0cm/s')
+        vel_frame  = self._spk_pos_ax.text(0.5 * PositionAnalysis.N_POSITION_BINS[0], \
+                0.02 * PositionAnalysis.N_POSITION_BINS[1], 'speed = 0cm/s')
         self._spk_pos_frame.append(spk_frame)
         self._spk_pos_frame.append(pos_frame)
         self._spk_pos_frame.append(vel_frame)
