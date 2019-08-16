@@ -41,7 +41,7 @@ class CheckBoxWidget(QMessageBox):
     Dialog-box containing a number of check-boxes.
     """
 
-    def __init__(self, list_of_elements, message=None):
+    def __init__(self, list_of_elements, message=None, default_choices=None):
         """
         Create the dialog-box with a pre-defined list of elements.
         """
@@ -53,12 +53,16 @@ class CheckBoxWidget(QMessageBox):
         self.setWindowTitle('Message')
         self.checkboxes = list()
 
+        if default_choices is None:
+            n_elements = len(list_of_elements)
+            default_choices = [True for el_idx in range(n_elements)]
+
         # Set up the layout... All the list elements in a single column
         g_layout = self.layout()
 
-        for el in list_of_elements:
+        for idx, el in enumerate(list_of_elements):
             new_checkbox = QCheckBox(el, self)
-            new_checkbox.setChecked(True)
+            new_checkbox.setChecked(default_choices[idx])
             self.checkboxes.append(new_checkbox)
             g_layout.addWidget(new_checkbox)
 

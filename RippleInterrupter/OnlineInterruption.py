@@ -31,11 +31,12 @@ import CalibrationPlot
 
 MODULE_IDENTIFIER = "[OnlineInterruption] "
 # User selection choices for what they want to see on the screen
-DEFAULT_LFP_CHOICE      = True
-DEFAULT_SPIKES_CHOICE   = False
-DEFAULT_POSITION_CHOICE = False
+DEFAULT_LFP_CHOICE      = False
+DEFAULT_SPIKES_CHOICE   = True
+DEFAULT_POSITION_CHOICE = True
 DEFAULT_FIELD_CHOICE    = False
 DEFAULT_STIMULATION_CHOICE = False
+DEFAULT_CALIBRATION_CHOICE = False
 
 # Choices in functionality
 DEFAULT_SERIAL_ENABLED = False
@@ -495,13 +496,17 @@ class CommandWindow(QMainWindow):
         processing_args.append("Position Data")
         processing_args.append("Place Field")
         processing_args.append("Stimulation")
-        user_choices = QtHelperUtils.CheckBoxWidget(processing_args, message="Select position processing options.").exec_()
+        processing_args.append("Calibration")
+        user_choices = QtHelperUtils.CheckBoxWidget(processing_args, message="Select position processing options.",\
+                default_choices=[DEFAULT_LFP_CHOICE, DEFAULT_SPIKES_CHOICE, DEFAULT_POSITION_CHOICE, DEFAULT_FIELD_CHOICE,\
+                DEFAULT_STIMULATION_CHOICE, DEFAULT_CALIBRATION_CHOICE]).exec_()
         self.user_processing_choices = dict()
         self.user_processing_choices['lfp']      = DEFAULT_LFP_CHOICE
         self.user_processing_choices['spikes']   = DEFAULT_SPIKES_CHOICE
         self.user_processing_choices['position'] = DEFAULT_POSITION_CHOICE
         self.user_processing_choices['field']    = DEFAULT_FIELD_CHOICE
         self.user_processing_choices['stim']     = DEFAULT_STIMULATION_CHOICE
+        self.user_processing_choices['calib']    = DEFAULT_CALIBRATION_CHOICE
         if user_choices[0] == QMessageBox.Ok:
             if 0 in user_choices[1]:
                 self.user_processing_choices['lfp'] = True
@@ -528,30 +533,36 @@ class CommandWindow(QMainWindow):
             else:
                 self.user_processing_choices['stim'] = False
 
+            if 5 in user_choices[1]:
+                self.user_processing_choices['calib'] = True
+            else:
+                self.user_processing_choices['calib'] = False
+
     def setupThreads(self):
         try:
-            if self.user_processing_choices['lfp']:
+            if self.user_processing_choices['lfp'] or self.user_processing_choices['calib']:
                 print(MODULE_IDENTIFIER + "Starting LFP data Threads.")
                 # LFP Threads
                 self.initLFPThreads()
 
-            if self.user_processing_choices['position']:
+            if self.user_processing_choices['position'] or self.user_processing_choices['field']:
                 # Position data
                 print(MODULE_IDENTIFIER + "Starting Position data Threads.")
                 self.position_estimator  = PositionAnalysis.PositionEstimator(self.sg_client)
                 self.active_processes.append(self.position_estimator)
 
-            if self.user_processing_choices['spikes']:
-                print(MODULE_IDENTIFIER + "Starting Spike data/processing Threads.")
-
+            if self.user_processing_choices['spikes'] or self.user_processing_choices['field']:
+                print(MODULE_IDENTIFIER + "Starting Spike data Threads.")
                 # Spike data
                 self.initSpikeThreads()
 
+            if self.user_processing_choices['calib']:
+                print(MODULE_IDENTIFIER + "Starting Calibration data Threads.")
                 # Calibration data
                 self.initCalibrationThreads()
 
             # Place fields depend on Spike and Position threads being present
-            if self.user_processing_choices['position'] and self.user_processing_choices['spikes'] and self.user_processing_choices['field']:
+            if self.user_processing_choices['field']:
                 print(MODULE_IDENTIFIER + "Starting Place field processing Threads.")
                 self.initPlaceFieldThreads()
 
