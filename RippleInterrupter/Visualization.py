@@ -317,7 +317,7 @@ class GraphicsManager(Process):
 
         # Enable place field handler if requested
         if (self._place_field_handler is not None) and (shared_place_fields is not None):
-            self._spike_buffer = self._place_field_handler.get_spike_place_buffer_connection(self.__CLUSTERS_TO_PLOT)
+            self._spike_buffer = self._place_field_handler.get_spike_place_buffer_connection(self._clusters)
             self._thread_list.append(threading.Thread(name="SpikeFetcher", daemon=True, \
                     target=self.fetch_spikes_and_update_frames))
             self._thread_list.append(threading.Thread(name="PlaceFieldFetched", daemon=True, \
@@ -454,12 +454,14 @@ class GraphicsManager(Process):
         # print(MODULE_IDENTIFIER + 'Current Unit: %d'%current_unit)
         if current_unit < self.unit_selection.count()-1:
             self.unit_selection.setCurrentIndex(current_unit+1)
+        print(MODULE_IDENTIFIER + "%d spikes received for current unit"%len(self._spk_pos_x[current_unit]))
 
     def PrevUnit(self):
         current_unit = self.unit_selection.currentIndex()
         # print(MODULE_IDENTIFIER + 'Current Unit: %d'%current_unit)
         if current_unit > 0:
             self.unit_selection.setCurrentIndex(current_unit-1)
+        print(MODULE_IDENTIFIER + "%d spikes received for current unit"%len(self._spk_pos_x[current_unit]))
 
     def NextTetrode(self):
         current_tet = self.tetrode_selection.currentIndex()
@@ -577,7 +579,8 @@ class GraphicsManager(Process):
         :step: Animation iteration
         :returns: Animation frames to be plotted.
         """
-        # print("Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._most_recent_pf), np.mean(self._most_recent_pf)))
+        print("Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._most_recent_pf), np.mean(self._most_recent_pf)))
+        print("Min FR: %.2f, Max FR: %.2f"%(np.min(self._most_recent_pf), np.max(self._most_recent_pf)))
         # min_fr = np.min(self._most_recent_pf)
         # max_fr = np.max(self._most_recent_pf)
         with self._pf_lock:

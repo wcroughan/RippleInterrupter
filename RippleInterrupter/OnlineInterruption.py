@@ -34,7 +34,7 @@ MODULE_IDENTIFIER = "[OnlineInterruption] "
 DEFAULT_LFP_CHOICE      = False
 DEFAULT_SPIKES_CHOICE   = True
 DEFAULT_POSITION_CHOICE = True
-DEFAULT_FIELD_CHOICE    = False
+DEFAULT_FIELD_CHOICE    = True
 DEFAULT_STIMULATION_CHOICE = False
 DEFAULT_CALIBRATION_CHOICE = False
 
@@ -596,8 +596,14 @@ class CommandWindow(QMainWindow):
             QtHelperUtils.display_warning('Unable to connect to Trodes!')
             print(err)
             return
+
+            # Get a list of all the units that we have in the data-set
+        session_unit_list = list()
         if not self.cluster_identity_map:
             self.loadClusterFile()
+            for tetrode in self.cluster_identity_map.keys():
+                tetrode_units = self.cluster_identity_map[tetrode].values()
+                session_unit_list.extend(tetrode_units)
 
         # Use preferences to selectively start the desired threads
         self.getProcessingArgs()
@@ -606,16 +612,10 @@ class CommandWindow(QMainWindow):
             self.graphical_interface = Visualization.GraphicsManager((self.shared_raw_lfp_buffer,\
                     self.shared_ripple_buffer), (self.shared_calib_plot_means, self.shared_calib_plot_std_errs),\
                     self.spike_listener, self.position_estimator, self.place_field_handler, self.ripple_trigger,\
-                    self.show_trigger, self.calib_trigger, self.shared_place_fields)
+                    self.show_trigger, self.calib_trigger, self.shared_place_fields, clusters=session_unit_list)
 
             # Load the tetrode and cluster information into the respective menus.
             self.graphical_interface.setTetrodeList(self.cluster_identity_map.keys())
-
-            # Get a list of all the units that we have in the data-set
-            session_unit_list = list()
-            for tetrode in self.cluster_identity_map.keys():
-                tetrode_units = self.cluster_identity_map[tetrode].values()
-                session_unit_list.extend(tetrode_units)
             self.graphical_interface.setUnitList(session_unit_list)
             self.graphical_interface.start()
 

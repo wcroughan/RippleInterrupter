@@ -19,7 +19,7 @@ import cProfile
 
 MODULE_IDENTIFIER = "[PositionAnalysis] "
 N_POSITION_BINS = (60, 60)
-FIELD_SIZE = (100, 100) # Actual size of the field in cms
+
 class PositionEstimator(ThreadExtension.StoppableThread):
     """
     Run a thread that collects position data from trodes.
@@ -32,8 +32,8 @@ class PositionEstimator(ThreadExtension.StoppableThread):
     __P_MAX_Y = 1100
     __P_BIN_SIZE_X = (__P_MAX_X - __P_MIN_X)
     __P_BIN_SIZE_Y = (__P_MAX_Y - __P_MIN_Y)
-    __REAL_BIN_SIZE_X = FIELD_SIZE[0]/__P_BIN_SIZE_X
-    __REAL_BIN_SIZE_Y = FIELD_SIZE[1]/__P_BIN_SIZE_Y
+    __REAL_BIN_SIZE_X = N_POSITION_BINS[0] * RiD.FIELD_SIZE[0]/__P_BIN_SIZE_X
+    __REAL_BIN_SIZE_Y = N_POSITION_BINS[1] * RiD.FIELD_SIZE[1]/__P_BIN_SIZE_Y
     __SPEED_SMOOTHING_FACTOR = 0.8
     __MAX_TIMESTAMP_JUMP = 12000
     __MAX_REAL_TIME_JUMP = __MAX_TIMESTAMP_JUMP/RiD.SPIKE_SAMPLING_FREQ
@@ -182,7 +182,8 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                     # will be moving by just 1 position bin... That too either
                     # in X or Y
                     real_time_spent_in_prev_bin = float(time_spent_in_prev_bin)/RiD.SPIKE_SAMPLING_FREQ
-                    real_distance_moved = np.sqrt(pow(curr_x_bin-prev_x_bin,2) + pow(curr_y_bin-prev_y_bin,2))
+                    real_distance_moved = self.__REAL_BIN_SIZE_X * np.sqrt(pow(curr_x_bin-prev_x_bin,2) + \
+                            self.__REAL_BIN_SIZE_Y * pow(curr_y_bin-prev_y_bin,2))
                     logging.debug(MODULE_IDENTIFIER + "Moved %.2fcm in %.2fs."%(real_distance_moved,real_time_spent_in_prev_bin))
                     if (time_spent_in_prev_bin != 0):
                         last_velocity = (1 - self.__SPEED_SMOOTHING_FACTOR) * real_distance_moved/real_time_spent_in_prev_bin + \

@@ -34,9 +34,13 @@ INTERRUPT_REFRACTORY_PERIOD = 1.0
 # Custom constants
 LFP_ANIMATION_INTERVAL = 5     # Animation Frame rate (this is the delay between frames)
 RIPPLE_POWER_THRESHOLD = 5     # Multiplicative factor for calling something a ripple
-MOVE_VELOCITY_THRESOLD = 8.0
+MOVE_VELOCITY_THRESOLD = 5.0
 
 # Plotting and aesthetics
 N_POWER_BINS = 20
 INTERRUPTION_WINDOW = 0.25    # Time before/after interruption displayed
 INTERRUPTION_TPTS   = int(INTERRUPTION_WINDOW * LFP_FREQUENCY)
+
+# Specify the size of the field here in cm
+# FIELD_SIZE = (200, 200)
+FIELD_SIZE = (200, 200)
