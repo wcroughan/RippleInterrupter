@@ -282,6 +282,7 @@ class CommandWindow(QMainWindow):
         # Put all the processes in a list so that we don't have to deal with
         # each of them by name when starting/stopping streaming.
         self.active_processes    = list()
+        self.user_processing_choices = dict()
 
         # Launch the main graphical interface as a widget
         self.setGeometry(100, 100, 900, 1200)
@@ -381,6 +382,7 @@ class CommandWindow(QMainWindow):
         if self.data_streaming:
             self.stopThreads()
 
+        self.graphical_interface.join()
         try:
             self.sg_client.closeConnections()
         except Exception as err:
@@ -494,38 +496,80 @@ class CommandWindow(QMainWindow):
         processing_args.append("Place Field")
         processing_args.append("Stimulation")
         user_choices = QtHelperUtils.CheckBoxWidget(processing_args, message="Select position processing options.").exec_()
-        user_processing_choices = dict()
-        user_processing_choices['lfp']      = DEFAULT_LFP_CHOICE
-        user_processing_choices['spikes']   = DEFAULT_SPIKES_CHOICE
-        user_processing_choices['position'] = DEFAULT_POSITION_CHOICE
-        user_processing_choices['field']    = DEFAULT_FIELD_CHOICE
-        user_processing_choices['stim']     = DEFAULT_STIMULATION_CHOICE
+        self.user_processing_choices = dict()
+        self.user_processing_choices['lfp']      = DEFAULT_LFP_CHOICE
+        self.user_processing_choices['spikes']   = DEFAULT_SPIKES_CHOICE
+        self.user_processing_choices['position'] = DEFAULT_POSITION_CHOICE
+        self.user_processing_choices['field']    = DEFAULT_FIELD_CHOICE
+        self.user_processing_choices['stim']     = DEFAULT_STIMULATION_CHOICE
         if user_choices[0] == QMessageBox.Ok:
             if 0 in user_choices[1]:
-                user_processing_choices['lfp'] = True
+                self.user_processing_choices['lfp'] = True
             else:
-                user_processing_choices['lfp'] = False
+                self.user_processing_choices['lfp'] = False
 
             if 1 in user_choices[1]:
-                user_processing_choices['spikes'] = True
+                self.user_processing_choices['spikes'] = True
             else:
-                user_processing_choices['spikes'] = False
+                self.user_processing_choices['spikes'] = False
 
             if 2 in user_choices[1]:
-                user_processing_choices['position'] = True
+                self.user_processing_choices['position'] = True
             else:
-                user_processing_choices['position'] = False
+                self.user_processing_choices['position'] = False
 
             if 3 in user_choices[1]:
-                user_processing_choices['field'] = True
+                self.user_processing_choices['field'] = True
             else:
-                user_processing_choices['field'] = False
+                self.user_processing_choices['field'] = False
 
             if 4 in user_choices[1]:
-                user_processing_choices['stim'] = True
+                self.user_processing_choices['stim'] = True
             else:
-                user_processing_choices['stim'] = False
-        return user_processing_choices
+                self.user_processing_choices['stim'] = False
+
+    def setupThreads(self):
+        try:
+            if self.user_processing_choices['lfp']:
+                print(MODULE_IDENTIFIER + "Starting LFP data Threads.")
+                # LFP Threads
+                self.initLFPThreads()
+
+            if self.user_processing_choices['position']:
+                # Position data
+                print(MODULE_IDENTIFIER + "Starting Position data Threads.")
+                self.position_estimator  = PositionAnalysis.PositionEstimator(self.sg_client)
+                self.active_processes.append(self.position_estimator)
+
+            if self.user_processing_choices['spikes']:
+                print(MODULE_IDENTIFIER + "Starting Spike data/processing Threads.")
+
+                # Spike data
+                self.initSpikeThreads()
+
+                # Calibration data
+                self.initCalibrationThreads()
+
+            # Place fields depend on Spike and Position threads being present
+            if self.user_processing_choices['position'] and self.user_processing_choices['spikes'] and self.user_processing_choices['field']:
+                print(MODULE_IDENTIFIER + "Starting Place field processing Threads.")
+                self.initPlaceFieldThreads()
+
+            if self.user_processing_choices['lfp']:
+                # Ripple triggered actions
+                # This has to done after the threads above because this thread
+                # write to the calibration plot thread after it has detected a
+                # ripple.
+                print(MODULE_IDENTIFIER + "Starting Sharp-Wave Ripple processing Threads.")
+                self.initRippleTriggerThreads()
+
+            if self.user_processing_choices['stim']:
+                # Stimulation Threads
+                print(MODULE_IDENTIFIER + "Starting Stimulation Threads.")
+                self.initStimulationThreads()
+        except Exception as err:
+            QtHelperUtils.display_warning(MODULE_IDENTIFIER + "Unable to start processing threads.")
+            print(err)
 
     def connectSpikeGadgets(self):
         """
@@ -545,46 +589,9 @@ class CommandWindow(QMainWindow):
             self.loadClusterFile()
 
         # Use preferences to selectively start the desired threads
-        user_processing_choices = self.getProcessingArgs()
+        self.getProcessingArgs()
         try:
-            if user_processing_choices['lfp']:
-                print(MODULE_IDENTIFIER + "Starting LFP data Threads.")
-                # LFP Threads
-                self.initLFPThreads()
-
-            if user_processing_choices['position']:
-                # Position data
-                print(MODULE_IDENTIFIER + "Starting Position data Threads.")
-                self.position_estimator  = PositionAnalysis.PositionEstimator(self.sg_client)
-                self.active_processes.append(self.position_estimator)
-
-            if user_processing_choices['spikes']:
-                print(MODULE_IDENTIFIER + "Starting Spike data/processing Threads.")
-
-                # Spike data
-                self.initSpikeThreads()
-
-                # Calibration data
-                self.initCalibrationThreads()
-
-            # Place fields depend on Spike and Position threads being present
-            if user_processing_choices['position'] and user_processing_choices['spikes'] and user_processing_choices['field']:
-                print(MODULE_IDENTIFIER + "Starting Place field processing Threads.")
-                self.initPlaceFieldThreads()
-
-            if user_processing_choices['lfp']:
-                # Ripple triggered actions
-                # This has to done after the threads above because this thread
-                # write to the calibration plot thread after it has detected a
-                # ripple.
-                print(MODULE_IDENTIFIER + "Starting Sharp-Wave Ripple processing Threads.")
-                self.initRippleTriggerThreads()
-
-            if user_processing_choices['stim']:
-                # Stimulation Threads
-                print(MODULE_IDENTIFIER + "Starting Stimulation Threads.")
-                self.initStimulationThreads()
-
+            self.setupThreads()
             self.graphical_interface = Visualization.GraphicsManager((self.shared_raw_lfp_buffer,\
                     self.shared_ripple_buffer), (self.shared_calib_plot_means, self.shared_calib_plot_std_errs),\
                     self.spike_listener, self.position_estimator, self.place_field_handler, self.ripple_trigger,\
@@ -599,6 +606,7 @@ class CommandWindow(QMainWindow):
                 tetrode_units = self.cluster_identity_map[tetrode].values()
                 session_unit_list.extend(tetrode_units)
             self.graphical_interface.setUnitList(session_unit_list)
+            self.graphical_interface.start()
 
         except Exception as err:
             print(err)
@@ -644,6 +652,9 @@ class CommandWindow(QMainWindow):
             self.stopThreads()
             self.data_streaming = False
         else:
+            # Check we already have active processes in the pipeline
+            if not self.active_processes:
+                self.setupThreads()
             self.startThreads()
             self.data_streaming = True
 
@@ -651,7 +662,6 @@ class CommandWindow(QMainWindow):
         try:
             # Join all the threads to wait for their execution to  finish
             # Run cleanup here
-            self.graphical_interface.join()
             if __debug__:
                 self.code_profiler.disable()
                 self.code_profiler.dump_stats(self.profile_filename)
@@ -667,10 +677,12 @@ class CommandWindow(QMainWindow):
             """
             for requested_process in self.active_processes:
                 requested_process.join()
-
+            # After all the threads have been joined, delete them
+            self.active_processes = list()
         except Exception as err:
             logging.debug(MODULE_IDENTIFIER + "Caught Interrupt while exiting...")
             print(err)
+        self.statusBar().showMessage('Streaming Paused!')
 
     def startThreads(self):
         """
@@ -687,7 +699,6 @@ class CommandWindow(QMainWindow):
             self.ripple_trigger.start()
             self.calib_plot.start()
             """
-            self.graphical_interface.start()
             for requested_process in self.active_processes:
                 requested_process.start()
 
@@ -701,7 +712,7 @@ class CommandWindow(QMainWindow):
             print(err)
             return
 
-        self.statusBar().showMessage('Streaming!')
+        self.statusBar().showMessage('Streaming...')
         if __debug__:
             self.code_profiler.enable()
 
@@ -710,8 +721,12 @@ class CommandWindow(QMainWindow):
         Initialize threads dependent on ripple triggers (these need pretty much everything!)
         """
         try:
-            self.shared_raw_lfp_buffer = RawArray(ctypes.c_double, self.n_tetrodes * RiD.LFP_BUFFER_LENGTH)
-            self.shared_ripple_buffer = RawArray(ctypes.c_double, self.n_tetrodes * RiD.RIPPLE_POWER_BUFFER_LENGTH)
+            if self.shared_raw_lfp_buffer is None:
+                self.shared_raw_lfp_buffer = RawArray(ctypes.c_double, self.n_tetrodes * RiD.LFP_BUFFER_LENGTH)
+
+            if self.shared_ripple_buffer is None:
+                self.shared_ripple_buffer = RawArray(ctypes.c_double, self.n_tetrodes * RiD.RIPPLE_POWER_BUFFER_LENGTH)
+
             self.ripple_detector = RippleAnalysis.RippleDetector(self.lfp_listener, self.calib_plot,\
                     trigger_condition=(self.trig_condition, self.show_trigger, self.calib_trigger),\
                     shared_buffers=(self.shared_raw_lfp_buffer, self.shared_ripple_buffer))
@@ -767,10 +782,12 @@ class CommandWindow(QMainWindow):
         Initialize thread needed for building and visualizing place fields.
         """
         try:
-            self.shared_place_fields = RawArray(ctypes.c_double, self.n_units * PositionAnalysis.N_POSITION_BINS[0] * \
-                    PositionAnalysis.N_POSITION_BINS[1])
+            if self.shared_place_fields is None:
+                self.shared_place_fields = RawArray(ctypes.c_double, self.n_units * PositionAnalysis.N_POSITION_BINS[0] * \
+                        PositionAnalysis.N_POSITION_BINS[1])
             self.place_field_handler = SpikeAnalysis.PlaceFieldHandler(self.position_estimator,\
                     self.spike_listener, self.shared_place_fields)
+
             # self.bayesian_estimator = PositionDecoding.BayesianEstimator(self.spike_listener, \
             #     self.place_field_handler, self.shared_place_fields)
 
@@ -786,9 +803,15 @@ class CommandWindow(QMainWindow):
         """
         Initialize threads needed for stimulus calibration.
         """
-        self.shared_calib_plot_means = RawArray(ctypes.c_double, RiD.CALIB_PLOT_BUFFER_LENGTH)
-        self.shared_calib_plot_std_errs = RawArray(ctypes.c_double, RiD.CALIB_PLOT_BUFFER_LENGTH)
-        self.shared_calib_plot_spike_count_buffer = RawArray(ctypes.c_uint32, RiD.CALIB_PLOT_ONLINE_BUFFER_SIZE)
+        if self.shared_calib_plot_means is None:
+            self.shared_calib_plot_means = RawArray(ctypes.c_double, RiD.CALIB_PLOT_BUFFER_LENGTH)
+
+        if self.shared_calib_plot_std_errs is None:
+            self.shared_calib_plot_std_errs = RawArray(ctypes.c_double, RiD.CALIB_PLOT_BUFFER_LENGTH)
+
+        if self.shared_calib_plot_spike_count_buffer is None:
+            self.shared_calib_plot_spike_count_buffer = RawArray(ctypes.c_uint32, RiD.CALIB_PLOT_ONLINE_BUFFER_SIZE)
+
         try:
             self.calib_plot = CalibrationPlot.CalibrationPlot(self.sg_client, (self.shared_calib_plot_means,\
                     self.shared_calib_plot_std_errs, self.shared_calib_plot_spike_count_buffer),\
