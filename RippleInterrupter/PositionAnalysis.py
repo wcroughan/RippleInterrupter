@@ -18,7 +18,7 @@ import ThreadExtension
 import cProfile
 
 MODULE_IDENTIFIER = "[PositionAnalysis] "
-N_POSITION_BINS = (30, 30)
+N_POSITION_BINS = (50, 50)
 
 class PositionEstimator(ThreadExtension.StoppableThread):
     """
@@ -26,14 +26,25 @@ class PositionEstimator(ThreadExtension.StoppableThread):
     """
 
     # Min/Max position values in x and y to be used for binning
+    # For Open Field
     __P_MIN_X = 100
     __P_MIN_Y = -100
     __P_MAX_X = 1300
     __P_MAX_Y = 1100
+
+    # For Krech Maze
+    """
+    __P_MIN_X = 200
+    __P_MIN_Y = 200
+    __P_MAX_X = 1000
+    __P_MAX_Y = 800
+    """
+
+
     __P_BIN_SIZE_X = (__P_MAX_X - __P_MIN_X)
     __P_BIN_SIZE_Y = (__P_MAX_Y - __P_MIN_Y)
-    __REAL_BIN_SIZE_X = N_POSITION_BINS[0] * RiD.FIELD_SIZE[0]/__P_BIN_SIZE_X
-    __REAL_BIN_SIZE_Y = N_POSITION_BINS[1] * RiD.FIELD_SIZE[1]/__P_BIN_SIZE_Y
+    __REAL_BIN_SIZE_X = N_POSITION_BINS[0] * RiD.FIELD_SIZE[0]/1200.0
+    __REAL_BIN_SIZE_Y = N_POSITION_BINS[1] * RiD.FIELD_SIZE[1]/1200.0
     __SPEED_SMOOTHING_FACTOR = 0.5
     __MAX_TIMESTAMP_JUMP = 12000
     __MAX_REAL_TIME_JUMP = __MAX_TIMESTAMP_JUMP/RiD.SPIKE_SAMPLING_FREQ
