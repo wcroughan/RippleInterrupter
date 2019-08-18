@@ -5,11 +5,12 @@ Module for analysis of ripples in streaming or offline LFP data.
 import os
 import sys
 import time
+import ctypes
 import logging
 from datetime import datetime
 import threading
 import collections
-from multiprocessing import Pipe, Lock, Event, Value
+from multiprocessing import Pipe, Lock, Event, Value, RawArray
 from scipy import signal
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -22,6 +23,7 @@ import TrodesInterface
 import ThreadExtension
 import RippleDefinitions as RiD
 import Visualization
+import QtHelperUtils
 
 # Profiling
 import cProfile
@@ -109,13 +111,12 @@ class RippleDetector(ThreadExtension.StoppableProcess):
     Thread for ripple detection on a set of channels [ONLINE]
     """
 
-    def __init__(self, lfp_listener, calib_plot, baseline_stats=None, \
+    def __init__(self, lfp_listener, calib_plot, \
             trigger_condition=None, shared_buffers=None):
         """
-
-        :baseline_stats: Ripple power mean and std to detect/trigger interruption
         :trigger_condition: Instance of multiprocessing.Event() (or
             threading.Condition()) to communicate synchronization with other threads.
+        :shared_buffers: Shared data buffers
         """
 
         ThreadExtension.StoppableProcess.__init__(self)
@@ -128,16 +129,15 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         # computation of mean and standard deviation on/off 
         self._n_tetrodes = lfp_listener.get_n_tetrodes()
         self._target_tetrodes = lfp_listener.get_tetrodes()
-        self._ripple_reference_tetrode = 0
-        self._ripple_baseline_tetrode = None
-        if baseline_stats is None:
-            self._mean_ripple_power = np.full(self._n_tetrodes, D_MEAN_RIPPLE_POWER, dtype='float')
-            self._std_ripple_power = np.full(self._n_tetrodes, D_STD_RIPPLE_POWER, dtype='float')
-            self._var_ripple_power = np.full(self._n_tetrodes, D_STD_RIPPLE_POWER * D_STD_RIPPLE_POWER, dtype='float')
-        else:
-            self._mean_ripple_power = baseline_stats[0]
-            self._std_ripple_power  = baseline_stats[1]
-            self._var_ripple_power  = baseline_stats[1] * baseline_stats[1]
+
+        self._ripple_data_accsess = Lock()
+        self._shared_mean_ripple_power = RawArray(ctypes.c_double, self._n_tetrodes)
+        self._shared_std_ripple_power = RawArray(ctypes.c_double, self._n_tetrodes)
+        self._mean_ripple_power = np.reshape(np.frombuffer(self._shared_mean_ripple_power, dtype='double'), (self._n_tetrodes))
+        self._std_ripple_power = np.reshape(np.frombuffer(self._shared_std_ripple_power, dtype='double'), (self._n_tetrodes))
+        self._var_ripple_power = self._std_ripple_power * self._std_ripple_power
+        self._ripple_reference_tetrode = Value("i", 0)
+        self._ripple_baseline_tetrode = Value("i", 0)
 
         self._trigger_condition = trigger_condition[0]
         self._show_trigger = trigger_condition[1]
@@ -164,12 +164,19 @@ class RippleDetector(ThreadExtension.StoppableProcess):
 
         logging.info(MODULE_IDENTIFIER + "Started Ripple detection thread.")
 
+    def show_ripple_stats(self):
+        with self._ripple_data_accsess:
+            list_display = QtHelperUtils.ListDisplayWidget("Ripple Statistics", self._target_tetrodes, \
+                    self._shared_mean_ripple_power, self._shared_std_ripple_power)
+        list_display.exec_()
+
     def set_ripple_reference(self, t_ref):
         """
         Set the tetrode index that should be used for detecting ripples.
         """
         if -1 < t_ref < self._n_tetrodes:
-            self._ripple_reference_tetrode = t_ref
+            with self._ripple_data_accsess:
+                self._ripple_reference_tetrode.value = t_ref
             print(MODULE_IDENTIFIER + "Tetrode %s set as ripple reference"%self._target_tetrodes[t_ref])
         else:
             logging.info(MODULE_IDENTIFIER + "Invalid tetrode selected for ripple reference")
@@ -181,7 +188,8 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         power on the ripple reference tetrode.
         """
         if -1 < t_baseline < self._n_tetrodes:
-            self._ripple_baseline_tetrode = t_baseline
+            with self._ripple_data_accsess:
+                self._ripple_baseline_tetrode.value = t_baseline
             print(MODULE_IDENTIFIER + "Tetrode %s set as ripple baseline"%self._target_tetrodes[t_baseline])
         else:
             logging.info(MODULE_IDENTIFIER + "Invalid tetrode selected for ripple baseline")
@@ -240,6 +248,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
 
                 # If the filter window is full, filter the data and record it in rippple power
                 if (lfp_window_ptr == RiD.LFP_FILTER_ORDER):
+                    self._ripple_data_accsess.acquire()
                     lfp_window_ptr = 0
                     filtered_window, ripple_frame_filter = signal.sosfilt(self._ripple_filter, \
                            raw_lfp_window, axis=1, zi=ripple_frame_filter)
@@ -254,14 +263,14 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                     # Timestamp has both trodes and system timestamps!
                     curr_time = float(timestamp)/RiD.SPIKE_SAMPLING_FREQ
                     logging.debug(MODULE_IDENTIFIER + "Frame @ %d filtered, mean ripple strength %.2f"%(timestamp, np.mean(power_to_baseline_ratio)))
-                    if self._ripple_baseline_tetrode is not None:
+                    if self._ripple_baseline_tetrode.value > 0:
                         # Get the ripple power on this tetrode to be used as baseline power
-                        # power_to_baseline_ratio -= power_to_baseline_ratio[self._ripple_baseline_tetrode]
+                        # power_to_baseline_ratio -= power_to_baseline_ratio[self._ripple_baseline_tetrode.value]
                         power_to_baseline_ratio -= 0
 
                     if ((curr_time - prev_ripple) > RiD.RIPPLE_REFRACTORY_PERIOD):
                         # if (power_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD).any():
-                        if power_to_baseline_ratio[self._ripple_reference_tetrode] > RiD.RIPPLE_POWER_THRESHOLD:
+                        if power_to_baseline_ratio[self._ripple_reference_tetrode.value] > RiD.RIPPLE_POWER_THRESHOLD:
                             prev_ripple = curr_time
                             with self._trigger_condition:
                                 # First trigger interruption and all time critical operations
@@ -271,9 +280,9 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                                 ripple_unseen_calib = True
                                 logging.info(MODULE_IDENTIFIER + "Detected ripple, notified with lag of %.6fs"%(curr_wall_time-frame_time))
                             logging.info(MODULE_IDENTIFIER + "Detected ripple at %.6f, TS: %d. Peak Strength: %.2f"% \
-                                    (frame_time, timestamp, power_to_baseline_ratio[self._ripple_reference_tetrode]))
+                                    (frame_time, timestamp, power_to_baseline_ratio[self._ripple_reference_tetrode.value]))
                             print(MODULE_IDENTIFIER + "Detected ripple at %.6f, TS: %d. Peak Strength: %.2f"% \
-                                    (frame_time, timestamp, power_to_baseline_ratio[self._ripple_reference_tetrode]))
+                                    (frame_time, timestamp, power_to_baseline_ratio[self._ripple_reference_tetrode.value]))
 
                     # For each tetrode, update the MEAN and STD for ripple power
                     if n_data_pts_seen < RiD.STAT_ADJUSTMENT_DATA_PTS:
@@ -285,8 +294,9 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                         np.sqrt(self._var_ripple_power/n_data_pts_seen, out=self._std_ripple_power)
                         # Print out stats every 5s
                         if n_data_pts_seen%int(1 * RiD.LFP_FREQUENCY) == 0:
-                            print(MODULE_IDENTIFIER + "T%s: Mean LFP %.4f, STD LFP: %.4f"%(self._target_tetrodes[self._ripple_reference_tetrode],\
-                                    self._mean_ripple_power[self._ripple_reference_tetrode], self._std_ripple_power[self._ripple_reference_tetrode]))
+                            print(MODULE_IDENTIFIER + "T%s: Mean LFP %.4f, STD LFP: %.4f"%(self._target_tetrodes[self._ripple_reference_tetrode.value],\
+                                    self._mean_ripple_power[self._ripple_reference_tetrode.value], self._std_ripple_power[self._ripple_reference_tetrode.value]))
+                    self._ripple_data_accsess.release()
 
                     if ((curr_time - prev_ripple) > RiD.LFP_BUFFER_TIME/2) and ripple_unseen_LFP:
                         ripple_unseen_LFP = False

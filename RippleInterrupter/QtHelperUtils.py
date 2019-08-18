@@ -6,7 +6,7 @@ import os
 import sys
 import argparse
 from PyQt5.QtWidgets import QApplication, QMessageBox, QWidget, QFileDialog
-from PyQt5.QtWidgets import QCheckBox, QPushButton, QComboBox, QLabel, QDialog
+from PyQt5.QtWidgets import QCheckBox, QPushButton, QComboBox, QLabel, QDialog, QListWidget
 from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QDialogButtonBox
 from tkinter import Tk, filedialog
 
@@ -100,6 +100,44 @@ class RippleSelectionMenuWidget(QDialog):
 
     def getIdxs(self):
         return self._sel_reference_idx, self._sel_baseline_idx
+
+
+class ListDisplayWidget(QDialog):
+
+    """
+    Dialog-box showing a list of numbers.
+    TODO: Might have to move away from QMessageBox to be able to save this data onto a file.
+    """
+
+    def __init__(self, title, arg_id, arg_field1, arg_field2=None):
+        QDialog.__init__(self)
+        if title is not None:
+            self.setWindowTitle(title)
+        else:
+            self.setWindowTitle('Data')
+
+        self.data_list_widget = QListWidget()
+        n_data_entries = len(arg_id)
+        self.data_list_widget.resize(100,20*n_data_entries)
+
+        # It is upto the user to supply correctly sized lists in this case.
+        for data_idx, data_value in enumerate(arg_id):
+            if arg_field2 is None:
+                self.data_list_widget.addItem("%s: %.2f"%(data_value, arg_field1[data_idx]))
+            else:
+                self.data_list_widget.addItem("%s: %.2f, %.2f"%(data_value, arg_field1[data_idx], \
+                        arg_field2[data_idx]))
+
+        g_layout = QVBoxLayout()
+        g_layout.addWidget(self.data_list_widget)
+
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+
+        g_layout.addWidget(self.button_box)
+        self.setLayout(g_layout)
 
 class CheckBoxWidget(QMessageBox):
   

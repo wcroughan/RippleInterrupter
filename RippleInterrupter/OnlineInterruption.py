@@ -399,7 +399,8 @@ class CommandWindow(QMainWindow):
 
     # Show ripple stats (current as well as history) for tetrodes
     def showRippleStats(self):
-        QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
+        if self.ripple_detector is not None:
+            self.ripple_detector.show_ripple_stats()
 
     def disconnectAndQuit(self):
         if QtHelperUtils.display_information(MODULE_IDENTIFIER + 'Quit Program?') == QMessageBox.Cancel:
