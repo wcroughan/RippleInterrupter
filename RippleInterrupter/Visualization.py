@@ -534,9 +534,12 @@ class GraphicsManager(Process):
             self._rd_frame[0].set_data(self._lfp_tpts, 3.0 + self._local_lfp_buffer[current_tetrode_selection,:]/self.__PEAK_LFP_AMPLITUDE)
 
             # Smooth out the ripple power
+            """
             smoothed_ripple_power = self.__RIPPLE_SMOOTHING_WINDOW * \
                     gaussian_filter(self._local_ripple_power_buffer[current_tetrode_selection,:], \
                     self.__RIPPLE_SMOOTHING_WINDOW)
+            """
+            smoothed_ripple_power = self._local_ripple_power_buffer[current_tetrode_selection,:]
             self._rd_frame[1].set_data(self._ripple_power_tpts, (smoothed_ripple_power\
                     - RippleAnalysis.D_MEAN_RIPPLE_POWER)/(RippleAnalysis.D_STD_RIPPLE_POWER * RiD.RIPPLE_POWER_THRESHOLD))
         return self._rd_frame

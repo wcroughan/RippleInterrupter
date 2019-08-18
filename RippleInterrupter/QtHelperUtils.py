@@ -6,7 +6,8 @@ import os
 import sys
 import argparse
 from PyQt5.QtWidgets import QApplication, QMessageBox, QWidget, QFileDialog
-from PyQt5.QtWidgets import QCheckBox, QPushButton
+from PyQt5.QtWidgets import QCheckBox, QPushButton, QComboBox, QLabel, QDialog
+from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QDialogButtonBox
 from tkinter import Tk, filedialog
 
 USE_QT_FOR_FILEIO = False
@@ -34,6 +35,71 @@ def display_information(info):
     msg.setWindowTitle('Message')
     msg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
     return msg.exec_()
+
+class RippleSelectionMenuWidget(QDialog):
+    """
+    Dialog-box that allows the user to choose a tetrode to be set as the ripple
+    reference and baseline.  This can be converted into a more general
+    selection tool but not for now.
+    """
+    def __init__(self, tetrode_list):
+        """
+        Create the dialog box using the supplied tetrode list.
+        """
+
+        QDialog.__init__(self)
+        # self.setIcon(QMessageBox.Information)
+        # self.setText("Ripple preference menu")
+        self.setWindowTitle("Ripple preference menu")
+
+        self.ripple_reference_selection = QComboBox()
+        self.ripple_baseline_selection = QComboBox()
+
+        # Add tetrode items to the ripple preferences menu
+        tetrode_id_strings = [str(tet_id) for tet_id in tetrode_list]
+
+        self.ripple_reference_selection.addItems(tetrode_id_strings)
+        self.ripple_baseline_selection.addItems(tetrode_id_strings)
+
+        # Add the two entries in one line each, appending a label next to them
+        reference_layout = QHBoxLayout()
+        reference_layout.addStretch(1)
+        reference_layout.addWidget(QLabel("Reference"))
+        reference_layout.addWidget(self.ripple_reference_selection)
+
+        baseline_layout = QHBoxLayout()
+        baseline_layout.addStretch(1)
+        baseline_layout.addWidget(QLabel("Baseline"))
+        baseline_layout.addWidget(self.ripple_baseline_selection)
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+
+        selection_menu_layout = QVBoxLayout()
+        selection_menu_layout.addLayout(reference_layout)
+        selection_menu_layout.addLayout(baseline_layout)
+        selection_menu_layout.addWidget(self.button_box)
+        self.setLayout(selection_menu_layout)
+
+        # Hold the indexes selected last by the user as class members
+        self._sel_reference_idx = 0
+        self._sel_baseline_idx = 0
+
+    def exec_(self, *args, **kwargs):
+        """
+        Overloading the exec_() function to get both the messagebox result,
+        as well as the selected checkboxes.
+        """
+        self.ripple_reference_selection.setCurrentIndex(self._sel_reference_idx)
+        self.ripple_baseline_selection.setCurrentIndex(self._sel_baseline_idx)
+        ok = QDialog.exec_(self, *args, *kwargs)
+        self._sel_reference_idx = self.ripple_reference_selection.currentIndex()
+        self._sel_baseline_idx  = self.ripple_baseline_selection.currentIndex()
+        return ok
+
+    def getIdxs(self):
+        return self._sel_reference_idx, self._sel_baseline_idx
 
 class CheckBoxWidget(QMessageBox):
   

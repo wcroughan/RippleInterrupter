@@ -27,8 +27,8 @@ import Visualization
 import cProfile
 
 MODULE_IDENTIFIER = "[RippleAnalysis] "
-D_MEAN_RIPPLE_POWER = 80.0
-D_STD_RIPPLE_POWER = 55.0
+D_MEAN_RIPPLE_POWER = 40.0
+D_STD_RIPPLE_POWER = 35.0
 
 class LFPListener(ThreadExtension.StoppableThread):
     """
@@ -59,6 +59,9 @@ class LFPListener(ThreadExtension.StoppableThread):
 
     def get_n_tetrodes(self):
         return self._n_tetrodes
+
+    def get_tetrodes(self):
+        return self._target_tetrodes
 
     def get_lfp_listener_connection(self):
         self._lfp_producer, lfp_consumer = Pipe()
@@ -124,6 +127,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         # probably get away by not looking at running speed to turn the
         # computation of mean and standard deviation on/off 
         self._n_tetrodes = lfp_listener.get_n_tetrodes()
+        self._target_tetrodes = lfp_listener.get_tetrodes()
         self._ripple_reference_tetrode = 0
         self._ripple_baseline_tetrode = None
         if baseline_stats is None:
@@ -163,6 +167,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         """
         if -1 < t_ref < self._n_tetrodes:
             self._ripple_reference_tetrode = t_ref
+            print(MODULE_IDENTIFIER + "Tetrode %s set as ripple reference"%self._target_tetrodes[t_ref])
         else:
             logging.info(MODULE_IDENTIFIER + "Invalid tetrode selected for ripple reference")
 
@@ -174,6 +179,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         """
         if -1 < t_baseline < self._n_tetrodes:
             self._ripple_baseline_tetrode = t_baseline
+            print(MODULE_IDENTIFIER + "Tetrode %s set as ripple baseline"%self._target_tetrodes[t_baseline])
         else:
             logging.info(MODULE_IDENTIFIER + "Invalid tetrode selected for ripple baseline")
 
@@ -236,7 +242,8 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                     filtered_window, ripple_frame_filter = signal.sosfilt(self._ripple_filter, \
                            raw_lfp_window, axis=1, zi=ripple_frame_filter)
                     current_ripple_power = np.sqrt(np.mean(np.power(filtered_window, 2), axis=1))
-                    ripple_power.append(current_ripple_power)
+                    power_to_baseline_ratio = np.divide(current_ripple_power - self._mean_ripple_power, self._std_ripple_power)
+                    ripple_power.append(power_to_baseline_ratio)
 
                     # Fill in the shared data variables
                     self._local_ripple_power_buffer.append(current_ripple_power)
@@ -248,23 +255,23 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                     self._mean_ripple_power += (ripple_power[:, pow_window_ptr] - previous_mean_ripple_power)/n_data_pts_seen
                     self._std_ripple_power += (ripple_power[:, pow_window_ptr] - previous_mean_ripple_power) * \
                             (ripple_power[:, pow_window_ptr] - self._mean_ripple_power)
+                    
                     # This is the accumulate sum of squares. The actual variance is <current-value>/(n_data_pts_seen-1)
                     """
                     n_data_pts_seen += 1
                     # print("Read %d frames so far."%n_data_pts_seen)
         
                     # TODO: Right now, we are not using average power in the smoothing window, but the current power.
-                    power_to_baseline_ratio = np.divide(current_ripple_power - self._mean_ripple_power, self._std_ripple_power)
 
                     # Timestamp has both trodes and system timestamps!
                     curr_time = float(timestamp)/RiD.SPIKE_SAMPLING_FREQ
                     logging.debug(MODULE_IDENTIFIER + "Frame @ %d filtered, mean ripple strength %.2f"%(timestamp, np.mean(power_to_baseline_ratio)))
                     if self._ripple_baseline_tetrode is not None:
                         # Get the ripple power on this tetrode to be used as baseline power
-                        power_to_baseline_ratio -= power_to_baseline_ratio[self._ripple_baseline_tetrode]
+                        # power_to_baseline_ratio -= power_to_baseline_ratio[self._ripple_baseline_tetrode]
+                        power_to_baseline_ratio -= 0
 
                     if ((curr_time - prev_ripple) > RiD.RIPPLE_REFRACTORY_PERIOD):
-                        # TODO: Consider switching to all, or atleast a majority of tetrodes for ripple detection.
                         # if (power_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD).any():
                         if power_to_baseline_ratio[self._ripple_reference_tetrode] > RiD.RIPPLE_POWER_THRESHOLD:
                             prev_ripple = curr_time
@@ -276,7 +283,9 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                                 ripple_unseen_calib = True
                                 logging.info(MODULE_IDENTIFIER + "Detected ripple, notified with lag of %.6fs"%(curr_wall_time-frame_time))
                             logging.info(MODULE_IDENTIFIER + "Detected ripple at %.6f, TS: %d. Peak Strength: %.2f"% \
-                                    (frame_time, timestamp, np.max(power_to_baseline_ratio)))
+                                    (frame_time, timestamp, power_to_baseline_ratio[self._ripple_reference_tetrode]))
+                            print(MODULE_IDENTIFIER + "Detected ripple at %.6f, TS: %d. Peak Strength: %.2f"% \
+                                    (frame_time, timestamp, power_to_baseline_ratio[self._ripple_reference_tetrode]))
 
                     if ((curr_time - prev_ripple) > RiD.LFP_BUFFER_TIME/2) and ripple_unseen_LFP:
                         ripple_unseen_LFP = False

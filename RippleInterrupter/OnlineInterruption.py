@@ -11,7 +11,7 @@ from multiprocessing import Queue, RawArray, Condition
 from multiprocessing import Pipe, Lock, Event, Value
 
 # PyQt imports
-from PyQt5.QtWidgets import QMainWindow, QAction, qApp, QApplication, QMessageBox
+from PyQt5.QtWidgets import QMainWindow, QAction, qApp, QApplication, QMessageBox, QDialog
 from PyQt5 import QtCore
 
 # Local imports
@@ -31,10 +31,22 @@ import CalibrationPlot
 
 MODULE_IDENTIFIER = "[OnlineInterruption] "
 # User selection choices for what they want to see on the screen
+
+# Configuration for looking at spikes and fields
+"""
 DEFAULT_LFP_CHOICE      = False
 DEFAULT_SPIKES_CHOICE   = True
 DEFAULT_POSITION_CHOICE = True
 DEFAULT_FIELD_CHOICE    = True
+DEFAULT_STIMULATION_CHOICE = False
+DEFAULT_CALIBRATION_CHOICE = False
+"""
+
+# Configuration for LFP and adjusting
+DEFAULT_LFP_CHOICE      = True
+DEFAULT_SPIKES_CHOICE   = False
+DEFAULT_POSITION_CHOICE = False
+DEFAULT_FIELD_CHOICE    = False
 DEFAULT_STIMULATION_CHOICE = False
 DEFAULT_CALIBRATION_CHOICE = False
 
@@ -285,8 +297,11 @@ class CommandWindow(QMainWindow):
         self.active_processes    = list()
         self.user_processing_choices = dict()
 
+        # Setup child Qt objects to be called later using menu functions
+        self._ripple_preference_menu = None
+
         # Launch the main graphical interface as a widget
-        self.setGeometry(100, 100, 900, 1200)
+        self.setGeometry(100, 100, 600, 800)
 
         """
         # The 2 lines below remove the CLOSE button on the window.
@@ -339,6 +354,17 @@ class CommandWindow(QMainWindow):
             self.ripple_trigger.disable()
         else:
             self.ripple_trigger.enable()
+
+    # Preference selection
+    def collectSWRPreferences(self):
+        if self._ripple_preference_menu is None:
+            QtHelperUtils.display_information(MODULE_IDENTIFIER + "LFP Stream not setup.")
+            return
+        user_ok = self._ripple_preference_menu.exec_()
+        if (user_ok == QDialog.Accepted):
+            ripple_reference, ripple_baseline = self._ripple_preference_menu.getIdxs()
+            self.ripple_detector.set_ripple_reference(ripple_reference)
+            self.ripple_detector.set_ripple_baseline(ripple_baseline)
 
     ############################# SERIAL FUNCTIONALITY #############################
     # Add functions that let you access and test the serial port in a
@@ -488,6 +514,12 @@ class CommandWindow(QMainWindow):
 
         stimulation_menu.addAction(self.stim_mode_position)
         stimulation_menu.addAction(self.stim_mode_ripple)
+
+        # =============== PREFERENCES MENU =============== 
+        preferences_menu = menu_bar.addMenu('&Preferences')
+        ripple_preferences_menu = preferences_menu.addAction('&SWR Detection')
+        ripple_preferences_menu.setStatusTip('Set SWR preferences.')
+        ripple_preferences_menu.triggered.connect(self.collectSWRPreferences)
 
     def getProcessingArgs(self):
         processing_args = list()
@@ -744,6 +776,7 @@ class CommandWindow(QMainWindow):
             self.ripple_detector = RippleAnalysis.RippleDetector(self.lfp_listener, self.calib_plot,\
                     trigger_condition=(self.trig_condition, self.show_trigger, self.calib_trigger),\
                     shared_buffers=(self.shared_raw_lfp_buffer, self.shared_ripple_buffer))
+            self._ripple_preference_menu = QtHelperUtils.RippleSelectionMenuWidget(self.tetrodes_of_interest)
             self.active_processes.append(self.ripple_detector)
         except Exception as err:
             QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start ripple trigger threads(s).')
