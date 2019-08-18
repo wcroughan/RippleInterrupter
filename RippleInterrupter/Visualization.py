@@ -535,13 +535,12 @@ class GraphicsManager(Process):
 
             # Smooth out the ripple power
             """
-            smoothed_ripple_power = self.__RIPPLE_SMOOTHING_WINDOW * \
+            smoothed_ripple_power = \
                     gaussian_filter(self._local_ripple_power_buffer[current_tetrode_selection,:], \
                     self.__RIPPLE_SMOOTHING_WINDOW)
             """
             smoothed_ripple_power = self._local_ripple_power_buffer[current_tetrode_selection,:]
-            self._rd_frame[1].set_data(self._ripple_power_tpts, (smoothed_ripple_power\
-                    - RippleAnalysis.D_MEAN_RIPPLE_POWER)/(RippleAnalysis.D_STD_RIPPLE_POWER * RiD.RIPPLE_POWER_THRESHOLD))
+            self._rd_frame[1].set_data(self._ripple_power_tpts, smoothed_ripple_power)
         return self._rd_frame
 
     def update_calib_plot_frame(self, step=0):

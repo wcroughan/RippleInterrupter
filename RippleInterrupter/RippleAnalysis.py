@@ -246,7 +246,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                     ripple_power.append(power_to_baseline_ratio)
 
                     # Fill in the shared data variables
-                    self._local_ripple_power_buffer.append(current_ripple_power)
+                    self._local_ripple_power_buffer.append(power_to_baseline_ratio)
 
                     # TODO: Enable this part of the code to update the mean and STD over time
                     # Update the mean and std for ripple power at each of the tetrodes

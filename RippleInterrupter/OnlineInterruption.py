@@ -402,19 +402,20 @@ class CommandWindow(QMainWindow):
         QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
 
     def disconnectAndQuit(self):
-        QtHelperUtils.display_information(MODULE_IDENTIFIER + 'Quitting Program!')
+        if QtHelperUtils.display_information(MODULE_IDENTIFIER + 'Quit Program?') == QMessageBox.Cancel:
+            return
+
         if self.graphical_interface is not None:
             self.graphical_interface.kill_gui()
+        else:
+            if self.data_streaming:
+                self.stopThreads()
 
-        if self.data_streaming:
-            self.stopThreads()
-
-        self.graphical_interface.join()
-        try:
-            self.sg_client.closeConnections()
-        except Exception as err:
-            print(MODULE_IDENTIFIER + "Unable to close connection to Trodes. Not that it won't throw seg fault in your face anyways!")
-            print(err)
+            try:
+                self.sg_client.closeConnections()
+            except Exception as err:
+                print(MODULE_IDENTIFIER + "Unable to close connection to Trodes. Not that it won't throw seg fault in your face anyways!")
+                print(err)
 
         print(MODULE_IDENTIFIER + "Program finished. Exiting.")
         qApp.quit()
