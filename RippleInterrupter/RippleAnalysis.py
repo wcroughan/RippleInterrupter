@@ -281,8 +281,9 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                                 logging.info(MODULE_IDENTIFIER + "Detected ripple, notified with lag of %.6fs"%(curr_wall_time-frame_time))
                             logging.info(MODULE_IDENTIFIER + "Detected ripple at %.6f, TS: %d. Peak Strength: %.2f"% \
                                     (frame_time, timestamp, power_to_baseline_ratio[self._ripple_reference_tetrode.value]))
-                            print(MODULE_IDENTIFIER + "Detected ripple at %.6f, TS: %d. Peak Strength: %.2f"% \
-                                    (frame_time, timestamp, power_to_baseline_ratio[self._ripple_reference_tetrode.value]))
+                            if __debug__:
+                                print(MODULE_IDENTIFIER + "Detected ripple at %.6f, TS: %d. Peak Strength: %.2f"% \
+                                        (frame_time, timestamp, power_to_baseline_ratio[self._ripple_reference_tetrode.value]))
 
                     # For each tetrode, update the MEAN and STD for ripple power
                     if n_data_pts_seen < RiD.STAT_ADJUSTMENT_DATA_PTS:
@@ -294,7 +295,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                         np.sqrt(self._var_ripple_power/n_data_pts_seen, out=self._std_ripple_power)
                         # Print out stats every 5s
                         if n_data_pts_seen%int(1 * RiD.LFP_FREQUENCY) == 0:
-                            print(MODULE_IDENTIFIER + "T%s: Mean LFP %.4f, STD LFP: %.4f"%(self._target_tetrodes[self._ripple_reference_tetrode.value],\
+                            logging.info(MODULE_IDENTIFIER + "T%s: Mean LFP %.4f, STD LFP: %.4f"%(self._target_tetrodes[self._ripple_reference_tetrode.value],\
                                     self._mean_ripple_power[self._ripple_reference_tetrode.value], self._std_ripple_power[self._ripple_reference_tetrode.value]))
                     self._ripple_data_accsess.release()
 
@@ -306,7 +307,8 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                             np.copyto(self._ripple_power_buffer, np.asarray(self._local_ripple_power_buffer).T)
                             logging.info(MODULE_IDENTIFIER + "%.2fs: Peak ripple power in frame %.2f"%(curr_time, np.max(self._ripple_power_buffer)))
                             with self._show_trigger:
-                                # First trigger interruption and all time critical operations
+                                if __debug__:
+                                    print(MODULE_IDENTIFIER + "%.2fs: Peak ripple power in frame %.2f"%(curr_time, np.max(self._ripple_power_buffer)))
                                 self._show_trigger.notify()
                                 
                     if ((curr_time - prev_ripple) > RiD.CALIB_PLOT_BUFFER_TIME/2) and ripple_unseen_calib:

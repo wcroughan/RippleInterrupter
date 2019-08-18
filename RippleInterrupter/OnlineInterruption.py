@@ -316,6 +316,13 @@ class CommandWindow(QMainWindow):
         self.disconnectAndQuit()
 
     # Functions for saving data
+    def saveDisplaySnapshot(self):
+        if self.graphical_interface is not None:
+            # Save the current ripple frame
+            saved_file = self.graphical_interface.saveDisplay()
+            if saved_file:
+                self.statusBar().showMessage("Display snapshot saved to disk")
+
     def saveFields(self):
         QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
 
@@ -439,6 +446,11 @@ class CommandWindow(QMainWindow):
 
         # =============== SAVE MENU =============== 
         save_menu = file_menu.addMenu('&Save')
+        save_ripple_snapshot_action = QAction('&Display', self)
+        save_ripple_snapshot_action.setStatusTip('Save display snapshot')
+        save_ripple_snapshot_action.triggered.connect(self.saveDisplaySnapshot)
+        save_ripple_snapshot_action.setShortcut('Ctrl+S')
+
         save_place_fields_action = QAction('Place &Fields', self)
         save_place_fields_action.setStatusTip('Save place fields')
         save_place_fields_action.triggered.connect(self.saveFields)
@@ -447,6 +459,7 @@ class CommandWindow(QMainWindow):
         save_bayesian_decoding_action.setStatusTip('Save bayesian decoding')
         save_bayesian_decoding_action.triggered.connect(self.saveBayesianDecoding)
 
+        save_menu.addAction(save_ripple_snapshot_action)
         save_menu.addAction(save_place_fields_action)
         save_menu.addAction(save_bayesian_decoding_action)
 

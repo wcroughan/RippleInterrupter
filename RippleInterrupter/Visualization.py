@@ -171,7 +171,7 @@ class GraphicsManager(Process):
     __CLUSTERS_TO_PLOT = []
     __N_SUBPLOT_COLS = int(3)
     __MAX_FIRING_RATE = 40.0
-    __RIPPLE_DETECTION_TIMEOUT = 1.0
+    __RIPPLE_DETECTION_TIMEOUT = 0.5
     __RIPPLE_SMOOTHING_WINDOW = 2
 
     def __init__(self, ripple_buffers, calib_plot_buffers, spike_listener, position_estimator, \
@@ -474,6 +474,26 @@ class GraphicsManager(Process):
     def ClearUserMessage(self):
         pass
 
+    # Saving Images
+    def saveDisplay(self):
+        if self.figure is None:
+            return
+
+        # Create a filename
+        save_file_name = time.strftime("T" + str(self.tetrode_selection.currentText()) + "_%Y%m%d_%H%M%S.png") 
+        save_success = False
+        try:
+            self.figure.savefig(save_file_name)
+            save_success = True
+        except Exception as err:
+            print(MODULE_IDENTIFIER + "Unable to save current display.")
+            print(err)
+        return save_success
+
+    # Saving Videos
+    def recordDisplay(self):
+        pass
+
     def NextUnit(self):
         current_unit = self.unit_selection.currentIndex()
         # print(MODULE_IDENTIFIER + 'Current Unit: %d'%current_unit)
@@ -509,7 +529,7 @@ class GraphicsManager(Process):
             self._rd_ax.set_xlabel("Time (s)")
             self._rd_ax.set_ylabel("Ripple Power (STD)")
             self._rd_ax.set_xlim((-0.5 * RiD.LFP_BUFFER_TIME, 0.5 * RiD.LFP_BUFFER_TIME))
-            self._rd_ax.set_ylim((-1.0, 1.2*RiD.RIPPLE_POWER_THRESHOLD))
+            self._rd_ax.set_ylim((-1.0, 1.6*RiD.RIPPLE_POWER_THRESHOLD))
             self._rd_ax.grid(True)
 
         # Calibration plot
@@ -629,7 +649,7 @@ class GraphicsManager(Process):
                     np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
                 logging.info(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
             else:
-                time.sleep(self.__RIPPLE_DETECTION_TIMEOUT)
+                time.sleep(0.01)
         logging.info(MODULE_IDENTIFIER + "Ripple frame pipe closed.")
 
     def fetch_calibration_plot(self):
@@ -646,7 +666,7 @@ class GraphicsManager(Process):
                     np.copyto(self._local_spk_cnt_buffer, self._shared_calib_plot_means)
                     np.copyto(self._local_spk_cnt_stderr_buffer, self._shared_calib_plot_std_errs)
             else:
-                time.sleep(self.__RIPPLE_DETECTION_TIMEOUT)
+                time.sleep(0.01)
         logging.info(MODULE_IDENTIFIER + "Calibration pipe closed.")
 
     def fetch_place_fields(self):

@@ -1,4 +1,5 @@
 *.pr
+*.png
 *.npy
 *.csv
 *.log
