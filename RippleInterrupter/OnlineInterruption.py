@@ -301,7 +301,7 @@ class CommandWindow(QMainWindow):
         self._ripple_preference_menu = None
 
         # Launch the main graphical interface as a widget
-        self.setGeometry(100, 100, 400, 50)
+        self.setGeometry(100, 100, 320, 50)
 
         """
         # The 2 lines below remove the CLOSE button on the window.

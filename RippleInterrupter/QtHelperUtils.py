@@ -145,7 +145,7 @@ class CheckBoxWidget(QDialog):
     Dialog-box containing a number of check-boxes.
     """
 
-    MAX_CHECKBOX_COLUMNS = 3
+    MAX_CHECKBOX_COLUMNS = 2
     def __init__(self, list_of_elements, message=None, default_choices=None):
         """
         Create the dialog-box with a pre-defined list of elements.

@@ -167,7 +167,7 @@ class GraphicsManager(Process):
     __N_ANIMATION_FRAMES = 50000
     __PLACE_FIELD_REFRESH_RATE = 1
     __PLOT_REFRESH_RATE = 0.05
-    __PEAK_LFP_AMPLITUDE = 600
+    __PEAK_LFP_AMPLITUDE = 1000
     __CLUSTERS_TO_PLOT = []
     __N_SUBPLOT_COLS = int(3)
     __MAX_FIRING_RATE = 40.0
