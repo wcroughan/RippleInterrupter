@@ -24,9 +24,9 @@ import matplotlib.animation as animation
 
 # Creating windows using PyQt
 from PyQt5.QtWidgets import QMainWindow, QAction, qApp, QApplication, QDialog, QFileDialog, QMessageBox
-from PyQt5.QtWidgets import QPushButton, QSlider, QRadioButton, QLabel, QInputDialog
+from PyQt5.QtWidgets import QPushButton, QSlider, QRadioButton, QLabel, QInputDialog, QTextEdit
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QGridLayout, QComboBox
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal, Qt
 
 # Local Imports
 import Configuration
@@ -247,6 +247,13 @@ class GraphicsManager(Process):
 
         # Selecting individual units
         self.unit_selection = QComboBox()
+        self.user_message = QTextEdit()
+        self.user_message.resize(300, 100)
+        self.log_message = QPushButton('Log')
+        self.clear_message = QPushButton('Clear')
+        self.log_message.clicked.connect(self.LogUserMessage)
+        self.clear_message.clicked.connect(self.ClearUserMessage)
+
         # self.unit_selection.currentIndexChanged.connect(self.refresh)
         # Add next and prev buttons to look at individual cells.
         self.next_unit_button = QPushButton('Next')
@@ -421,9 +428,21 @@ class GraphicsManager(Process):
         vbox_tetrode_buttons.addWidget(self.next_tet_button)
         vbox_tetrode_buttons.addWidget(self.prev_tet_button)
 
+        # Add a block for user to add comments
+        message_button_box = QHBoxLayout()
+        message_button_box.addStretch(1)
+        message_button_box.addWidget(self.log_message)
+        message_button_box.addWidget(self.clear_message)
+        message_button_box.addStretch(1)
+
+        vbox_user_message = QVBoxLayout()
+        vbox_user_message.addWidget(self.user_message)
+        vbox_user_message.addStretch(1)
+        vbox_user_message.addLayout(message_button_box)
+
         # Put the tetrode and unit buttons together
         hbox_unit_and_tet_controls = QHBoxLayout()
-        hbox_unit_and_tet_controls.addStretch(1)
+        hbox_unit_and_tet_controls.addLayout(vbox_user_message)
         hbox_unit_and_tet_controls.addLayout(vbox_unit_buttons)
         hbox_unit_and_tet_controls.addLayout(vbox_tetrode_buttons)
 
@@ -448,6 +467,12 @@ class GraphicsManager(Process):
     def setTetrodeList(self, tetrode_list):
         tetrode_id_strings = [str(tet_id) for tet_id in tetrode_list]
         self.tetrode_selection.addItems(tetrode_id_strings)
+
+    def LogUserMessage(self):
+        pass
+
+    def ClearUserMessage(self):
+        pass
 
     def NextUnit(self):
         current_unit = self.unit_selection.currentIndex()
