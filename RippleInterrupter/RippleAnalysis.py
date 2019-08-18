@@ -133,9 +133,12 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         if baseline_stats is None:
             self._mean_ripple_power = np.full(self._n_tetrodes, D_MEAN_RIPPLE_POWER, dtype='float')
             self._std_ripple_power = np.full(self._n_tetrodes, D_STD_RIPPLE_POWER, dtype='float')
+            self._var_ripple_power = np.full(self._n_tetrodes, D_STD_RIPPLE_POWER * D_STD_RIPPLE_POWER, dtype='float')
         else:
             self._mean_ripple_power = baseline_stats[0]
             self._std_ripple_power  = baseline_stats[1]
+            self._var_ripple_power  = baseline_stats[1] * baseline_stats[1]
+
         self._trigger_condition = trigger_condition[0]
         self._show_trigger = trigger_condition[1]
         self._calib_trigger_condition = trigger_condition[2]
@@ -209,10 +212,9 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         # Buffers for storing/manipulating raw LFP, ripple filtered LFP and
         # ripple power.
         raw_lfp_window = np.zeros((self._n_tetrodes, RiD.LFP_FILTER_ORDER), dtype='float')
-        ripple_power = collections.deque(maxlen=RiD.RIPPLE_SMOOTHING_WINDOW)
         previous_mean_ripple_power = np.zeros_like(self._mean_ripple_power)
+        previous_inst_ripple_power = np.zeros((self._n_tetrodes,))
         lfp_window_ptr = 0
-        pow_window_ptr = 0
         n_data_pts_seen = 0
 
         # Delay measures for ripple detection (and trigger)
@@ -242,27 +244,13 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                     filtered_window, ripple_frame_filter = signal.sosfilt(self._ripple_filter, \
                            raw_lfp_window, axis=1, zi=ripple_frame_filter)
                     current_ripple_power = np.sqrt(np.mean(np.power(filtered_window, 2), axis=1))
-                    power_to_baseline_ratio = np.divide(current_ripple_power - self._mean_ripple_power, self._std_ripple_power)
-                    ripple_power.append(power_to_baseline_ratio)
+                    power_to_baseline_ratio = np.divide(current_ripple_power - self._mean_ripple_power, \
+                            self._std_ripple_power) + RiD.RIPPLE_SMOOTHING_FACTOR * previous_inst_ripple_power
+                    previous_inst_ripple_power = power_to_baseline_ratio
 
                     # Fill in the shared data variables
                     self._local_ripple_power_buffer.append(power_to_baseline_ratio)
-
-                    # TODO: Enable this part of the code to update the mean and STD over time
-                    # Update the mean and std for ripple power at each of the tetrodes
-                    """
-                    np.copyto(previous_mean_ripple_power, self._mean_ripple_power)
-                    self._mean_ripple_power += (ripple_power[:, pow_window_ptr] - previous_mean_ripple_power)/n_data_pts_seen
-                    self._std_ripple_power += (ripple_power[:, pow_window_ptr] - previous_mean_ripple_power) * \
-                            (ripple_power[:, pow_window_ptr] - self._mean_ripple_power)
-                    
-                    # This is the accumulate sum of squares. The actual variance is <current-value>/(n_data_pts_seen-1)
-                    """
-                    n_data_pts_seen += 1
-                    # print("Read %d frames so far."%n_data_pts_seen)
         
-                    # TODO: Right now, we are not using average power in the smoothing window, but the current power.
-
                     # Timestamp has both trodes and system timestamps!
                     curr_time = float(timestamp)/RiD.SPIKE_SAMPLING_FREQ
                     logging.debug(MODULE_IDENTIFIER + "Frame @ %d filtered, mean ripple strength %.2f"%(timestamp, np.mean(power_to_baseline_ratio)))
@@ -286,6 +274,19 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                                     (frame_time, timestamp, power_to_baseline_ratio[self._ripple_reference_tetrode]))
                             print(MODULE_IDENTIFIER + "Detected ripple at %.6f, TS: %d. Peak Strength: %.2f"% \
                                     (frame_time, timestamp, power_to_baseline_ratio[self._ripple_reference_tetrode]))
+
+                    # For each tetrode, update the MEAN and STD for ripple power
+                    if n_data_pts_seen < RiD.STAT_ADJUSTMENT_DATA_PTS:
+                        n_data_pts_seen += 1
+                        np.copyto(previous_mean_ripple_power, self._mean_ripple_power)
+                        self._mean_ripple_power += (current_ripple_power - previous_mean_ripple_power)/n_data_pts_seen
+                        self._var_ripple_power += (current_ripple_power - previous_mean_ripple_power) * \
+                                (current_ripple_power - self._mean_ripple_power)/n_data_pts_seen
+                        np.sqrt(self._var_ripple_power, out=self._std_ripple_power)
+                        # Print out stats every 5s
+                        if n_data_pts_seen%int(5 * RiD.LFP_FREQUENCY) == 0:
+                            print(MODULE_IDENTIFIER + "T%s: Mean LFP %.4f, STD LFP: %.4f"%(self._target_tetrodes[self._ripple_reference_tetrode],\
+                                    self._mean_ripple_power[self._ripple_reference_tetrode], self._std_ripple_power[self._ripple_reference_tetrode]))
 
                     if ((curr_time - prev_ripple) > RiD.LFP_BUFFER_TIME/2) and ripple_unseen_LFP:
                         ripple_unseen_LFP = False

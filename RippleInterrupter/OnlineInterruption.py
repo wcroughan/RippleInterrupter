@@ -407,7 +407,6 @@ class CommandWindow(QMainWindow):
 
         if self.graphical_interface is not None:
             self.graphical_interface.kill_gui()
-        else:
             if self.data_streaming:
                 self.stopThreads()
 
