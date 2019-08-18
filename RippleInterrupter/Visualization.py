@@ -484,7 +484,7 @@ class GraphicsManager(Process):
             self._rd_ax.set_xlabel("Time (s)")
             self._rd_ax.set_ylabel("Ripple Power (STD)")
             self._rd_ax.set_xlim((-0.5 * RiD.LFP_BUFFER_TIME, 0.5 * RiD.LFP_BUFFER_TIME))
-            self._rd_ax.set_ylim((-1.0, 6.0))
+            self._rd_ax.set_ylim((-1.0, 1.2*RiD.RIPPLE_POWER_THRESHOLD))
             self._rd_ax.grid(True)
 
         # Calibration plot
@@ -602,7 +602,7 @@ class GraphicsManager(Process):
                 with self._lfp_lock:
                     np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
                     np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
-                # print(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
+                logging.info(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
             else:
                 time.sleep(self.__RIPPLE_DETECTION_TIMEOUT)
         logging.info(MODULE_IDENTIFIER + "Ripple frame pipe closed.")

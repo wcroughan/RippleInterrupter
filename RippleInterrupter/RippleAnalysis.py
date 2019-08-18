@@ -243,10 +243,10 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                     lfp_window_ptr = 0
                     filtered_window, ripple_frame_filter = signal.sosfilt(self._ripple_filter, \
                            raw_lfp_window, axis=1, zi=ripple_frame_filter)
-                    current_ripple_power = np.sqrt(np.mean(np.power(filtered_window, 2), axis=1))
-                    power_to_baseline_ratio = np.divide(current_ripple_power - self._mean_ripple_power, \
-                            self._std_ripple_power) + RiD.RIPPLE_SMOOTHING_FACTOR * previous_inst_ripple_power
-                    previous_inst_ripple_power = power_to_baseline_ratio
+                    current_ripple_power = np.sqrt(np.mean(np.power(filtered_window, 2), axis=1)) + \
+                            (RiD.RIPPLE_SMOOTHING_FACTOR * previous_inst_ripple_power)
+                    power_to_baseline_ratio = np.divide(current_ripple_power - self._mean_ripple_power, self._std_ripple_power) 
+                    previous_inst_ripple_power = current_ripple_power
 
                     # Fill in the shared data variables
                     self._local_ripple_power_buffer.append(power_to_baseline_ratio)
@@ -281,10 +281,10 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                         np.copyto(previous_mean_ripple_power, self._mean_ripple_power)
                         self._mean_ripple_power += (current_ripple_power - previous_mean_ripple_power)/n_data_pts_seen
                         self._var_ripple_power += (current_ripple_power - previous_mean_ripple_power) * \
-                                (current_ripple_power - self._mean_ripple_power)/n_data_pts_seen
-                        np.sqrt(self._var_ripple_power, out=self._std_ripple_power)
+                                (current_ripple_power - self._mean_ripple_power)
+                        np.sqrt(self._var_ripple_power/n_data_pts_seen, out=self._std_ripple_power)
                         # Print out stats every 5s
-                        if n_data_pts_seen%int(5 * RiD.LFP_FREQUENCY) == 0:
+                        if n_data_pts_seen%int(1 * RiD.LFP_FREQUENCY) == 0:
                             print(MODULE_IDENTIFIER + "T%s: Mean LFP %.4f, STD LFP: %.4f"%(self._target_tetrodes[self._ripple_reference_tetrode],\
                                     self._mean_ripple_power[self._ripple_reference_tetrode], self._std_ripple_power[self._ripple_reference_tetrode]))
 
@@ -498,7 +498,8 @@ def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
     return (power_mean, power_std)
 
 def main():
-    tetrodes_to_be_analyzed = [2,14]
+    # tetrodes_to_be_analyzed = [2,14]
+    tetrodes_to_be_analyzed = [3,23]
     if len(sys.argv) > 2:
         stim_time = float(sys.argv[2])
     else:
