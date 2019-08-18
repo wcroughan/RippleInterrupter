@@ -242,7 +242,7 @@ class CommandWindow(QMainWindow):
     def __init__(self):
         """TODO: to be defined1. """
         QMainWindow.__init__(self)
-        self.setWindowTitle('Spike Processor')
+        self.setWindowTitle('ActiveLink')
         self.statusBar().showMessage('Connect to SpikeGadgets.')
         self.stim_mode_position = None
         self.stim_mode_ripple = None
@@ -301,7 +301,7 @@ class CommandWindow(QMainWindow):
         self._ripple_preference_menu = None
 
         # Launch the main graphical interface as a widget
-        self.setGeometry(100, 100, 600, 800)
+        self.setGeometry(100, 100, 400, 50)
 
         """
         # The 2 lines below remove the CLOSE button on the window.
@@ -530,7 +530,7 @@ class CommandWindow(QMainWindow):
         processing_args.append("Place Field")
         processing_args.append("Stimulation")
         processing_args.append("Calibration")
-        user_choices = QtHelperUtils.CheckBoxWidget(processing_args, message="Select position processing options.",\
+        user_choices = QtHelperUtils.CheckBoxWidget(processing_args, message="Select processing options.",\
                 default_choices=[DEFAULT_LFP_CHOICE, DEFAULT_SPIKES_CHOICE, DEFAULT_POSITION_CHOICE, DEFAULT_FIELD_CHOICE,\
                 DEFAULT_STIMULATION_CHOICE, DEFAULT_CALIBRATION_CHOICE]).exec_()
         self.user_processing_choices = dict()
@@ -540,7 +540,7 @@ class CommandWindow(QMainWindow):
         self.user_processing_choices['field']    = DEFAULT_FIELD_CHOICE
         self.user_processing_choices['stim']     = DEFAULT_STIMULATION_CHOICE
         self.user_processing_choices['calib']    = DEFAULT_CALIBRATION_CHOICE
-        if user_choices[0] == QMessageBox.Ok:
+        if user_choices[0] == QDialog.Accepted:
             if 0 in user_choices[1]:
                 self.user_processing_choices['lfp'] = True
             else:
@@ -655,6 +655,7 @@ class CommandWindow(QMainWindow):
         except Exception as err:
             print(err)
             return
+        self.setGeometry(100, 100, 700, 750)
         self.setCentralWidget(self.graphical_interface.widget)
         self.statusBar().showMessage('Connected to SpikeGadgets. Press Ctrl+T to stream.')
 
@@ -665,7 +666,8 @@ class CommandWindow(QMainWindow):
         # Uncomment to use a hardcoded file
         # cluster_filename = "./config/Billy3_20181219_005635_merge_time_0.trodesClusters"
         # cluster_filename = "./config/full_config20190206_session_start.trodesClusters"
-        cluster_filename = "./config/full_config20190206_session_end.trodesClusters"
+        cluster_filename = "./config/full_config20190208_session_start.trodesClusters"
+        # cluster_filename = "./config/full_config20190206_session_end.trodesClusters"
         # cluster_filename = "./config/full_config20190307.trodesClusters"
         # cluster_filename = "open_field_full_config20190220_172702.trodesClusters"
         cluster_config = Configuration.read_cluster_file(cluster_filename, self.tetrodes_of_interest)
