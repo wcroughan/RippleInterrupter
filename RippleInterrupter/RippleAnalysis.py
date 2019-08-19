@@ -135,6 +135,11 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         self._shared_std_ripple_power = RawArray(ctypes.c_double, self._n_tetrodes)
         self._mean_ripple_power = np.reshape(np.frombuffer(self._shared_mean_ripple_power, dtype='double'), (self._n_tetrodes))
         self._std_ripple_power = np.reshape(np.frombuffer(self._shared_std_ripple_power, dtype='double'), (self._n_tetrodes))
+
+        # Fill in appropriate values into the mean and std vectors
+        self._mean_ripple_power.fill(D_MEAN_RIPPLE_POWER)
+        self._std_ripple_power.fill(D_STD_RIPPLE_POWER)
+
         self._var_ripple_power = self._std_ripple_power * self._std_ripple_power
         self._ripple_reference_tetrode = Value("i", 0)
         self._ripple_baseline_tetrode = Value("i", 0)
