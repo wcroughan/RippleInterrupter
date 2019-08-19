@@ -268,10 +268,12 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                     # Timestamp has both trodes and system timestamps!
                     curr_time = float(timestamp)/RiD.SPIKE_SAMPLING_FREQ
                     logging.debug(MODULE_IDENTIFIER + "Frame @ %d filtered, mean ripple strength %.2f"%(timestamp, np.mean(power_to_baseline_ratio)))
+                    """
                     if self._ripple_baseline_tetrode.value > 0:
                         # Get the ripple power on this tetrode to be used as baseline power
                         # power_to_baseline_ratio -= power_to_baseline_ratio[self._ripple_baseline_tetrode.value]
                         power_to_baseline_ratio -= 0
+                    """
 
                     if ((curr_time - prev_ripple) > RiD.RIPPLE_REFRACTORY_PERIOD):
                         # if (power_to_baseline_ratio > RiD.RIPPLE_POWER_THRESHOLD).any():
@@ -280,10 +282,10 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                             with self._trigger_condition:
                                 # First trigger interruption and all time critical operations
                                 self._trigger_condition.notify()
-                                curr_wall_time = time.perf_counter()
-                                ripple_unseen_LFP = True
-                                ripple_unseen_calib = True
-                                logging.info(MODULE_IDENTIFIER + "Detected ripple, notified with lag of %.6fs"%(curr_wall_time-frame_time))
+                            curr_wall_time = time.perf_counter()
+                            ripple_unseen_LFP = True
+                            ripple_unseen_calib = True
+                            logging.info(MODULE_IDENTIFIER + "Detected ripple, notified with lag of %.6fs"%(curr_wall_time-frame_time))
                             logging.info(MODULE_IDENTIFIER + "Detected ripple at %.6f, TS: %d. Peak Strength: %.2f"% \
                                     (frame_time, timestamp, power_to_baseline_ratio[self._ripple_reference_tetrode.value]))
                             if __debug__:
@@ -312,9 +314,9 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                             np.copyto(self._ripple_power_buffer, np.asarray(self._local_ripple_power_buffer).T)
                             logging.info(MODULE_IDENTIFIER + "%.2fs: Peak ripple power in frame %.2f"%(curr_time, np.max(self._ripple_power_buffer)))
                             with self._show_trigger:
-                                if __debug__:
-                                    print(MODULE_IDENTIFIER + "%.2fs: Peak ripple power in frame %.2f"%(curr_time, np.max(self._ripple_power_buffer)))
                                 self._show_trigger.notify()
+                            if __debug__:
+                                print(MODULE_IDENTIFIER + "%.2fs: Peak ripple power in frame %.2f"%(curr_time, np.max(self._ripple_power_buffer)))
                                 
                     if ((curr_time - prev_ripple) > RiD.CALIB_PLOT_BUFFER_TIME/2) and ripple_unseen_calib:
                         ripple_unseen_calib = False
@@ -329,6 +331,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                 if down_time > 1.0:
                     print(MODULE_IDENTIFIER + "Warning: Not receiving LFP Packets.")
                     down_time = 0.0
+
 """
 Code below here is from the previous iterations where we were using a single
 file to detect and disrupt all ripples based on the LFP on a single tetrode.

@@ -2,12 +2,13 @@
 import os
 import csv
 import time
+import ctypes
 import threading
 from datetime import datetime
 from scipy import signal, stats
 from scipy.ndimage import gaussian_filter, center_of_mass
 import matplotlib.pyplot as plt
-from multiprocessing import Queue, Pipe, Condition, Event
+from multiprocessing import Queue, Pipe, Condition, Event, RawArray
 import numpy as np
 import logging
 
@@ -36,10 +37,17 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         self._spike_buffer = spike_processor.get_spike_buffer_connection()
         n_units = spike_processor.get_n_clusters()
         self._field_shape = (PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1])
-        self._place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), (n_units, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
+
+        # Hold the shared data variables that we will have to access later on in a separate buffer
+        self._shared_nspks_in_bin = RawArray(ctypes.c_double, n_units * PositionAnalysis.N_POSITION_BINS[0] * PositionAnalysis.N_POSITION_BINS[1])
+        self._shared_bin_occupancy = RawArray(ctypes.c_double, PositionAnalysis.N_POSITION_BINS[0] * PositionAnalysis.N_POSITION_BINS[1])
+
+        self._place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), \
+                (n_units, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
         self._log_place_fields = np.zeros_like(self._place_fields)
-        self._nspks_in_bin = np.zeros(np.shape(self._place_fields))
-        self._bin_occupancy = np.zeros((PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]), dtype='float')
+        self._nspks_in_bin = np.reshape(np.frombuffer(self._shared_nspks_in_bin, dtype='double'), self._place_fields.shape)
+        self._bin_occupancy = np.reshape(np.frombuffer(self._shared_bin_occupancy, dtype='double'), \
+                (PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
         self._has_pf_request = False
         self._place_field_lock = Condition()
         self._spike_place_buffer_connections = []
@@ -88,6 +96,38 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
             self._requested_clusters.append(cl)
         return your_end
 
+    def save_place_fields(self):
+        """
+        Save all the data related to place fields in the current session.
+        """
+        fields_save_success = False
+        try:
+            with self._place_field_lock:
+                np.savez(self._place_field_filename, self._shared_nspks_in_bin, self._shared_bin_occupancy)
+            logging.info(self.CLASS_IDENTIFIER + "Fields saved to %s."%(self._place_field_filename))
+            fields_save_success = True
+        except Exception as err:
+            print(self.CLASS_IDENTIFIER + "Unable to save fields to %s."%(self._place_field_filename))
+
+        return fields_save_success
+
+    def load_place_fields(self, field_filename):
+        """
+        Load place field data from the given file.
+        """
+        fields_load_success = False
+        try:
+            with self._place_field_lock:
+                place_field_data = np.load(field_filename)
+                np.copyto(self._nspks_in_bin, np.reshape(place_field_data['arr_0'], self._nspks_in_bin.shape))
+                np.copyto(self._bin_occupancy, np.reshape(place_field_data['arr_1'], self._bin_occupancy.shape))
+            logging.info(self.CLASS_IDENTIFIER + "Fields loaded to %s."%(field_filename))
+            fields_load_success = True
+        except Exception as err:
+            print(self.CLASS_IDENTIFIER + "Unable to load fields to %s."%(field_filename))
+            print(err)
+        return fields_load_success
+
     def run(self):
         """
         Start collecting data to construct the field
@@ -103,6 +143,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         curr_speed = 0
         spk_time = 0
 
+        raw_place_fields = np.zeros_like(self._place_fields)
         update_pf_every_n_spks = 100 #this controls how many spikes are collected before place fields are recalculated
         pf_update_spk_iter = 0
 
@@ -154,9 +195,10 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                     # stationary.. Since we are not counting spikes during this
                     # period, this penalizes bins where the animal stops.
                     if (timestamps_in_prev_bin > 0) and (curr_speed > RiD.MOVE_VELOCITY_THRESOLD):
+                        with self._place_field_lock:
+                            self._bin_occupancy[prev_posbin_x, prev_posbin_y] += real_time_spent_in_prev_bin
                         logging.debug(self.CLASS_IDENTIFIER + "Updating occupancy in bin (%d, %d), time spent %.2fs"%\
                                 (prev_posbin_x,prev_posbin_y,real_time_spent_in_prev_bin))
-                        self._bin_occupancy[prev_posbin_x, prev_posbin_y] += real_time_spent_in_prev_bin
 
                     prev_posbin_x = curr_posbin_x
                     prev_posbin_y = curr_posbin_y
@@ -180,7 +222,8 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                         break
                     else:
                         pf_update_spk_iter += 1
-                        self._nspks_in_bin[spk_cl, curr_posbin_x, curr_posbin_y] += 1
+                        with self._place_field_lock:
+                                self._nspks_in_bin[spk_cl, curr_posbin_x, curr_posbin_y] += 1
                         # Send this to the visualization pipeline to see how spike are being reported
                         if spk_cl in self._requested_clusters:
                             for pipe_in in self._spike_place_buffer_connections:
@@ -204,10 +247,11 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                     pf_update_spk_iter = 0
                     # Deal with divide by zero when the occupancy is zero for some of the place bins
                     # If we assign the values to a new location, new memory is allocated!
-                    np.divide(self._nspks_in_bin, self._bin_occupancy, out=self._place_fields, \
+                    np.divide(self._nspks_in_bin, self._bin_occupancy, out=raw_place_fields, \
                             where=self._bin_occupancy!=0)
+
                     # Apply gaussian smoothing to the computed place fields`
-                    gaussian_filter(self._place_fields, sigma=[0, 3, 3], output=self._place_fields)
+                    gaussian_filter(raw_place_fields, sigma=[0, 3, 3], output=self._place_fields)
                     np.log(self._place_fields, out=self._log_place_fields, where=self._place_fields!=0)
                     logging.info(self.CLASS_IDENTIFIER + "Fields updated. Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._place_fields), np.mean(self._place_fields)))
 
@@ -239,9 +283,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
 
     def get_bin_occupancy(self):
         with self._place_field_lock:
-            logging.info("Bin occupancy requested. Peak: %.2fs, Mean: %.2fs"%\
-                    (np.max(self._bin_occupancy), np.mean(self._bin_occupancy)))
-            return np.copy(self._bin_occupancy)
+            return np.copy(self._shared_bin_occupancy)
 
     def get_raw_place_fields(self, cluster_idx=None):
         """

@@ -1,6 +1,7 @@
 *.pr
 *.png
 *.npy
+*.npz
 *.csv
 *.log
 *.swp

@@ -170,7 +170,7 @@ class GraphicsManager(Process):
     __PEAK_LFP_AMPLITUDE = 1000
     __CLUSTERS_TO_PLOT = []
     __N_SUBPLOT_COLS = int(3)
-    __MAX_FIRING_RATE = 40.0
+    __MAX_FIRING_RATE = 15.0
     __RIPPLE_DETECTION_TIMEOUT = 0.5
     __RIPPLE_SMOOTHING_WINDOW = 2
 
@@ -811,7 +811,7 @@ class GraphicsManager(Process):
         pf_heatmap = self._pf_ax.imshow(np.zeros((PositionAnalysis.N_POSITION_BINS[0], \
                 PositionAnalysis.N_POSITION_BINS[1]), dtype='float'), vmin=0, \
                 vmax=self.__MAX_FIRING_RATE, animated=True)
-        plt.colorbar(pf_heatmap)
+        self.figure.colorbar(pf_heatmap)
         self._pf_frame.append(pf_heatmap)
         anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_place_field_frame, \
                 frames=np.arange(self.__N_ANIMATION_FRAMES), interval=ANIMATION_INTERVAL, blit=True, repeat=True)

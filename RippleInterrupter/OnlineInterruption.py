@@ -324,14 +324,32 @@ class CommandWindow(QMainWindow):
                 self.statusBar().showMessage("Display snapshot saved to disk")
 
     def saveFields(self):
-        QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
+        if self.place_field_handler is not None:
+            fields_saved = self.place_field_handler.save_place_fields()
+        else:
+            fields_saved = False
+
+        if fields_saved:
+            self.statusBar().showMessage("Place fields saved.")
 
     def saveBayesianDecoding(self):
         QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
 
     # Functions for loading data
     def loadFields(self):
-        QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
+        if self.place_field_handler is None:
+            QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Place Field handler not setup to load fields.')
+            return
+
+        # Get the name of the place-field file
+        place_field_filename = QtHelperUtils.get_open_file_name(file_format="Place Field (*.npz)", message="Select place field file")
+        if place_field_filename:
+            fields_loaded = self.place_field_handler.load_place_fields(place_field_filename)
+        else:
+            fields_loaded = False
+
+        if fields_loaded:
+            self.statusBar().showMessage("Place fields loaded.")
 
     ############################# STIMULATION TRIGGERS #############################
     # Set up the different stimulation methods here. The three different
