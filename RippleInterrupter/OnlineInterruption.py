@@ -33,22 +33,22 @@ MODULE_IDENTIFIER = "[OnlineInterruption] "
 # User selection choices for what they want to see on the screen
 
 # Configuration for looking at spikes and fields
-"""
 DEFAULT_LFP_CHOICE      = False
 DEFAULT_SPIKES_CHOICE   = True
 DEFAULT_POSITION_CHOICE = True
 DEFAULT_FIELD_CHOICE    = True
 DEFAULT_STIMULATION_CHOICE = False
 DEFAULT_CALIBRATION_CHOICE = False
-"""
 
 # Configuration for LFP and adjusting
+"""
 DEFAULT_LFP_CHOICE      = True
 DEFAULT_SPIKES_CHOICE   = False
 DEFAULT_POSITION_CHOICE = False
 DEFAULT_FIELD_CHOICE    = False
 DEFAULT_STIMULATION_CHOICE = False
 DEFAULT_CALIBRATION_CHOICE = False
+"""
 
 # Choices in functionality
 DEFAULT_SERIAL_ENABLED = False
@@ -668,7 +668,8 @@ class CommandWindow(QMainWindow):
         except Exception as err:
             print(err)
             return
-        self.setGeometry(100, 100, 700, 750)
+        # self.setGeometry(100, 100, 700, 750)
+        self.setGeometry(100, 100, 900, 600)
         self.setCentralWidget(self.graphical_interface.widget)
         self.statusBar().showMessage('Connected to SpikeGadgets. Press Ctrl+T to stream.')
 
@@ -677,9 +678,9 @@ class CommandWindow(QMainWindow):
         Load cluster information from a cluster file.
         """
         # Uncomment to use a hardcoded file
-        # cluster_filename = "./config/Billy3_20181219_005635_merge_time_0.trodesClusters"
+        cluster_filename = "./config/Billy3_20181219_005635_merge_time_0.trodesClusters"
         # cluster_filename = "./config/full_config20190206_session_start.trodesClusters"
-        cluster_filename = "./config/full_config20190208_session_start.trodesClusters"
+        # cluster_filename = "./config/full_config20190208_session_start.trodesClusters"
         # cluster_filename = "./config/full_config20190206_session_end.trodesClusters"
         # cluster_filename = "./config/full_config20190307.trodesClusters"
         # cluster_filename = "open_field_full_config20190220_172702.trodesClusters"

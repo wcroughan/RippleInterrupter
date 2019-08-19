@@ -207,7 +207,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                     np.divide(self._nspks_in_bin, self._bin_occupancy, out=self._place_fields, \
                             where=self._bin_occupancy!=0)
                     # Apply gaussian smoothing to the computed place fields`
-                    gaussian_filter(self._place_fields, sigma=[0, 1, 1], output=self._place_fields)
+                    gaussian_filter(self._place_fields, sigma=[0, 3, 3], output=self._place_fields)
                     np.log(self._place_fields, out=self._log_place_fields, where=self._place_fields!=0)
                     logging.info(self.CLASS_IDENTIFIER + "Fields updated. Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._place_fields), np.mean(self._place_fields)))
 
