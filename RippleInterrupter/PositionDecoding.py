@@ -19,10 +19,10 @@ import ThreadExtension
 # decoding windows.
 
 MODULE_IDENTIFIER = "[BayesianEstimator] "
-N_FRAMES_TO_UPDATE = 20
+N_FRAMES_TO_UPDATE = 10
 DECODING_TIME_WINDOW = 0.050
 DECODING_WINDOW_SLIDE = 0.050
-POSTERIOR_BUFFER_SIZE = 100
+POSTERIOR_BUFFER_SIZE = 10
 
 class BayesianEstimator(ThreadExtension.StoppableProcess):
     """
@@ -75,13 +75,16 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
 
         # If we want to use the place fields themselves multiply them
         # (instead of adding log fields) for posterior estimation.
-        np.copyto(self._most_recent_pf, self._shared_place_fields)
+        self._place_field_provider.submit_immediate_request()
+        np.copyto(self._most_recent_pf, DECODING_TIME_WINDOW * self._shared_place_fields)
+        self._place_field_provider.end_immediate_request()
 
         # Update the place field exponent - We are using all the units for now.
         # TODO: Remove units from this calculation that have very low firing rates.
         np.exp(-DECODING_TIME_WINDOW*np.sum(self._most_recent_pf, axis=0), \
                 out=self._pf_multiplier)
-        print(self._pf_multiplier.shape)
+        print(self._most_recent_pf)
+        print(self._pf_multiplier)
 
         self._place_field_provider.end_immediate_request()
 
@@ -101,7 +104,7 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
                     print(MODULE_IDENTIFIER + "First spike received [TS]:%d"%spk_time)
                     for f_idx in range(POSTERIOR_BUFFER_SIZE):
                         self._bin_times.append(self._frame_start + self.time_bin_width * f_idx)
-                        self._probs_out.append(self._pf_multiplier)
+                        self._probs_out.append(np.copy(self._pf_multiplier))
                 else:
                     self._time_bin = int(np.floor_divide(float(spk_time) - self._frame_start, self.time_bin_width))
                     # logging.debug(MODULE_IDENTIFIER + "Inserting spike in time bin: %d"%self._time_bin)
@@ -112,22 +115,24 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
                         print(MODULE_IDENTIFIER + "Received spikes for cleared time bin.")
                     elif self._time_bin >= POSTERIOR_BUFFER_SIZE:
                         # Calculate the required number of empty frames.
-                        elapsed_frames += 1
                         n_frames_to_attach = self._time_bin - POSTERIOR_BUFFER_SIZE
+                        elapsed_frames += n_frames_to_attach
                         self._time_bin -= n_frames_to_attach + 1
                         self._frame_start += n_frames_to_attach * self.time_bin_width
                         for f_idx in range(n_frames_to_attach):
-                            self._probs_out.append(self._pf_multiplier)
+                            self._probs_out.append(np.copy(self._pf_multiplier))
                             self._bin_times.append(self._frame_start + self.time_bin_width * f_idx)
 
                 # Now that we have the correct time bin, multiply the place field in the correct place 
-                np.multiply(self._probs_out[self._time_bin], self._most_recent_pf[spk_cl,:,:], out=self._probs_out[self._time_bin])
+                spike_field_contribution = np.multiply(self._probs_out[self._time_bin], self._most_recent_pf[spk_cl,:,:])
+                np.copyto(self._probs_out[self._time_bin], spike_field_contribution/np.sum(spike_field_contribution))
 
                 if elapsed_frames >= N_FRAMES_TO_UPDATE:
                     elapsed_frames = 0
                     with self._trigger:
                         # Normalize all the posterior
                         np.copyto(self._shared_posterior_buffer, np.asarray(self._probs_out))
+                        print(MODULE_IDENTIFIER + "Peak posterior %.2f in Frame 0."%np.max(self._probs_out[0]))
                         self._trigger.notify()
 
                     # Might as well take a break from the program and check if

@@ -28,6 +28,8 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
     Class for creating and updating place fields online
     """
     CLASS_IDENTIFIER = "[PlaceFieldHandler] "
+    _MIN_PLACE_FIELD_ACTIVATION = 0.00000001
+    _MIN_OCCUPANCY = 0.0000001
     _ALLOWED_TIMESTAMPS_LAG = 12000
 
     def __init__(self, position_processor, spike_processor, shared_place_fields, write_spike_log=False):
@@ -41,6 +43,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         # Hold the shared data variables that we will have to access later on in a separate buffer
         self._shared_nspks_in_bin = RawArray(ctypes.c_double, n_units * PositionAnalysis.N_POSITION_BINS[0] * PositionAnalysis.N_POSITION_BINS[1])
         self._shared_bin_occupancy = RawArray(ctypes.c_double, PositionAnalysis.N_POSITION_BINS[0] * PositionAnalysis.N_POSITION_BINS[1])
+        self._shared_place_fields = shared_place_fields
 
         self._place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), \
                 (n_units, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
@@ -121,6 +124,17 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                 place_field_data = np.load(field_filename)
                 np.copyto(self._nspks_in_bin, np.reshape(place_field_data['arr_0'], self._nspks_in_bin.shape))
                 np.copyto(self._bin_occupancy, np.reshape(place_field_data['arr_1'], self._bin_occupancy.shape))
+
+                # No Gaussian heroics here
+                # raw_place_fields = np.divide(self._nspks_in_bin, self._bin_occupancy, where=self._bin_occupancy>self._MIN_OCCUPANCY)
+                # gaussian_filter(raw_place_fields, sigma=[0, 3, 3], output=self._place_fields).shape
+
+                np.divide(self._nspks_in_bin, self._bin_occupancy, where=self._bin_occupancy>self._MIN_OCCUPANCY,\
+                        out=self._place_fields)
+                print(self._place_fields)
+                occupancy_mask = self._place_fields < self._MIN_PLACE_FIELD_ACTIVATION
+                self._place_fields[occupancy_mask] = self._MIN_PLACE_FIELD_ACTIVATION
+
             logging.info(self.CLASS_IDENTIFIER + "Fields loaded to %s."%(field_filename))
             fields_load_success = True
         except Exception as err:
@@ -150,9 +164,10 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         while not self.req_stop():
             # If thread has been requested to stop an updates to place field
             # data because of an outside access to the data
-            if self._has_pf_request:
-                logging.debug(self.CLASS_IDENTIFIER + "Waiting for Place field request to complete.")
-                time.sleep(0.001) #5ms
+            with self._place_field_lock:
+                if self._has_pf_request:
+                    logging.debug(self.CLASS_IDENTIFIER + "Waiting for Place field request to complete.")
+                    time.sleep(0.001) #5ms
 
             if not (self._spike_buffer.poll() or self._position_buffer.poll()):
                 # logging.debug(self.CLASS_IDENTIFIER + "Spike/Position buffers empty, sleeping")
@@ -241,19 +256,21 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                 # basically forces us to check for a new position entry after
                 # each spike has gone by, minimizing incorrect reporting.
 
-            if pf_update_spk_iter >= update_pf_every_n_spks and not self._has_pf_request:
+            if pf_update_spk_iter >= update_pf_every_n_spks:
                 logging.info(MODULE_IDENTIFIER + "Updating place fields. Last spike at %d"%spk_time)
                 with self._place_field_lock:
-                    pf_update_spk_iter = 0
-                    # Deal with divide by zero when the occupancy is zero for some of the place bins
-                    # If we assign the values to a new location, new memory is allocated!
-                    np.divide(self._nspks_in_bin, self._bin_occupancy, out=raw_place_fields, \
-                            where=self._bin_occupancy!=0)
+                    if not self._has_pf_request:
+                        pf_update_spk_iter = 0
+                        # Deal with divide by zero when the occupancy is zero for some of the place bins
+                        # If we assign the values to a new location, new memory is allocated!
+                        np.divide(self._nspks_in_bin, self._bin_occupancy, out=raw_place_fields, \
+                                where=self._bin_occupancy!=0)
 
-                    # Apply gaussian smoothing to the computed place fields`
-                    gaussian_filter(raw_place_fields, sigma=[0, 3, 3], output=self._place_fields)
-                    np.log(self._place_fields, out=self._log_place_fields, where=self._place_fields!=0)
-                    logging.info(self.CLASS_IDENTIFIER + "Fields updated. Peak FR: %.2f, Mean FR: %.2f"%(np.max(self._place_fields), np.mean(self._place_fields)))
+                        # Apply gaussian smoothing to the computed place fields`
+                        gaussian_filter(raw_place_fields, sigma=[0, 3, 3], output=self._place_fields)
+                        # np.log(self._place_fields, out=self._log_place_fields, where=self._place_fields!=0)
+                        logging.info(self.CLASS_IDENTIFIER + "Fields updated. Peak FR: %.2f, Mean FR: %.2f"%\
+                                (np.max(self._place_fields), np.mean(self._place_fields)))
 
         if self._csv_writer:
             self._csv_file.close()
@@ -270,16 +287,16 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
         BE SURE TO CALL end_immediate_request() immediately upon finishing access to
         the place field
         """
-        self._has_pf_request = True
         with self._place_field_lock:
-            return
+            self._has_pf_request = True
 
     def end_immediate_request(self):
         """
-        Call this after calling submit_pf_request immediately after place field
+        Call this after calling submit_immediately_request immediately after place field
         access is finished
         """
-        self._has_pf_request = False
+        with self._place_field_lock:
+            self._has_pf_request = False
 
     def get_bin_occupancy(self):
         with self._place_field_lock:

@@ -697,6 +697,8 @@ class GraphicsManager(Process):
             """
 
             posterior_peak = np.unravel_index(np.argmax(total_posterior), total_posterior.shape)
+            # print(MODULE_IDENTIFIER + "Peak posterior %.2f at(%d, %d)"%(total_posterior[posterior_peak[0], \
+            #         posterior_peak[1]], posterior_peak[0], posterior_peak[1]))
             self._dec_frame[0].set_data((posterior_peak[0], posterior_peak[1]))
         return self._dec_frame
 
@@ -713,6 +715,7 @@ class GraphicsManager(Process):
                         np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
                         np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
                 logging.info(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
+            time.sleep(self.__RIPPLE_DETECTION_TIMEOUT)
         logging.info(MODULE_IDENTIFIER + "Ripple frame pipe closed.")
 
     def fetch_calibration_plot(self):
@@ -727,6 +730,7 @@ class GraphicsManager(Process):
                     if ripple_triggered:
                         np.copyto(self._local_spk_cnt_buffer, self._shared_calib_plot_means)
                         np.copyto(self._local_spk_cnt_stderr_buffer, self._shared_calib_plot_std_errs)
+            time.sleep(self.__RIPPLE_DETECTION_TIMEOUT)
         logging.info(MODULE_IDENTIFIER + "Calibration pipe closed.")
 
     def fetch_posterior_plot(self):
@@ -740,6 +744,7 @@ class GraphicsManager(Process):
                     decoding_finished = self._decoding_condition.wait(self.__POSTERIOR_TIMEOUT)
                     if decoding_finished:
                         np.copyto(self._local_posterior_buffer, self._shared_posterior)
+            time.sleep(self.__POSTERIOR_TIMEOUT)
         logging.info(MODULE_IDENTIFIER + "Decoding pipe closed.")
 
     def fetch_place_fields(self):
