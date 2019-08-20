@@ -701,8 +701,15 @@ class CommandWindow(QMainWindow):
         except Exception as err:
             print(err)
             return
+
+        # For a single app
         # self.setGeometry(100, 100, 700, 750)
-        self.setGeometry(100, 100, 900, 600)
+
+        # Double app
+        # self.setGeometry(100, 100, 900, 600)
+
+        # Triple app
+        self.setGeometry(100, 100, 1400, 600)
         self.setCentralWidget(self.graphical_interface.widget)
         self.statusBar().showMessage('Connected to SpikeGadgets. Press Ctrl+T to stream.')
 

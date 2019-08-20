@@ -175,6 +175,7 @@ class GraphicsManager(Process):
     __POSTERIOR_TIMEOUT = 0.5
     __RIPPLE_DETECTION_TIMEOUT = 0.5
     __RIPPLE_SMOOTHING_WINDOW = 2
+    __DECODED_SMOOTHING_COM_FACTOR = 0.8
 
     def __init__(self, ripple_buffers, calib_plot_buffers, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_thread, ripple_trigger_condition, calib_trigger_condition, \
@@ -373,12 +374,20 @@ class GraphicsManager(Process):
         # Enable posterior fetcher thread if requested.
         self._decoding_lock = threading.Lock()
         if shared_posterior is not None:
+            self.prev_CoM = [0.0, 0.0]
+            self.dec_CoM = np.zeros((PositionDecoding.POSTERIOR_BUFFER_SIZE,2), dtype='float')
+            self.peak_posterior = np.zeros(PositionDecoding.POSTERIOR_BUFFER_SIZE, dtype='float')
+            self.raw_CoM_grid = np.meshgrid(np.linspace(1,PositionAnalysis.N_POSITION_BINS[1], PositionAnalysis.N_POSITION_BINS[1]), \
+                    np.linspace(1,PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[0]))
             self._shared_posterior = np.reshape(np.frombuffer(shared_posterior, dtype='double'), \
                 (PositionDecoding.POSTERIOR_BUFFER_SIZE, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
             self._thread_list.append(threading.Thread(name="PosteriorFetcher", daemon=True, \
                     target=self.fetch_posterior_plot))
             logging.info(MODULE_IDENTIFIER + "Added Bayesian threads to Graphics pipeline.")
         else:
+            self.dec_CoM = None
+            self.peak_posterior = None
+            self.raw_CoM_grid = None
             self._shared_posterior = None
 
         # Local copies of the shared data that can be used at a leisurely pace
@@ -581,8 +590,8 @@ class GraphicsManager(Process):
             self._pf_ax.cla()
             self._pf_ax.set_xlabel("x (bin)")
             self._pf_ax.set_ylabel("y (bin)")
-            self._pf_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
-            self._pf_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
+            self._pf_ax.set_xlim((0, -0.5+PositionAnalysis.N_POSITION_BINS[1]))
+            self._pf_ax.set_ylim((0, -0.5+PositionAnalysis.N_POSITION_BINS[0]))
             self._pf_ax.grid(True)
 
         # Spikes (from a single cell) and position
@@ -684,22 +693,38 @@ class GraphicsManager(Process):
         :returns: Animation frames to be plotted.
         """
         with self._decoding_lock:
+
+            """
             # For now, show the aggregate posterior over the entire time period
             # that we received data for. Later we can show the posterior
             # colored by time, or just show the posterior center of mass
-            total_posterior = np.sum(self._local_posterior_buffer.T, axis=0)
+            # total_posterior = np.sum(self._local_posterior_buffer.T, axis=0)
 
-            """
-            peak_posterior = np.max(total_posterior)
-            if peak_posterior == 0.0:
-                peak_posterior = 1.0
-            self._dec_frame[0].set_array(total_posterior/peak_posterior)
-            """
-
+            self.peak_posterior = np.max(total_posterior)
+            if self.peak_posterior == 0.0:
+                self.peak_posterior = 1.0
+            self._dec_frame[0].set_array(total_posterior/self.peak_posterior)
             posterior_peak = np.unravel_index(np.argmax(total_posterior), total_posterior.shape)
+
+            """
+
+            for dec_idx in range(PositionDecoding.POSTERIOR_BUFFER_SIZE):
+                # Calculate the CoM
+                # Not sure if there is any point in including time data into this as well.
+                self.dec_CoM[dec_idx,0] = np.sum(np.multiply(self._local_posterior_buffer[dec_idx,:,:], \
+                        self.raw_CoM_grid[1])) + (self.prev_CoM[0] * self.__DECODED_SMOOTHING_COM_FACTOR)
+                self.dec_CoM[dec_idx,1] = np.sum(np.multiply(self._local_posterior_buffer[dec_idx,:,:], \
+                        self.raw_CoM_grid[0])) + (self.prev_CoM[1] * self.__DECODED_SMOOTHING_COM_FACTOR)
+
+                self.prev_CoM[0] = self.dec_CoM[dec_idx,0]
+                self.prev_CoM[1] = self.dec_CoM[dec_idx,1]
+                self.peak_posterior[dec_idx] = np.max(self._local_posterior_buffer[dec_idx,:,:])
+
+                # TODO: Maybe add something to discard low probability frames.
+
             # print(MODULE_IDENTIFIER + "Peak posterior %.2f at(%d, %d)"%(total_posterior[posterior_peak[0], \
             #         posterior_peak[1]], posterior_peak[0], posterior_peak[1]))
-            self._dec_frame[0].set_data((posterior_peak[0], posterior_peak[1]))
+            self._dec_frame[0].set_data((self.dec_CoM[:,0], self.dec_CoM[:,1]))
         return self._dec_frame
 
     def fetch_incident_ripple(self):
@@ -889,7 +914,7 @@ class GraphicsManager(Process):
         pf_heatmap = self._pf_ax.imshow(np.zeros((PositionAnalysis.N_POSITION_BINS[0], \
                 PositionAnalysis.N_POSITION_BINS[1]), dtype='float'), vmin=0, \
                 vmax=self.__MAX_FIRING_RATE, animated=True)
-        self.figure.colorbar(pf_heatmap)
+        # self.figure.colorbar(pf_heatmap)
         self._pf_frame.append(pf_heatmap)
         anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_place_field_frame, \
                 frames=np.arange(self.__N_ANIMATION_FRAMES), interval=ANIMATION_INTERVAL, blit=True, repeat=True)

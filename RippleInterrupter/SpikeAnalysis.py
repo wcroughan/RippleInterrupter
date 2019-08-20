@@ -21,6 +21,7 @@ import ThreadExtension
 # Profiling specific code
 import cProfile
 MODULE_IDENTIFIER = "[SpikeAnalysis] "
+EPSILON = 0.00000002
 
 class PlaceFieldHandler(ThreadExtension.StoppableProcess):
 
@@ -28,7 +29,8 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
     Class for creating and updating place fields online
     """
     CLASS_IDENTIFIER = "[PlaceFieldHandler] "
-    _MIN_PLACE_FIELD_ACTIVATION = 0.00000001
+    _FIELD_SMOOTHING_FACTOR = 3
+    _MIN_PLACE_FIELD_ACTIVATION = 0.5 * EPSILON
     _MIN_OCCUPANCY = 0.0000001
     _ALLOWED_TIMESTAMPS_LAG = 12000
 
@@ -263,11 +265,12 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                         pf_update_spk_iter = 0
                         # Deal with divide by zero when the occupancy is zero for some of the place bins
                         # If we assign the values to a new location, new memory is allocated!
-                        np.divide(self._nspks_in_bin, self._bin_occupancy, out=raw_place_fields, \
-                                where=self._bin_occupancy!=0)
+                        np.divide(self._FIELD_SMOOTHING_FACTOR * self._nspks_in_bin, self._bin_occupancy, out=raw_place_fields, \
+                                where=self._bin_occupancy>self._MIN_OCCUPANCY)
 
                         # Apply gaussian smoothing to the computed place fields`
-                        gaussian_filter(raw_place_fields, sigma=[0, 3, 3], output=self._place_fields)
+                        gaussian_filter(raw_place_fields, sigma=[0, self._FIELD_SMOOTHING_FACTOR, self._FIELD_SMOOTHING_FACTOR], \
+                                output=self._place_fields)
                         # np.log(self._place_fields, out=self._log_place_fields, where=self._place_fields!=0)
                         logging.info(self.CLASS_IDENTIFIER + "Fields updated. Peak FR: %.2f, Mean FR: %.2f"%\
                                 (np.max(self._place_fields), np.mean(self._place_fields)))

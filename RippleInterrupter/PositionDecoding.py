@@ -82,7 +82,7 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
         # Update the place field exponent - We are using all the units for now.
         # TODO: Remove units from this calculation that have very low firing rates.
         np.exp(-DECODING_TIME_WINDOW*np.sum(self._most_recent_pf, axis=0), \
-                out=self._pf_multiplier)
+                out=self._pf_multiplier, where=self._most_recent_pf>SpikeAnalysis.EPSILON)
         print(self._most_recent_pf)
         print(self._pf_multiplier)
 
@@ -115,24 +115,34 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
                         print(MODULE_IDENTIFIER + "Received spikes for cleared time bin.")
                     elif self._time_bin >= POSTERIOR_BUFFER_SIZE:
                         # Calculate the required number of empty frames.
-                        n_frames_to_attach = self._time_bin - POSTERIOR_BUFFER_SIZE
+                        last_decoded_frame = np.copy(self._probs_out[-1])
+                        n_frames_to_attach = min(POSTERIOR_BUFFER_SIZE, 1 + self._time_bin - POSTERIOR_BUFFER_SIZE)
                         elapsed_frames += n_frames_to_attach
-                        self._time_bin -= n_frames_to_attach + 1
+                        self._time_bin = POSTERIOR_BUFFER_SIZE-1
                         self._frame_start += n_frames_to_attach * self.time_bin_width
                         for f_idx in range(n_frames_to_attach):
+                            # Instead of initializing with the actual exponent,
+                            # what if we initialize this with the last decoded
+                            # frame. This might ensure continuity!
                             self._probs_out.append(np.copy(self._pf_multiplier))
+                            # Doesn't seem to work very well
+                            # self._probs_out.append(np.multiply(self._pf_multiplier, last_decoded_frame))
+
                             self._bin_times.append(self._frame_start + self.time_bin_width * f_idx)
 
                 # Now that we have the correct time bin, multiply the place field in the correct place 
-                spike_field_contribution = np.multiply(self._probs_out[self._time_bin], self._most_recent_pf[spk_cl,:,:])
-                np.copyto(self._probs_out[self._time_bin], spike_field_contribution/np.sum(spike_field_contribution))
+                try:
+                    spike_field_contribution = np.multiply(self._probs_out[self._time_bin], self._most_recent_pf[spk_cl,:,:])
+                    np.copyto(self._probs_out[self._time_bin], spike_field_contribution/np.sum(spike_field_contribution))
+                except IndexError as err:
+                    print(MODULE_IDENTIFIER + "Incorrectly accessed posterior matrix at %d"%self._time_bin)
 
                 if elapsed_frames >= N_FRAMES_TO_UPDATE:
                     elapsed_frames = 0
                     with self._trigger:
                         # Normalize all the posterior
                         np.copyto(self._shared_posterior_buffer, np.asarray(self._probs_out))
-                        print(MODULE_IDENTIFIER + "Peak posterior %.2f in Frame 0."%np.max(self._probs_out[0]))
+                        # print(MODULE_IDENTIFIER + "Peak posterior %.2f in Frame 0."%np.max(self._probs_out[0]))
                         self._trigger.notify()
 
                     # Might as well take a break from the program and check if
