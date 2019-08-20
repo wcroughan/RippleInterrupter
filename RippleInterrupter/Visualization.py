@@ -32,6 +32,7 @@ from PyQt5.QtCore import QThread, pyqtSignal, Qt
 import Configuration
 import RippleAnalysis
 import PositionAnalysis
+import PositionDecoding
 import RippleDefinitions as RiD
 
 MODULE_IDENTIFIER = "[GraphicsHandler] "
@@ -176,7 +177,7 @@ class GraphicsManager(Process):
 
     def __init__(self, ripple_buffers, calib_plot_buffers, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_thread, ripple_trigger_condition, calib_trigger_condition, \
-            shared_place_fields, clusters=None):
+            decoding_condition, shared_place_fields, shared_posterior, clusters=None):
         """
         Graphical Manager for all the processes
         :ripple_analyzer: Process/Thread listening to LFP and detecting ripples
@@ -194,6 +195,9 @@ class GraphicsManager(Process):
         self.canvas  = FigureCanvas(self.figure)
 
         # Count the number of requested features
+        # TODO: Add stricter checks here. For example, in case of place field
+        # handler, both the shared fields and the tigger condition should be
+        # available for us to run a separate thread for managing it.
         n_features_to_show = 0
         if ripple_buffers[0] is not None:
             # Ripple data needs to be shown
@@ -208,6 +212,9 @@ class GraphicsManager(Process):
         if place_field_handler is not None:
             n_features_to_show += 1
 
+        if shared_posterior is not None:
+            n_features_to_show += 1
+
         # The layout of the application can be different based on what features
         # are being requested
         if n_features_to_show == 1:
@@ -218,8 +225,13 @@ class GraphicsManager(Process):
             plot_grid = gridspec.GridSpec(1, 3)
         elif n_features_to_show == 4:
             plot_grid = gridspec.GridSpec(2, 2)
+        elif n_features_to_show == 5:
+            plot_grid = gridspec.GridSpec(3, 2)
 
         self.toolbar = NavigationToolbar(self.canvas, self.widget)
+
+        # TODO: This code can be cleaned up and merged below where the same
+        # conditions are being checked to intialize thread.
         current_grid_place = 0
         if ripple_buffers[0] is not None:
             self._rd_ax = self.figure.add_subplot(plot_grid[current_grid_place])
@@ -244,6 +256,12 @@ class GraphicsManager(Process):
             current_grid_place += 1
         else:
             self._pf_ax = None
+
+        if shared_posterior is not None:
+            self._dec_ax = self.figure.add_subplot(plot_grid[current_grid_place])
+            current_grid_place += 1
+        else:
+            self._dec_ax = None
 
         # Selecting individual units
         self.unit_selection = QComboBox()
@@ -273,6 +291,7 @@ class GraphicsManager(Process):
         self._keep_running = Event()
         self._spike_listener = spike_listener
         self._position_estimator = position_estimator
+        self._decoding_condition = decoding_condition
         self._place_field_handler = place_field_handler
         self._ripple_trigger_thread = ripple_trigger_thread
         self._ripple_trigger_condition = ripple_trigger_condition
@@ -350,12 +369,24 @@ class GraphicsManager(Process):
             self._shared_calib_plot_means = None
             self._shared_calib_plot_std_errs = None
 
+        # Enable posterior fetcher thread if requested.
+        self._decoding_lock = threading.Lock()
+        if shared_posterior is not None:
+            self._shared_posterior = np.reshape(np.frombuffer(shared_posterior, dtype='double'), \
+                (PositionDecoding.POSTERIOR_BUFFER_SIZE, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
+            self._thread_list.append(threading.Thread(name="PosteriorFetcher", daemon=True, \
+                    target=self.fetch_posterior_plot))
+        else:
+            self._shared_posterior = None
+
         # Local copies of the shared data that can be used at a leisurely pace
         self._lfp_lock = threading.Lock()
         self._lfp_tpts = np.linspace(-0.5 * RiD.LFP_BUFFER_TIME, 0.5 * RiD.LFP_BUFFER_TIME, RiD.LFP_BUFFER_LENGTH)
         self._ripple_power_tpts = np.linspace(-0.5 * RiD.LFP_BUFFER_TIME, 0.5 * RiD.LFP_BUFFER_TIME, RiD.RIPPLE_POWER_BUFFER_LENGTH)
         self._local_lfp_buffer = np.zeros((self._n_tetrodes, RiD.LFP_BUFFER_LENGTH), dtype='double')
         self._local_ripple_power_buffer = np.zeros((self._n_tetrodes, RiD.RIPPLE_POWER_BUFFER_LENGTH), dtype='double')
+        self._local_posterior_buffer = np.zeros((PositionDecoding.POSTERIOR_BUFFER_SIZE, PositionAnalysis.N_POSITION_BINS[0],\
+                PositionAnalysis.N_POSITION_BINS[1]), dtype='double')
 
         self._pf_lock = threading.Lock()
         self._most_recent_pf = np.zeros((PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]), \
@@ -383,6 +414,7 @@ class GraphicsManager(Process):
         self._rd_frame = list()
         self._spk_pos_frame = list()
         self._pf_frame = list()
+        self._dec_frame = list()
         self._cp_frame = list()
         self._anim_objs = list()
 
@@ -395,6 +427,7 @@ class GraphicsManager(Process):
         self.initialize_calib_plot_fig()
         self.initialize_spike_pos_fig()
         self.initialize_place_field_fig()
+        self.initialize_posterior_fig()
 
         self.pauseAnimation()
         self._keep_running.set()
@@ -634,22 +667,29 @@ class GraphicsManager(Process):
             self._pf_frame[0].set_array(self._most_recent_pf.T)
         return self._pf_frame
         
+    def update_decoding_frame(self, step=0):
+        """
+        Function used for animating the Bayesian estimate
+        :step: Animation iteration
+        :returns: Animation frames to be plotted.
+        """
+        with self._decoding_lock:
+            self._dec_frame[0].set_array(self._local_posterior_buffer.T)
+        return self._pf_frame
+
     def fetch_incident_ripple(self):
         """
         Fetch raw LFP data and ripple power data.
         """
         logging.info(MODULE_IDENTIFIER + "Ripple frame pipe opened.")
         while self._keep_running.is_set():
-            with self._ripple_trigger_condition:
-                ripple_triggered = self._ripple_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
-
-            if ripple_triggered:
-                with self._lfp_lock:
-                    np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
-                    np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
+            with self._lfp_lock:
+                with self._ripple_trigger_condition:
+                    ripple_triggered = self._ripple_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
+                    if ripple_triggered:
+                        np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
+                        np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
                 logging.info(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
-            else:
-                time.sleep(0.01)
         logging.info(MODULE_IDENTIFIER + "Ripple frame pipe closed.")
 
     def fetch_calibration_plot(self):
@@ -658,16 +698,26 @@ class GraphicsManager(Process):
         """
         logging.info(MODULE_IDENTIFIER + "Calibration pipe opened.")
         while self._keep_running.is_set():
-            with self._calib_trigger_condition:
-                ripple_triggered = self._calib_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
-
-            if ripple_triggered:
-                with self._calib_lock:
-                    np.copyto(self._local_spk_cnt_buffer, self._shared_calib_plot_means)
-                    np.copyto(self._local_spk_cnt_stderr_buffer, self._shared_calib_plot_std_errs)
-            else:
-                time.sleep(0.01)
+            with self._calib_lock:
+                with self._calib_trigger_condition:
+                    ripple_triggered = self._calib_trigger_condition.wait(self.__RIPPLE_DETECTION_TIMEOUT)
+                    if ripple_triggered:
+                        np.copyto(self._local_spk_cnt_buffer, self._shared_calib_plot_means)
+                        np.copyto(self._local_spk_cnt_stderr_buffer, self._shared_calib_plot_std_errs)
         logging.info(MODULE_IDENTIFIER + "Calibration pipe closed.")
+
+    def fetch_posterior_plot(self):
+        """
+        Fetch and plot the posterior.
+        """
+        logging.info(MODULE_IDENTIFIER + "Posterior pipe opened.")
+        while self._keep_running.is_set():
+            with self._decoding_lock
+                with self._decoding_condition:
+                    decoding_finished = self._decoding_condition.wait(self.__POSTERIOR_TIMEOUT)
+                    if decoding_finished:
+                        np.copyto(self._local_posterior_buffer, self._shared_posterior)
+        logging.info(MODULE_IDENTIFIER + "Decoding pipe closed.")
 
     def fetch_place_fields(self):
         """
@@ -816,6 +866,20 @@ class GraphicsManager(Process):
         anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_place_field_frame, \
                 frames=np.arange(self.__N_ANIMATION_FRAMES), interval=ANIMATION_INTERVAL, blit=True, repeat=True)
         logging.info(MODULE_IDENTIFIER + 'Place field frame created!')
+        self._anim_objs.append(anim_obj)
+
+    def initialize_posterior_fig(self):
+        if self._dec_ax is None:
+            return
+
+        posterior_heatmap = self._dec_ax.imshow(np.zeros((PositionAnalysis.N_POSITION_BINS[0], \
+                PositionAnalysis.N_POSITION_BINS[1]), dtype='float'), vmin=0, \
+                vmax=1, animated=True)
+        self.figure.colorbar(posterior_heatmap)
+        self._dec_frame.append(pf_heatmap)
+        anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_decoding_frame, \
+                frames=np.arange(self.__N_ANIMATION_FRAMES), interval=ANIMATION_INTERVAL, blit=True, repeat=True)
+        logging.info(MODULE_IDENTIFIER + 'Posterior frame created!')
         self._anim_objs.append(anim_obj)
 
     def run(self):

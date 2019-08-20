@@ -39,6 +39,7 @@ DEFAULT_POSITION_CHOICE = True
 DEFAULT_FIELD_CHOICE    = True
 DEFAULT_STIMULATION_CHOICE = False
 DEFAULT_CALIBRATION_CHOICE = False
+DEFAULT_BAYESIAN_CHOICE = True
 
 # Configuration for LFP and adjusting
 """
@@ -262,6 +263,7 @@ class CommandWindow(QMainWindow):
         self.tetrodes_of_interest = None
 
         # Shared memory buffers for passing information across threads
+        self.shared_posterior_buffer = None
         self.shared_raw_lfp_buffer = None
         self.shared_ripple_buffer = None
         self.shared_place_fields = None
@@ -276,6 +278,7 @@ class CommandWindow(QMainWindow):
         self.data_streaming = False
 
         # Synchronization conditions across threads
+        self.decoding_done   = Condition()
         self.trig_condition  = Condition()
         self.show_trigger    = Condition()
         self.calib_trigger   = Condition()
@@ -561,9 +564,10 @@ class CommandWindow(QMainWindow):
         processing_args.append("Place Field")
         processing_args.append("Stimulation")
         processing_args.append("Calibration")
+        processing_args.append("Bayesian")
         user_choices = QtHelperUtils.CheckBoxWidget(processing_args, message="Select processing options.",\
                 default_choices=[DEFAULT_LFP_CHOICE, DEFAULT_SPIKES_CHOICE, DEFAULT_POSITION_CHOICE, DEFAULT_FIELD_CHOICE,\
-                DEFAULT_STIMULATION_CHOICE, DEFAULT_CALIBRATION_CHOICE]).exec_()
+                DEFAULT_STIMULATION_CHOICE, DEFAULT_CALIBRATION_CHOICE, DEFAULT_BAYESIAN_CHOICE]).exec_()
         self.user_processing_choices = dict()
         self.user_processing_choices['lfp']      = DEFAULT_LFP_CHOICE
         self.user_processing_choices['spikes']   = DEFAULT_SPIKES_CHOICE
@@ -571,6 +575,7 @@ class CommandWindow(QMainWindow):
         self.user_processing_choices['field']    = DEFAULT_FIELD_CHOICE
         self.user_processing_choices['stim']     = DEFAULT_STIMULATION_CHOICE
         self.user_processing_choices['calib']    = DEFAULT_CALIBRATION_CHOICE
+        self.user_processing_choices['bayesian'] = DEFAULT_BAYESIAN_CHOICE
         if user_choices[0] == QDialog.Accepted:
             if 0 in user_choices[1]:
                 self.user_processing_choices['lfp'] = True
@@ -602,6 +607,11 @@ class CommandWindow(QMainWindow):
             else:
                 self.user_processing_choices['calib'] = False
 
+            if 6 in user_choices[1]:
+                self.user_processing_choices['bayesian'] = True
+            else:
+                self.user_processing_choices['bayesian'] = False
+
     def setupThreads(self):
         try:
             if self.user_processing_choices['lfp'] or self.user_processing_choices['calib']:
@@ -609,13 +619,13 @@ class CommandWindow(QMainWindow):
                 # LFP Threads
                 self.initLFPThreads()
 
-            if self.user_processing_choices['position'] or self.user_processing_choices['field']:
+            if self.user_processing_choices['position'] or self.user_processing_choices['field'] or self.user_processing_choices['bayesian']:
                 # Position data
                 print(MODULE_IDENTIFIER + "Starting Position data Threads.")
                 self.position_estimator  = PositionAnalysis.PositionEstimator(self.sg_client)
                 self.active_processes.append(self.position_estimator)
 
-            if self.user_processing_choices['spikes'] or self.user_processing_choices['field']:
+            if self.user_processing_choices['spikes'] or self.user_processing_choices['field'] or self.user_processing_choices['bayesian']:
                 print(MODULE_IDENTIFIER + "Starting Spike data Threads.")
                 # Spike data
                 self.initSpikeThreads()
@@ -629,6 +639,10 @@ class CommandWindow(QMainWindow):
             if self.user_processing_choices['field']:
                 print(MODULE_IDENTIFIER + "Starting Place field processing Threads.")
                 self.initPlaceFieldThreads()
+
+            if self.user_processing_choices['bayesian']:
+                print(MODULE_IDENTIFIER + "Starting Bayesian estimation Threads.")
+                self.initBayesianEstimationThreads()
 
             if self.user_processing_choices['lfp']:
                 # Ripple triggered actions
@@ -676,7 +690,8 @@ class CommandWindow(QMainWindow):
             self.graphical_interface = Visualization.GraphicsManager((self.shared_raw_lfp_buffer,\
                     self.shared_ripple_buffer), (self.shared_calib_plot_means, self.shared_calib_plot_std_errs),\
                     self.spike_listener, self.position_estimator, self.place_field_handler, self.ripple_trigger,\
-                    self.show_trigger, self.calib_trigger, self.shared_place_fields, clusters=session_unit_list)
+                    self.show_trigger, self.calib_trigger, self.decoding_done, self.shared_place_fields, \
+                    self.shared_posterior_buffer, clusters=session_unit_list)
 
             # Load the tetrode and cluster information into the respective menus.
             self.graphical_interface.setTetrodeList(self.cluster_identity_map.keys())
@@ -870,14 +885,31 @@ class CommandWindow(QMainWindow):
             self.place_field_handler = SpikeAnalysis.PlaceFieldHandler(self.position_estimator,\
                     self.spike_listener, self.shared_place_fields)
 
-            # self.bayesian_estimator = PositionDecoding.BayesianEstimator(self.spike_listener, \
-            #     self.place_field_handler, self.shared_place_fields)
-
             # Update the active process list
             self.active_processes.append(self.place_field_handler)
-            # self.active_processes.append(self.bayesian_estimator)
         except Exception as err:
             QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start Place Field thread(s).')
+            print(err)
+            return
+
+    def initBayesianEstimationThreads(self):
+        """
+        Initialize thread needed for estimating position given spike data and
+        previously built place fields
+        """
+        try:
+            if self.shared_posterior_buffer is not None:
+                self.shared_posterior_buffer = RawArray(ctypes.c_double, PositionDecoding.POSTERIOR_BUFFER_SIZE * \
+                        PositionAnalysis.N_POSITION_BINS[0] * PositionAnalysis.N_POSITION_BINS[1])
+
+            self.bayesian_estimator = PositionDecoding.BayesianEstimator(self.spike_listener, \
+                self.place_field_handler, self.shared_place_fields, self.shared_posterior_buffer, \
+                self.decoding_done)
+
+            # Update the active process list
+            self.active_processes.append(self.bayesian_estimator)
+        except Exception as err:
+            QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start Bayesian estimator thread(s).')
             print(err)
             return
 
