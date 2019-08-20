@@ -20,7 +20,7 @@ import ThreadExtension
 
 MODULE_IDENTIFIER = "[BayesianEstimator] "
 N_FRAMES_TO_UPDATE = 10
-DECODING_TIME_WINDOW = 0.100
+DECODING_TIME_WINDOW = 0.20
 DECODING_WINDOW_SLIDE = 0.050
 POSTERIOR_BUFFER_SIZE = 10
 
@@ -83,11 +83,11 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
         # Remove the contributions in bins that have no firing from any cell..
         # This is a pain to deal with but it otherwise gets a very high
         # probability.
-        # np.exp(-DECODING_TIME_WINDOW*np.sum(self._most_recent_pf, axis=0), \
-        #         out=self._pf_multiplier, where=np.max(self._most_recent_pf, axis=0)>SpikeAnalysis.EPSILON)
-
         np.exp(-DECODING_TIME_WINDOW*np.sum(self._most_recent_pf, axis=0), \
-                out=self._pf_multiplier)
+                out=self._pf_multiplier, where=np.max(self._most_recent_pf, axis=0)>SpikeAnalysis.EPSILON)
+
+        # np.exp(-DECODING_TIME_WINDOW*np.sum(self._most_recent_pf, axis=0), \
+        #         out=self._pf_multiplier)
 
         # print(self._most_recent_pf)
         # print(self._pf_multiplier)

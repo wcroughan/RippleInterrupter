@@ -6,6 +6,7 @@ from collections import deque
 from multiprocessing import Process, Event
 import tkinter
 import time
+import math
 import numpy as np
 from datetime import datetime
 import threading
@@ -175,7 +176,7 @@ class GraphicsManager(Process):
     __POSTERIOR_TIMEOUT = 0.5
     __RIPPLE_DETECTION_TIMEOUT = 0.5
     __RIPPLE_SMOOTHING_WINDOW = 2
-    __DECODED_SMOOTHING_COM_FACTOR = 0.8
+    __DECODED_SMOOTHING_COM_FACTOR = 0.5
 
     def __init__(self, ripple_buffers, calib_plot_buffers, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_thread, ripple_trigger_condition, calib_trigger_condition, \
@@ -709,13 +710,23 @@ class GraphicsManager(Process):
             for dec_idx in range(PositionDecoding.POSTERIOR_BUFFER_SIZE):
                 # Calculate the CoM
                 # Not sure if there is any point in including time data into this as well.
+                """
                 self.dec_CoM[dec_idx,0] = np.sum(np.multiply(self._local_posterior_buffer[dec_idx,:,:], \
-                        self.raw_CoM_grid[1])) + (self.prev_CoM[0] * self.__DECODED_SMOOTHING_COM_FACTOR)
+                        self.raw_CoM_grid[1]))
                 self.dec_CoM[dec_idx,1] = np.sum(np.multiply(self._local_posterior_buffer[dec_idx,:,:], \
-                        self.raw_CoM_grid[0])) + (self.prev_CoM[1] * self.__DECODED_SMOOTHING_COM_FACTOR)
+                        self.raw_CoM_grid[0]))
+                """
+                self.dec_CoM[dec_idx,0] = np.sum(np.multiply(self._local_posterior_buffer[dec_idx,:,:], \
+                        self.raw_CoM_grid[1])) * (1 - self.__DECODED_SMOOTHING_COM_FACTOR) + \
+                        (self.prev_CoM[0] * self.__DECODED_SMOOTHING_COM_FACTOR)
+                self.dec_CoM[dec_idx,1] = np.sum(np.multiply(self._local_posterior_buffer[dec_idx,:,:], \
+                        self.raw_CoM_grid[0])) * (1 - self.__DECODED_SMOOTHING_COM_FACTOR) + \
+                        (self.prev_CoM[1] * self.__DECODED_SMOOTHING_COM_FACTOR)
 
-                self.prev_CoM[0] = self.dec_CoM[dec_idx,0]
-                self.prev_CoM[1] = self.dec_CoM[dec_idx,1]
+                if ~math.isnan(self.dec_CoM[dec_idx,1]):
+                    self.prev_CoM[0] = self.dec_CoM[dec_idx,0]
+                if ~math.isnan(self.dec_CoM[dec_idx,1]):
+                    self.prev_CoM[1] = self.dec_CoM[dec_idx,1]
                 self.peak_posterior[dec_idx] = np.max(self._local_posterior_buffer[dec_idx,:,:])
 
                 # TODO: Maybe add something to discard low probability frames.
