@@ -20,7 +20,7 @@ import ThreadExtension
 
 MODULE_IDENTIFIER = "[BayesianEstimator] "
 N_FRAMES_TO_UPDATE = 10
-DECODING_TIME_WINDOW = 0.050
+DECODING_TIME_WINDOW = 0.100
 DECODING_WINDOW_SLIDE = 0.050
 POSTERIOR_BUFFER_SIZE = 10
 
@@ -80,11 +80,17 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
         self._place_field_provider.end_immediate_request()
 
         # Update the place field exponent - We are using all the units for now.
-        # TODO: Remove units from this calculation that have very low firing rates.
+        # Remove the contributions in bins that have no firing from any cell..
+        # This is a pain to deal with but it otherwise gets a very high
+        # probability.
+        # np.exp(-DECODING_TIME_WINDOW*np.sum(self._most_recent_pf, axis=0), \
+        #         out=self._pf_multiplier, where=np.max(self._most_recent_pf, axis=0)>SpikeAnalysis.EPSILON)
+
         np.exp(-DECODING_TIME_WINDOW*np.sum(self._most_recent_pf, axis=0), \
-                out=self._pf_multiplier, where=self._most_recent_pf>SpikeAnalysis.EPSILON)
-        print(self._most_recent_pf)
-        print(self._pf_multiplier)
+                out=self._pf_multiplier)
+
+        # print(self._most_recent_pf)
+        # print(self._pf_multiplier)
 
         self._place_field_provider.end_immediate_request()
 
@@ -151,8 +157,8 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
                         break
             else:
                 # No more spikes to decode in the buffer
-                down_time += 0.01
-                time.sleep(0.01)
+                down_time += 0.005
+                time.sleep(0.005)
                 if down_time > 1.0:
                     down_time = 0.0
                     print(MODULE_IDENTIFIER + "Warning: Not receiving spike data.")

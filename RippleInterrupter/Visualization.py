@@ -693,7 +693,6 @@ class GraphicsManager(Process):
         :returns: Animation frames to be plotted.
         """
         with self._decoding_lock:
-
             """
             # For now, show the aggregate posterior over the entire time period
             # that we received data for. Later we can show the posterior
@@ -705,7 +704,6 @@ class GraphicsManager(Process):
                 self.peak_posterior = 1.0
             self._dec_frame[0].set_array(total_posterior/self.peak_posterior)
             posterior_peak = np.unravel_index(np.argmax(total_posterior), total_posterior.shape)
-
             """
 
             for dec_idx in range(PositionDecoding.POSTERIOR_BUFFER_SIZE):
