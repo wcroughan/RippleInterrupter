@@ -33,9 +33,6 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
     def __init__(self, spike_sender, place_field_provider, shared_place_fields,\
             shared_posterior_buffer, trigger_condition):
         ThreadExtension.StoppableProcess.__init__(self)
-        # Hoping that everything in python is pass by reference. Place fields
-        # is a giant array! Both spike buffer and place fields are shared
-        # resources.
         self.time_bin_width = DECODING_TIME_WINDOW * RippleDefinitions.SPIKE_SAMPLING_FREQ
         self._spike_buffer = spike_sender.get_spike_buffer_connection()
         #self._log_place_fields = place_field_provider.get_log_place_fields()
@@ -92,7 +89,7 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
         down_time = 0.0
         elapsed_frames = 0
         while not self.req_stop():
-            while self._spike_buffer.poll():
+            if self._spike_buffer.poll():
                 # Get the next spike
                 (spk_cl, spk_time) = self._spike_buffer.recv()
                 elapsed_frames += 1
@@ -107,7 +104,7 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
                         self._probs_out.append(self._pf_multiplier)
                 else:
                     self._time_bin = int(np.floor_divide(float(spk_time) - self._frame_start, self.time_bin_width))
-                    print(MODULE_IDENTIFIER + "Inserting spike in time bin: %d"%self._time_bin)
+                    # logging.debug(MODULE_IDENTIFIER + "Inserting spike in time bin: %d"%self._time_bin)
                     if self._time_bin < 0:
                         # Received spike precedes the first time bin we are decoding.
                         # TODO: We probably need to increase the buffer size, or raise a warning.
@@ -128,15 +125,19 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
 
                 if elapsed_frames >= N_FRAMES_TO_UPDATE:
                     elapsed_frames = 0
-                    with self._output_lock:
+                    with self._trigger:
+                        # Normalize all the posterior
                         np.copyto(self._shared_posterior_buffer, np.asarray(self._probs_out))
+                        self._trigger.notify()
 
-                    # Might as well take a break from the program and check if the application has been terminated.
-                    break
+                    # Might as well take a break from the program and check if
+                    # the application has been terminated.
+                    if self.req_stop():
+                        break
             else:
                 # No more spikes to decode in the buffer
-                down_time += 0.02
-                time.sleep(0.02)
+                down_time += 0.01
+                time.sleep(0.01)
                 if down_time > 1.0:
                     down_time = 0.0
                     print(MODULE_IDENTIFIER + "Warning: Not receiving spike data.")

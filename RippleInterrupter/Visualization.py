@@ -687,8 +687,17 @@ class GraphicsManager(Process):
             # For now, show the aggregate posterior over the entire time period
             # that we received data for. Later we can show the posterior
             # colored by time, or just show the posterior center of mass
-            # self._dec_frame[0].set_array(np.sum(self._local_posterior_buffer.T, axis=0))
-            self._dec_frame[0].set_data((5, 15))
+            total_posterior = np.sum(self._local_posterior_buffer.T, axis=0)
+
+            """
+            peak_posterior = np.max(total_posterior)
+            if peak_posterior == 0.0:
+                peak_posterior = 1.0
+            self._dec_frame[0].set_array(total_posterior/peak_posterior)
+            """
+
+            posterior_peak = np.unravel_index(np.argmax(total_posterior), total_posterior.shape)
+            self._dec_frame[0].set_data((posterior_peak[0], posterior_peak[1]))
         return self._dec_frame
 
     def fetch_incident_ripple(self):
@@ -886,21 +895,21 @@ class GraphicsManager(Process):
         if self._dec_ax is None:
             return
 
-        posterior_frame, = self._dec_ax.plot([], [], animated=True)
+        posterior_frame, = self._dec_ax.plot([], [], linestyle='None', marker='o', alpha=0.4, color='red', animated=True)
         self._dec_frame.append(posterior_frame)
-
         """
-        # Uncomment to see the posterior as an image
+        # See the posterior as an image
         posterior_heatmap = self._dec_ax.imshow(np.zeros((PositionAnalysis.N_POSITION_BINS[0], \
                 PositionAnalysis.N_POSITION_BINS[1]), dtype='float'), vmin=0, \
                 vmax=1, animated=True)
         # self.figure.colorbar(posterior_heatmap)
         self._dec_frame.append(posterior_heatmap)
+        """
+
         anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_decoding_frame, \
                 frames=np.arange(self.__N_ANIMATION_FRAMES), interval=ANIMATION_INTERVAL, blit=True, repeat=True)
         logging.info(MODULE_IDENTIFIER + 'Posterior frame created!')
         self._anim_objs.append(anim_obj)
-        """
 
     def run(self):
         """

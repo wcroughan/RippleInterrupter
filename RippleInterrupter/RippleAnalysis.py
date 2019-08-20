@@ -310,10 +310,10 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                         ripple_unseen_LFP = False
                         # Copy data over for visualization
                         if len(self._local_lfp_buffer) == RiD.LFP_BUFFER_LENGTH:
-                            np.copyto(self._raw_lfp_buffer, np.asarray(self._local_lfp_buffer).T)
-                            np.copyto(self._ripple_power_buffer, np.asarray(self._local_ripple_power_buffer).T)
                             logging.info(MODULE_IDENTIFIER + "%.2fs: Peak ripple power in frame %.2f"%(curr_time, np.max(self._ripple_power_buffer)))
                             with self._show_trigger:
+                                np.copyto(self._raw_lfp_buffer, np.asarray(self._local_lfp_buffer).T)
+                                np.copyto(self._ripple_power_buffer, np.asarray(self._local_ripple_power_buffer).T)
                                 self._show_trigger.notify()
                             if __debug__:
                                 print(MODULE_IDENTIFIER + "%.2fs: Peak ripple power in frame %.2f"%(curr_time, np.max(self._ripple_power_buffer)))
@@ -321,8 +321,8 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                     if ((curr_time - prev_ripple) > RiD.CALIB_PLOT_BUFFER_TIME/2) and ripple_unseen_calib:
                         ripple_unseen_calib = False
                         if self._calib_plot is not None:
-                            self._calib_plot.update_shared_buffer(timestamp)
                             with self._calib_trigger_condition:
+                                self._calib_plot.update_shared_buffer(timestamp)
                                 self._calib_trigger_condition.notify()
             else:
                 # logging.debug(MODULE_IDENTIFIER + "No LFP Frames to process. Sleeping")
