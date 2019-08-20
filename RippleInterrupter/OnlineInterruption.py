@@ -898,7 +898,7 @@ class CommandWindow(QMainWindow):
         previously built place fields
         """
         try:
-            if self.shared_posterior_buffer is not None:
+            if self.shared_posterior_buffer is  None:
                 self.shared_posterior_buffer = RawArray(ctypes.c_double, PositionDecoding.POSTERIOR_BUFFER_SIZE * \
                         PositionAnalysis.N_POSITION_BINS[0] * PositionAnalysis.N_POSITION_BINS[1])
 

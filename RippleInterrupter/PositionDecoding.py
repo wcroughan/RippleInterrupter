@@ -1,8 +1,10 @@
 # System imports
+import time
 import threading
 import multiprocessing
 import numpy as np
 import collections
+import logging
 
 # Local imports
 import RippleDefinitions
@@ -34,7 +36,7 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
         # Hoping that everything in python is pass by reference. Place fields
         # is a giant array! Both spike buffer and place fields are shared
         # resources.
-        self.time_bin_width = int(DECODING_TIME_WINDOW * RippleDefinitions.SPIKE_SAMPLING_FREQ)
+        self.time_bin_width = DECODING_TIME_WINDOW * RippleDefinitions.SPIKE_SAMPLING_FREQ
         self._spike_buffer = spike_sender.get_spike_buffer_connection()
         #self._log_place_fields = place_field_provider.get_log_place_fields()
         self._place_field_provider = place_field_provider
@@ -42,7 +44,7 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
         n_units = spike_sender.get_n_clusters()
         # Shared copy of the posterior buffer that we copy the data to when all the computation is done.
         self._shared_posterior_buffer = np.reshape(np.frombuffer(shared_posterior_buffer, dtype='double'), \
-                (n_units, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
+                (POSTERIOR_BUFFER_SIZE, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
 
         self._shared_place_fields = np.reshape(np.frombuffer(shared_place_fields, dtype='double'), \
             (n_units, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
@@ -51,7 +53,7 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
 
         # Allocate space for the Place-Field multiplier. This is the quantity
         # which we observe if we get 0 spikes from a cell.
-        self._pf_multiplier = np.ones((n_units, PositionAnalysis.N_POSITION_BINS[0], \
+        self._pf_multiplier = np.ones((PositionAnalysis.N_POSITION_BINS[0], \
             PositionAnalysis.N_POSITION_BINS[1]), dtype='float')
 
         # Create fixed size deque of time bins that we are currently decoding.
@@ -76,55 +78,68 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
 
         # If we want to use the place fields themselves multiply them
         # (instead of adding log fields) for posterior estimation.
-        np.copyto(self._most_recent_pf, self._self._shared_place_fields)
+        np.copyto(self._most_recent_pf, self._shared_place_fields)
 
         # Update the place field exponent - We are using all the units for now.
         # TODO: Remove units from this calculation that have very low firing rates.
         np.exp(-DECODING_TIME_WINDOW*np.sum(self._most_recent_pf, axis=0), \
                 out=self._pf_multiplier)
+        print(self._pf_multiplier.shape)
 
         self._place_field_provider.end_immediate_request()
 
         # After every N_FRAMES_TO_UPDATE, decoded data is sent out.
+        down_time = 0.0
         elapsed_frames = 0
         while not self.req_stop():
-            if self._spike_buffer.poll():
+            while self._spike_buffer.poll():
                 # Get the next spike
                 (spk_cl, spk_time) = self._spike_buffer.recv()
+                elapsed_frames += 1
 
                 # If the program has just started, reset the frame start time
                 if self._frame_start < 0:
-                    elapsed_frames = 1
                     self._time_bin = 0
-                    self._frame_start = spk_time
-                    self._bin_times.append(self._frame_start)
-                    self._probs_out.append(self._pf_multiplier)
+                    self._frame_start = float(spk_time)
+                    print(MODULE_IDENTIFIER + "First spike received [TS]:%d"%spk_time)
+                    for f_idx in range(POSTERIOR_BUFFER_SIZE):
+                        self._bin_times.append(self._frame_start + self.time_bin_width * f_idx)
+                        self._probs_out.append(self._pf_multiplier)
                 else:
-                    self._time_bin = (spk_time - self._frame_start) // self.time_bin_width
+                    self._time_bin = int(np.floor_divide(float(spk_time) - self._frame_start, self.time_bin_width))
+                    print(MODULE_IDENTIFIER + "Inserting spike in time bin: %d"%self._time_bin)
                     if self._time_bin < 0:
                         # Received spike precedes the first time bin we are decoding.
                         # TODO: We probably need to increase the buffer size, or raise a warning.
                         logging.info(MODULE_IDENTIFIER + "Received spikes for cleared time bin.")
+                        print(MODULE_IDENTIFIER + "Received spikes for cleared time bin.")
                     elif self._time_bin >= POSTERIOR_BUFFER_SIZE:
                         # Calculate the required number of empty frames.
                         elapsed_frames += 1
                         n_frames_to_attach = self._time_bin - POSTERIOR_BUFFER_SIZE
-                        self._time_bin -= n_frames_to_attach
+                        self._time_bin -= n_frames_to_attach + 1
                         self._frame_start += n_frames_to_attach * self.time_bin_width
                         for f_idx in range(n_frames_to_attach):
                             self._probs_out.append(self._pf_multiplier)
                             self._bin_times.append(self._frame_start + self.time_bin_width * f_idx)
 
-                    # Now that we have the correct time bin, multiply the place field in the correct place 
-                    np.multiply(self._probs_out[self._time_bin], self._most_recent_pf[spk_cl,:,:], out=self._probs_out[self._time_bin])
+                # Now that we have the correct time bin, multiply the place field in the correct place 
+                np.multiply(self._probs_out[self._time_bin], self._most_recent_pf[spk_cl,:,:], out=self._probs_out[self._time_bin])
 
-                    if elapsed_frames >= N_FRAMES_TO_UPDATE:
-                        elapsed_frames = 0
-                        with self._output_lock:
-                            np.copyto(self._shared_posterior_buffer, np.asarray(self._probs_out).T)
-                else:
-                    # No more spikes to decode in the buffer
-                    time.sleep(0.01)
+                if elapsed_frames >= N_FRAMES_TO_UPDATE:
+                    elapsed_frames = 0
+                    with self._output_lock:
+                        np.copyto(self._shared_posterior_buffer, np.asarray(self._probs_out))
+
+                    # Might as well take a break from the program and check if the application has been terminated.
+                    break
+            else:
+                # No more spikes to decode in the buffer
+                down_time += 0.02
+                time.sleep(0.02)
+                if down_time > 1.0:
+                    down_time = 0.0
+                    print(MODULE_IDENTIFIER + "Warning: Not receiving spike data.")
 
 
     def fetch_decoded_estimate(self):

@@ -172,6 +172,7 @@ class GraphicsManager(Process):
     __CLUSTERS_TO_PLOT = []
     __N_SUBPLOT_COLS = int(3)
     __MAX_FIRING_RATE = 15.0
+    __POSTERIOR_TIMEOUT = 0.5
     __RIPPLE_DETECTION_TIMEOUT = 0.5
     __RIPPLE_SMOOTHING_WINDOW = 2
 
@@ -376,6 +377,7 @@ class GraphicsManager(Process):
                 (PositionDecoding.POSTERIOR_BUFFER_SIZE, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
             self._thread_list.append(threading.Thread(name="PosteriorFetcher", daemon=True, \
                     target=self.fetch_posterior_plot))
+            logging.info(MODULE_IDENTIFIER + "Added Bayesian threads to Graphics pipeline.")
         else:
             self._shared_posterior = None
 
@@ -592,6 +594,14 @@ class GraphicsManager(Process):
             self._spk_pos_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
             self._spk_pos_ax.grid(True)
 
+        if self._dec_ax is not None:
+            self._dec_ax.cla()
+            self._dec_ax.set_xlabel("x (bin)")
+            self._dec_ax.set_ylabel("y (bin)")
+            self._dec_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
+            self._dec_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
+            self._dec_ax.grid(True)
+
         self.canvas.draw()
 
     def kill_gui(self):
@@ -674,8 +684,12 @@ class GraphicsManager(Process):
         :returns: Animation frames to be plotted.
         """
         with self._decoding_lock:
-            self._dec_frame[0].set_array(self._local_posterior_buffer.T)
-        return self._pf_frame
+            # For now, show the aggregate posterior over the entire time period
+            # that we received data for. Later we can show the posterior
+            # colored by time, or just show the posterior center of mass
+            # self._dec_frame[0].set_array(np.sum(self._local_posterior_buffer.T, axis=0))
+            self._dec_frame[0].set_data((5, 15))
+        return self._dec_frame
 
     def fetch_incident_ripple(self):
         """
@@ -712,7 +726,7 @@ class GraphicsManager(Process):
         """
         logging.info(MODULE_IDENTIFIER + "Posterior pipe opened.")
         while self._keep_running.is_set():
-            with self._decoding_lock
+            with self._decoding_lock:
                 with self._decoding_condition:
                     decoding_finished = self._decoding_condition.wait(self.__POSTERIOR_TIMEOUT)
                     if decoding_finished:
@@ -872,15 +886,21 @@ class GraphicsManager(Process):
         if self._dec_ax is None:
             return
 
+        posterior_frame, = self._dec_ax.plot([], [], animated=True)
+        self._dec_frame.append(posterior_frame)
+
+        """
+        # Uncomment to see the posterior as an image
         posterior_heatmap = self._dec_ax.imshow(np.zeros((PositionAnalysis.N_POSITION_BINS[0], \
                 PositionAnalysis.N_POSITION_BINS[1]), dtype='float'), vmin=0, \
                 vmax=1, animated=True)
-        self.figure.colorbar(posterior_heatmap)
-        self._dec_frame.append(pf_heatmap)
+        # self.figure.colorbar(posterior_heatmap)
+        self._dec_frame.append(posterior_heatmap)
         anim_obj = animation.FuncAnimation(self.canvas.figure, self.update_decoding_frame, \
                 frames=np.arange(self.__N_ANIMATION_FRAMES), interval=ANIMATION_INTERVAL, blit=True, repeat=True)
         logging.info(MODULE_IDENTIFIER + 'Posterior frame created!')
         self._anim_objs.append(anim_obj)
+        """
 
     def run(self):
         """
