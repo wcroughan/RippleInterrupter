@@ -326,8 +326,8 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                                 self._calib_trigger_condition.notify()
             else:
                 # logging.debug(MODULE_IDENTIFIER + "No LFP Frames to process. Sleeping")
-                time.sleep(0.05)
-                down_time += 0.05
+                time.sleep(0.005)
+                down_time += 0.005
                 if down_time > 1.0:
                     print(MODULE_IDENTIFIER + "Warning: Not receiving LFP Packets.")
                     down_time = 0.0

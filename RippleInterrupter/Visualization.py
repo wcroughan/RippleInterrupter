@@ -177,6 +177,7 @@ class GraphicsManager(Process):
     __RIPPLE_DETECTION_TIMEOUT = 0.5
     __RIPPLE_SMOOTHING_WINDOW = 2
     __DECODED_SMOOTHING_COM_FACTOR = 0.5
+    __MIN_DISPLAY_POSTERIOR = 0.2
 
     def __init__(self, ripple_buffers, calib_plot_buffers, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_thread, ripple_trigger_condition, calib_trigger_condition, \
@@ -716,6 +717,12 @@ class GraphicsManager(Process):
                 self.dec_CoM[dec_idx,1] = np.sum(np.multiply(self._local_posterior_buffer[dec_idx,:,:], \
                         self.raw_CoM_grid[0]))
                 """
+                self.peak_posterior[dec_idx] = np.max(self._local_posterior_buffer[dec_idx,:,:])
+                if self.peak_posterior[dec_idx] < self.__MIN_DISPLAY_POSTERIOR:
+                    self.dec_CoM[dec_idx,0] = float('nan')
+                    self.dec_CoM[dec_idx,1] = float('nan')
+                    continue
+
                 self.dec_CoM[dec_idx,0] = np.sum(np.multiply(self._local_posterior_buffer[dec_idx,:,:], \
                         self.raw_CoM_grid[1])) * (1 - self.__DECODED_SMOOTHING_COM_FACTOR) + \
                         (self.prev_CoM[0] * self.__DECODED_SMOOTHING_COM_FACTOR)
@@ -727,7 +734,6 @@ class GraphicsManager(Process):
                     self.prev_CoM[0] = self.dec_CoM[dec_idx,0]
                 if ~math.isnan(self.dec_CoM[dec_idx,1]):
                     self.prev_CoM[1] = self.dec_CoM[dec_idx,1]
-                self.peak_posterior[dec_idx] = np.max(self._local_posterior_buffer[dec_idx,:,:])
 
                 # TODO: Maybe add something to discard low probability frames.
 

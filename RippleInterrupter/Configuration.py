@@ -13,7 +13,7 @@ Create configuration structure for different environments with the following fie
 import os
 import logging
 import configparser
-from tkinter import Tk, filedialog
+import QtHelperUtils
 import xml.etree.ElementTree as ET
 
 DEFAULT_CONFIG_FILE='config/default.ini'
@@ -32,11 +32,8 @@ def read_cluster_file(filename=None, tetrodes=None):
     :returns: A dictionary giving valid cluster indices for each tetrode.
     """
     if filename is None:
-        gui_root = Tk()
-        gui_root.wm_withdraw()
-        filename = filedialog.askopenfilename(initialdir=os.getcwd(), title="Select Cluster file", \
-                filetypes=(("cluster files", "*.trodesClusters"), ("all files", "*.*")))
-        gui_root.destroy()
+        filename = QtHelperUtils.get_open_file_name(file_format="Cluster File (*.trodesClusters)", \
+                message="Select Cluster file")
 
     try:
         cluster_tree = ET.parse(filename)
@@ -96,11 +93,8 @@ def get_open_field_configuration(filename=None):
     Return configuration for the open field.
     """
     if filename is None:
-        gui_root = Tk()
-        gui_root.wm_withdraw()
-        filename = filedialog.askopenfilename(initialdir=os.getcwd(), title="Select Cluster file", \
-                filetypes=(("cluster files", "*.trodesClusters"), ("all files", "*.*")))
-        gui_root.destroy()
+        filename = QtHelperUtils.get_open_file_name(file_format="Cluster File (*.trodesClusteres)", \
+                message="Select Cluster file")
 
     configuration = configparser.ConfigParser()
     try:

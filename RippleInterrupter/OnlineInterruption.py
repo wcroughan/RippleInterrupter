@@ -718,7 +718,8 @@ class CommandWindow(QMainWindow):
         Load cluster information from a cluster file.
         """
         # Uncomment to use a hardcoded file
-        cluster_filename = "./config/Billy3_20181219_005635_merge_time_0.trodesClusters"
+        # cluster_filename = "./config/Billy3_20181218.trodesClusters"
+        # cluster_filename = "./config/Billy3_20181219_005635_merge_time_0.trodesClusters"
         # cluster_filename = "./config/full_config20190206_session_start.trodesClusters"
         # cluster_filename = "./config/full_config20190208_session_start.trodesClusters"
         # cluster_filename = "./config/full_config20190206_session_end.trodesClusters"
