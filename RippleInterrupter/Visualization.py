@@ -223,14 +223,19 @@ class GraphicsManager(Process):
         # are being requested
         if n_features_to_show == 1:
             plot_grid = gridspec.GridSpec(1, 1)
+            self._geometry = (700, 750)
         elif n_features_to_show == 2:
             plot_grid = gridspec.GridSpec(1, 2)
+            self._geometry = (900, 600)
         elif n_features_to_show == 3:
             plot_grid = gridspec.GridSpec(1, 3)
+            self._geometry = (1400, 600)
         elif n_features_to_show == 4:
             plot_grid = gridspec.GridSpec(2, 2)
+            self._geometry = (900, 950)
         elif n_features_to_show == 5:
             plot_grid = gridspec.GridSpec(3, 2)
+            self._geometry = (900, 950)
 
         self.toolbar = NavigationToolbar(self.canvas, self.widget)
 
@@ -448,6 +453,8 @@ class GraphicsManager(Process):
             p__thread.start()
         print(MODULE_IDENTIFIER + 'Animation plots initialized.')
 
+    def getGeometry(self):
+        return self._geometry
 
     def initSpikeDeque(self):
         self._spk_pos_x = []
