@@ -130,7 +130,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         self._n_tetrodes = lfp_listener.get_n_tetrodes()
         self._target_tetrodes = lfp_listener.get_tetrodes()
 
-        self._ripple_data_accsess = Lock()
+        self._ripple_data_access = Lock()
         self._shared_mean_ripple_power = RawArray(ctypes.c_double, self._n_tetrodes)
         self._shared_std_ripple_power = RawArray(ctypes.c_double, self._n_tetrodes)
         self._mean_ripple_power = np.reshape(np.frombuffer(self._shared_mean_ripple_power, dtype='double'), (self._n_tetrodes))
@@ -169,10 +169,61 @@ class RippleDetector(ThreadExtension.StoppableProcess):
 
         logging.info(MODULE_IDENTIFIER + "Started Ripple detection thread.")
 
+    def save_ripple_stats(self, save_file_name=None):
+        save_success = False
+
+        # Save ripple stats to the specified file
+        if save_file_name is None:
+            save_file_name = time.strftime("ripple_stats__%Y%m%d_%H%M%S.stats")
+
+        # Copy all the relevant data and release the ripple lock
+        with self._ripple_data_access:
+            copy_of_mean_ripple_power = np.copy(self._shared_mean_ripple_power)
+            copy_of_std_ripple_power = np.copy(self._shared_std_ripple_power)
+
+        try:
+            np.savez(save_file_name, copy_of_mean_ripple_power, copy_of_std_ripple_power)
+            save_success = True
+        except Exception as err:
+            print(MODULE_IDENTIFIER + "Unable to save ripple stats to file.")
+            print(err)
+            logging.info(MODULE_IDENTIFIER + "Unable to save ripple stats to file.")
+
+        return save_success
+
+    def load_ripple_stats(self, load_file_name):
+        load_success = False
+
+        # Load ripple stats from file. Preferably do this before you start
+        # streaming data from Trodes.
+        try:
+            loaded_ripple_data = np.load(load_file_name)
+        except (FileNotFoundError, IOError) as err:
+            print(MODULE_IDENTIFIER + "Unable to load ripple stats file.")
+            print(err)
+            return load_success
+
+        with self._ripple_data_access:
+            try:
+                np.copyto(self._mean_ripple_power, np.reshape(loaded_ripple_data['arr_0'], self._mean_ripple_power.shape))
+                np.copyto(self._std_ripple_power, np.reshape(loaded_ripple_data['arr_1'], self._std_ripple_power.shape))
+                load_success = True
+            except Exception as err:
+                # This could happen because the save data had a different set
+                # of tetrodes than the ones we are loading for. It can be
+                # accounted for but seems like a pain to do for now.
+                print(MODULE_IDENTIFIER + "Unable to use ripple stats in file.")
+                print(err)
+
+        return load_success
+
     def show_ripple_stats(self):
-        with self._ripple_data_accsess:
-            list_display = QtHelperUtils.ListDisplayWidget("Ripple Statistics", self._target_tetrodes, \
-                    self._shared_mean_ripple_power, self._shared_std_ripple_power)
+        with self._ripple_data_access:
+            copy_of_mean_ripple_power = np.copy(self._shared_mean_ripple_power)
+            copy_of_std_ripple_power = np.copy(self._shared_std_ripple_power)
+
+        list_display = QtHelperUtils.ListDisplayWidget("Ripple Statistics", self._target_tetrodes, \
+                copy_of_mean_ripple_power, copy_of_std_ripple_power)
         list_display.exec_()
 
     def set_ripple_reference(self, t_ref):
@@ -180,7 +231,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         Set the tetrode index that should be used for detecting ripples.
         """
         if -1 < t_ref < self._n_tetrodes:
-            with self._ripple_data_accsess:
+            with self._ripple_data_access:
                 self._ripple_reference_tetrode.value = t_ref
             print(MODULE_IDENTIFIER + "Tetrode %s set as ripple reference"%self._target_tetrodes[t_ref])
         else:
@@ -193,7 +244,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         power on the ripple reference tetrode.
         """
         if -1 < t_baseline < self._n_tetrodes:
-            with self._ripple_data_accsess:
+            with self._ripple_data_access:
                 self._ripple_baseline_tetrode.value = t_baseline
             print(MODULE_IDENTIFIER + "Tetrode %s set as ripple baseline"%self._target_tetrodes[t_baseline])
         else:
@@ -253,13 +304,14 @@ class RippleDetector(ThreadExtension.StoppableProcess):
 
                 # If the filter window is full, filter the data and record it in rippple power
                 if (lfp_window_ptr == RiD.LFP_FILTER_ORDER):
-                    self._ripple_data_accsess.acquire()
+                    self._ripple_data_access.acquire()
                     lfp_window_ptr = 0
                     filtered_window, ripple_frame_filter = signal.sosfilt(self._ripple_filter, \
                            raw_lfp_window, axis=1, zi=ripple_frame_filter)
                     current_ripple_power = np.sqrt(np.mean(np.power(filtered_window, 2), axis=1)) + \
                             (RiD.RIPPLE_SMOOTHING_FACTOR * previous_inst_ripple_power)
-                    power_to_baseline_ratio = np.divide(current_ripple_power - self._mean_ripple_power, self._std_ripple_power) 
+                    power_to_baseline_ratio = np.divide(current_ripple_power - self._mean_ripple_power, \
+                            self._std_ripple_power) 
                     previous_inst_ripple_power = current_ripple_power
 
                     # Fill in the shared data variables
@@ -267,7 +319,8 @@ class RippleDetector(ThreadExtension.StoppableProcess):
         
                     # Timestamp has both trodes and system timestamps!
                     curr_time = float(timestamp)/RiD.SPIKE_SAMPLING_FREQ
-                    logging.debug(MODULE_IDENTIFIER + "Frame @ %d filtered, mean ripple strength %.2f"%(timestamp, np.mean(power_to_baseline_ratio)))
+                    logging.debug(MODULE_IDENTIFIER + "Frame @ %d filtered, mean ripple strength %.2f"%\
+                            (timestamp, np.mean(power_to_baseline_ratio)))
                     """
                     if self._ripple_baseline_tetrode.value > 0:
                         # Get the ripple power on this tetrode to be used as baseline power
@@ -304,7 +357,7 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                         if n_data_pts_seen%int(1 * RiD.LFP_FREQUENCY) == 0:
                             logging.info(MODULE_IDENTIFIER + "T%s: Mean LFP %.4f, STD LFP: %.4f"%(self._target_tetrodes[self._ripple_reference_tetrode.value],\
                                     self._mean_ripple_power[self._ripple_reference_tetrode.value], self._std_ripple_power[self._ripple_reference_tetrode.value]))
-                    self._ripple_data_accsess.release()
+                    self._ripple_data_access.release()
 
                     if ((curr_time - prev_ripple) > RiD.LFP_BUFFER_TIME/2) and ripple_unseen_LFP:
                         ripple_unseen_LFP = False

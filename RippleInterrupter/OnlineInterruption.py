@@ -321,10 +321,20 @@ class CommandWindow(QMainWindow):
     # Functions for saving data
     def saveDisplaySnapshot(self):
         if self.graphical_interface is not None:
-            # Save the current ripple frame
+            # Save the current display frame
             saved_file = self.graphical_interface.saveDisplay()
             if saved_file:
                 self.statusBar().showMessage("Display snapshot saved to disk")
+
+    def saveRippleStats(self):
+        if self.ripple_detector is not None:
+            # Save the current ripple stats to file
+            ripple_stats_saved = self.ripple_detector.save_ripple_stats()
+        else:
+            ripple_stats_saved = False 
+
+        if ripple_stats_saved:
+            self.statusBar().showMessage("Ripple Stats saved.")
 
     def saveFields(self):
         if self.place_field_handler is not None:
@@ -353,6 +363,21 @@ class CommandWindow(QMainWindow):
 
         if fields_loaded:
             self.statusBar().showMessage("Place fields loaded.")
+
+    def loadRippleStats(self):
+        if self.ripple_detector is None:
+            QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Ripple detector not setup to load stats.')
+            return
+
+        # Get the name of the place-field file
+        ripple_stats_filename = QtHelperUtils.get_open_file_name(file_format="Ripple Stats (*.npz)", message="Select ripple stats file")
+        if ripple_stats_filename:
+            ripple_stats_loaded = self.ripple_detector.load_ripple_stats(ripple_stats_filename)
+        else:
+            ripple_stats_loaded = False
+
+        if ripple_stats_loaded:
+            self.statusBar().showMessage("Ripple Stats loaded.")
 
     ############################# STIMULATION TRIGGERS #############################
     # Set up the different stimulation methods here. The three different
@@ -467,10 +492,14 @@ class CommandWindow(QMainWindow):
 
         # =============== SAVE MENU =============== 
         save_menu = file_menu.addMenu('&Save')
-        save_ripple_snapshot_action = QAction('&Display', self)
-        save_ripple_snapshot_action.setStatusTip('Save display snapshot')
-        save_ripple_snapshot_action.triggered.connect(self.saveDisplaySnapshot)
-        save_ripple_snapshot_action.setShortcut('Ctrl+S')
+        save_display_snapshot_action = QAction('&Display', self)
+        save_display_snapshot_action.setStatusTip('Save display snapshot')
+        save_display_snapshot_action.triggered.connect(self.saveDisplaySnapshot)
+        save_display_snapshot_action.setShortcut('Ctrl+S')
+
+        save_ripple_stats_action = QAction('&Ripple Stats', self)
+        save_ripple_stats_action.setStatusTip('Save current SWR stats to file')
+        save_ripple_stats_action.triggered.connect(self.saveRippleStats)
 
         save_place_fields_action = QAction('Place &Fields', self)
         save_place_fields_action.setStatusTip('Save place fields')
@@ -480,7 +509,8 @@ class CommandWindow(QMainWindow):
         save_bayesian_decoding_action.setStatusTip('Save bayesian decoding')
         save_bayesian_decoding_action.triggered.connect(self.saveBayesianDecoding)
 
-        save_menu.addAction(save_ripple_snapshot_action)
+        save_menu.addAction(save_display_snapshot_action)
+        save_menu.addAction(save_ripple_stats_action)
         save_menu.addAction(save_place_fields_action)
         save_menu.addAction(save_bayesian_decoding_action)
 
