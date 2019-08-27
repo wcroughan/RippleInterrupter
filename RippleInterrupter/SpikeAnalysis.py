@@ -33,7 +33,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
     _MIN_PLACE_FIELD_ACTIVATION = 0.5 * EPSILON
     _MIN_OCCUPANCY = 0.0000001
     _ALLOWED_TIMESTAMPS_LAG = 12000
-    _SMOOTHING_RESCALE_FACTOR = 25.0
+    _SMOOTHING_RESCALE_FACTOR = 36.0
 
     def __init__(self, position_processor, spike_processor, shared_place_fields, write_spike_log=False):
     # def __init__(self, position_processor, spike_processor, place_fields):

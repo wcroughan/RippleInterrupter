@@ -178,7 +178,7 @@ class GraphicsManager(Process):
     __RIPPLE_SMOOTHING_WINDOW = 2
     __DECODED_SMOOTHING_COM_FACTOR = 0.8
     __DECODED_SMOOTHING_POSTERIOR_FACTOR = 0.01
-    __MIN_DISPLAY_POSTERIOR = 0.2
+    __MIN_DISPLAY_POSTERIOR = 0.05
 
     def __init__(self, ripple_buffers, calib_plot_buffers, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_thread, ripple_trigger_condition, calib_trigger_condition, \
