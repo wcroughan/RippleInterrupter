@@ -18,7 +18,7 @@ import ThreadExtension
 import cProfile
 
 MODULE_IDENTIFIER = "[PositionAnalysis] "
-N_POSITION_BINS = (24, 25)
+N_POSITION_BINS = (15, 16)
 
 class PositionEstimator(ThreadExtension.StoppableThread):
     """
@@ -99,9 +99,15 @@ class PositionEstimator(ThreadExtension.StoppableThread):
         """
         px = self._data_field['position_x']
         py = self._data_field['position_y']
-        x_bin = np.floor_divide(self._n_bins_x * (px - self.__P_MIN_X),self.__P_BIN_SIZE_X)
+
         # Camera data coming in has flipped Y-coordinates!
-        y_bin = np.floor_divide(self._n_bins_y * (self.__P_MAX_Y - py),self.__P_BIN_SIZE_Y)
+        # Instead of discretizing the position here, leave it as is. It can be
+        # taken care of when building place fields. This will allow for much
+        # better visualization.
+        # x_bin = np.floor_divide(self._n_bins_x * (px - self.__P_MIN_X),self.__P_BIN_SIZE_X)
+        # y_bin = np.floor_divide(self._n_bins_y * (self.__P_MAX_Y - py),self.__P_BIN_SIZE_Y)
+        x_bin = np.divide(self._n_bins_x * (px - self.__P_MIN_X),self.__P_BIN_SIZE_X)
+        y_bin = np.divide(self._n_bins_y * (self.__P_MAX_Y - py),self.__P_BIN_SIZE_Y)
 
         if x_bin < 0:
             x_bin = 0
@@ -168,12 +174,14 @@ class PositionEstimator(ThreadExtension.StoppableThread):
             for _ in range(n_available_frames):
                 self._position_consumer.readData(self._data_field)
                 current_timestamp = self._data_field['timestamp']
-                (curr_x_bin, curr_y_bin) = self.getXYBin()
+                (floating_x_bin, floating_y_bin) = self.getXYBin()
+                curr_x_bin = int(np.round(floating_x_bin))
+                curr_y_bin = int(np.round(floating_y_bin))
                 if (prev_x_bin < 0):
                     try:
                         print(MODULE_IDENTIFIER + 'Writing output buffers [1]...')
                         for outp in self._position_buffer_connections:
-                            outp.send((current_timestamp, curr_x_bin, curr_y_bin, 0.0))
+                            outp.send((current_timestamp, floating_x_bin, floating_y_bin, 0.0))
                         print(MODULE_IDENTIFIER + 'Buffers [1] written...')
                     except BrokenPipeError as err:
                         print(MODULE_IDENTIFIER + 'Unable to write to Pipe. Aborting.')
@@ -200,7 +208,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                                 self.__SPEED_SMOOTHING_FACTOR * last_velocity
 
                     for outp in self._position_buffer_connections:
-                        outp.send((current_timestamp, curr_x_bin, curr_y_bin, last_velocity))
+                        outp.send((current_timestamp, floating_x_bin, floating_y_bin, last_velocity))
 
                     # Update the total time spent in the bin we were previously in
                     # self._bin_occupancy[prev_x_bin, prev_y_bin] += real_time_spent_in_prev_bin
@@ -225,7 +233,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
                     last_velocity = (1 - self.__SPEED_SMOOTHING_FACTOR) * real_distance_moved/real_time_spent_in_prev_bin + \
                             self.__SPEED_SMOOTHING_FACTOR * last_velocity
                     for outp in self._position_buffer_connections:
-                        outp.send((current_timestamp, curr_x_bin, curr_y_bin, last_velocity))
+                        outp.send((current_timestamp, floating_x_bin, floating_y_bin, last_velocity))
 
                 if self._csv_writer:
                     self._csv_writer.writerow([current_timestamp, self._data_field['position_x'], self._data_field['position_y']])

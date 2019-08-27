@@ -932,7 +932,8 @@ class GraphicsManager(Process):
         if self._spk_pos_ax is None:
             return
 
-        spk_frame, = self._spk_pos_ax.plot([], [], linestyle='None', marker='o', alpha=0.4, animated=True)
+        spk_frame, = self._spk_pos_ax.plot([], [], linestyle='None', marker='o', \
+                markersize=2, alpha=0.4, animated=True)
         pos_frame, = self._spk_pos_ax.plot([], [], animated=True)
         vel_frame  = self._spk_pos_ax.text(0.5 * PositionAnalysis.N_POSITION_BINS[0], \
                 0.02 * PositionAnalysis.N_POSITION_BINS[1], 'speed = 0cm/s')

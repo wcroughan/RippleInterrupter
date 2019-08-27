@@ -204,7 +204,9 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                 # If it's after our most recent position update, try and read the next position
                 # keep reading positions until our position data is ahead of our spike data
                 if self._position_buffer.poll():
-                    (curr_postime, curr_posbin_x, curr_posbin_y, curr_speed) = self._position_buffer.recv()
+                    (curr_postime, floating_x_bin, floating_y_bin, curr_speed) = self._position_buffer.recv()
+                    curr_posbin_x = int(np.round(floating_x_bin))
+                    curr_posbin_y = int(np.round(floating_y_bin))
                     logging.debug(self.CLASS_IDENTIFIER + "Received new position (%d, %d) at %d"%(curr_posbin_x, curr_posbin_y, curr_postime))
                     
                     # NOTE: We have to do some repeated computation here but
@@ -252,7 +254,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                         # Send this to the visualization pipeline to see how spike are being reported
                         if spk_cl in self._requested_clusters:
                             for pipe_in in self._spike_place_buffer_connections:
-                                pipe_in.send((spk_cl, curr_posbin_x, curr_posbin_y, spk_time))
+                                pipe_in.send((spk_cl, floating_x_bin, floating_y_bin, spk_time))
                             logging.debug(self.CLASS_IDENTIFIER + "Spike at %d sent out to listeners"%spk_time)
 
                     if pf_update_spk_iter >= update_pf_every_n_spks:
