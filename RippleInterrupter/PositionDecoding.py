@@ -20,7 +20,7 @@ import ThreadExtension
 
 MODULE_IDENTIFIER = "[BayesianEstimator] "
 N_FRAMES_TO_UPDATE = 10
-DECODING_TIME_WINDOW = 0.20
+DECODING_TIME_WINDOW = 0.10
 DECODING_WINDOW_SLIDE = 0.050
 POSTERIOR_BUFFER_SIZE = 10
 
@@ -159,7 +159,7 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
                 # No more spikes to decode in the buffer
                 down_time += 0.005
                 time.sleep(0.005)
-                if down_time > 1.0:
+                if down_time > 10.0:
                     down_time = 0.0
                     print(MODULE_IDENTIFIER + "Warning: Not receiving spike data.")
 

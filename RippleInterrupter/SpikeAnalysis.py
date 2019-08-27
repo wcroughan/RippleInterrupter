@@ -33,6 +33,7 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
     _MIN_PLACE_FIELD_ACTIVATION = 0.5 * EPSILON
     _MIN_OCCUPANCY = 0.0000001
     _ALLOWED_TIMESTAMPS_LAG = 12000
+    _SMOOTHING_RESCALE_FACTOR = 25.0
 
     def __init__(self, position_processor, spike_processor, shared_place_fields, write_spike_log=False):
     # def __init__(self, position_processor, spike_processor, place_fields):
@@ -127,13 +128,20 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                 np.copyto(self._nspks_in_bin, np.reshape(place_field_data['arr_0'], self._nspks_in_bin.shape))
                 np.copyto(self._bin_occupancy, np.reshape(place_field_data['arr_1'], self._bin_occupancy.shape))
 
-                # No Gaussian heroics here
-                # raw_place_fields = np.divide(self._nspks_in_bin, self._bin_occupancy, where=self._bin_occupancy>self._MIN_OCCUPANCY)
-                # gaussian_filter(raw_place_fields, sigma=[0, 3, 3], output=self._place_fields).shape
+                # Do the Gaussian heroics
+                raw_place_fields = np.divide(self._nspks_in_bin, self._bin_occupancy + self._MIN_OCCUPANCY, \
+                        where=self._bin_occupancy>self._MIN_OCCUPANCY)
+                for unit_id in range(raw_place_fields.shape[0]):
+                    gaussian_filter(self._SMOOTHING_RESCALE_FACTOR * raw_place_fields[unit_id,:,:], sigma=[3.0, 3.0], \
+                            output=self._place_fields[unit_id,:,:])
 
-                np.divide(self._nspks_in_bin, self._bin_occupancy, where=self._bin_occupancy>self._MIN_OCCUPANCY,\
-                        out=self._place_fields)
-                print(self._place_fields)
+                # No Gaussian heroics here
+                # np.divide(self._nspks_in_bin, self._bin_occupancy, where=self._bin_occupancy>self._MIN_OCCUPANCY,\
+                #         out=self._place_fields)
+
+                # Print the peak firing rate for each cell.
+                print(np.max(np.max(raw_place_fields, axis=2), axis=1))
+                print(np.max(np.max(self._place_fields, axis=2), axis=1))
                 occupancy_mask = self._place_fields < self._MIN_PLACE_FIELD_ACTIVATION
                 self._place_fields[occupancy_mask] = self._MIN_PLACE_FIELD_ACTIVATION
 

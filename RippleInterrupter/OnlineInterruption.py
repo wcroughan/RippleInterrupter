@@ -524,8 +524,13 @@ class CommandWindow(QMainWindow):
         load_fields_action.setShortcut('Ctrl+F')
         load_fields_action.triggered.connect(self.loadFields)
 
+        load_ripple_stats_action = QAction('&Ripple Stats', self)
+        load_ripple_stats_action.setStatusTip('Load Ripple Stats from a file')
+        load_ripple_stats_action.triggered.connect(self.loadRippleStats)
+
         open_menu.addAction(load_fields_action)
         open_menu.addAction(load_clusters_action)
+        open_menu.addAction(load_ripple_stats_action)
 
         quit_action = QAction('&Exit', self)
         quit_action.setShortcut('Ctrl+Q')

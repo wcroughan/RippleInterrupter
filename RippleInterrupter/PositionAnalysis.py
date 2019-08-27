@@ -32,14 +32,13 @@ class PositionEstimator(ThreadExtension.StoppableThread):
     __P_MIN_Y = -100
     __P_MAX_X = 1300
     __P_MAX_Y = 1100
+    """
 
     # For Krech Maze
-    """
     __P_MIN_X = 200
     __P_MIN_Y = 200
     __P_MAX_X = 1000
     __P_MAX_Y = 800
-
 
     __P_BIN_SIZE_X = (__P_MAX_X - __P_MIN_X)
     __P_BIN_SIZE_Y = (__P_MAX_Y - __P_MIN_Y)
@@ -106,12 +105,12 @@ class PositionEstimator(ThreadExtension.StoppableThread):
 
         if x_bin < 0:
             x_bin = 0
-        elif x_bin > self._n_bins_x:
+        elif x_bin > self._n_bins_x-1:
             x_bin = self._n_bins_x-1
 
         if y_bin < 0:
             y_bin = 0
-        elif y_bin > self._n_bins_y:
+        elif y_bin > self._n_bins_y-1:
             y_bin = self._n_bins_y-1
         return (x_bin, y_bin)
 
