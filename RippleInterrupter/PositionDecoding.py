@@ -19,10 +19,10 @@ import ThreadExtension
 # decoding windows.
 
 MODULE_IDENTIFIER = "[BayesianEstimator] "
-N_FRAMES_TO_UPDATE = 10
-DECODING_TIME_WINDOW = 0.10
-DECODING_WINDOW_SLIDE = 0.050
+N_FRAMES_TO_UPDATE = 3
+DECODING_TIME_WINDOW = 0.1
 POSTERIOR_BUFFER_SIZE = 10
+POSTERIOR_SMOOTHING_FACTOR = 0.8
 
 class BayesianEstimator(ThreadExtension.StoppableProcess):
     """
@@ -89,6 +89,9 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
         # np.exp(-DECODING_TIME_WINDOW*np.sum(self._most_recent_pf, axis=0), \
         #         out=self._pf_multiplier)
 
+        # Normalize the place field multiplier
+        self._pf_multiplier = self._pf_multiplier / np.sum(self._pf_multiplier)
+
         # print(self._most_recent_pf)
         # print(self._pf_multiplier)
 
@@ -131,8 +134,10 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
                             # what if we initialize this with the last decoded
                             # frame. This might ensure continuity!
                             self._probs_out.append(np.copy(self._pf_multiplier))
+
                             # Doesn't seem to work very well
-                            # self._probs_out.append(np.multiply(self._pf_multiplier, last_decoded_frame))
+                            # self._probs_out.append(np.add(self._pf_multiplier, \
+                            #         POSTERIOR_SMOOTHING_FACTOR * last_decoded_frame))
 
                             self._bin_times.append(self._frame_start + self.time_bin_width * f_idx)
 

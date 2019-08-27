@@ -176,7 +176,8 @@ class GraphicsManager(Process):
     __POSTERIOR_TIMEOUT = 0.5
     __RIPPLE_DETECTION_TIMEOUT = 0.5
     __RIPPLE_SMOOTHING_WINDOW = 2
-    __DECODED_SMOOTHING_COM_FACTOR = 0.5
+    __DECODED_SMOOTHING_COM_FACTOR = 0.8
+    __DECODED_SMOOTHING_POSTERIOR_FACTOR = 0.01
     __MIN_DISPLAY_POSTERIOR = 0.2
 
     def __init__(self, ripple_buffers, calib_plot_buffers, spike_listener, position_estimator, \
@@ -382,6 +383,8 @@ class GraphicsManager(Process):
         self._decoding_lock = threading.Lock()
         if shared_posterior is not None:
             self.prev_CoM = [0.0, 0.0]
+            self.prev_posterior = np.zeros((PositionAnalysis.N_POSITION_BINS[0], \
+                    PositionAnalysis.N_POSITION_BINS[1]), dtype='float')
             self.dec_CoM = np.zeros((PositionDecoding.POSTERIOR_BUFFER_SIZE,2), dtype='float')
             self.peak_posterior = np.zeros(PositionDecoding.POSTERIOR_BUFFER_SIZE, dtype='float')
             self.raw_CoM_grid = np.meshgrid(np.linspace(1,PositionAnalysis.N_POSITION_BINS[1], PositionAnalysis.N_POSITION_BINS[1]), \
@@ -716,20 +719,28 @@ class GraphicsManager(Process):
             """
 
             for dec_idx in range(PositionDecoding.POSTERIOR_BUFFER_SIZE):
-                # Calculate the CoM
-                # Not sure if there is any point in including time data into this as well.
+                # Calculate the CoM without any smoothing
+                # Method 00
                 """
                 self.dec_CoM[dec_idx,0] = np.sum(np.multiply(self._local_posterior_buffer[dec_idx,:,:], \
                         self.raw_CoM_grid[1]))
                 self.dec_CoM[dec_idx,1] = np.sum(np.multiply(self._local_posterior_buffer[dec_idx,:,:], \
                         self.raw_CoM_grid[0]))
                 """
+
+                # Not sure if there is any point in including time data into this as well.
                 self.peak_posterior[dec_idx] = np.max(self._local_posterior_buffer[dec_idx,:,:])
                 if self.peak_posterior[dec_idx] < self.__MIN_DISPLAY_POSTERIOR:
                     self.dec_CoM[dec_idx,0] = float('nan')
                     self.dec_CoM[dec_idx,1] = float('nan')
                     continue
 
+                # Method 02
+                np.add((1.0 - self.__DECODED_SMOOTHING_POSTERIOR_FACTOR) * self._local_posterior_buffer[dec_idx,:,:], \
+                        self.__DECODED_SMOOTHING_POSTERIOR_FACTOR * self.prev_posterior, \
+                        out=self._local_posterior_buffer[dec_idx,:,:])
+
+                # Method 01: Smooth the calculated COM
                 self.dec_CoM[dec_idx,0] = np.sum(np.multiply(self._local_posterior_buffer[dec_idx,:,:], \
                         self.raw_CoM_grid[1])) * (1 - self.__DECODED_SMOOTHING_COM_FACTOR) + \
                         (self.prev_CoM[0] * self.__DECODED_SMOOTHING_COM_FACTOR)
@@ -737,10 +748,18 @@ class GraphicsManager(Process):
                         self.raw_CoM_grid[0])) * (1 - self.__DECODED_SMOOTHING_COM_FACTOR) + \
                         (self.prev_CoM[1] * self.__DECODED_SMOOTHING_COM_FACTOR)
 
-                if ~math.isnan(self.dec_CoM[dec_idx,1]):
+                """
+                # Smooth the calculated posterior
+                self.dec_CoM[dec_idx,0] = np.sum(np.multiply(self._local_posterior_buffer[dec_idx,:,:], \
+                        self.raw_CoM_grid[1]))
+                self.dec_CoM[dec_idx,1] = np.sum(np.multiply(self._local_posterior_buffer[dec_idx,:,:], \
+                        self.raw_CoM_grid[0]))
+                """
+
+                if (not math.isnan(self.dec_CoM[dec_idx,0])) and (not math.isnan(self.dec_CoM[dec_idx,1])):
                     self.prev_CoM[0] = self.dec_CoM[dec_idx,0]
-                if ~math.isnan(self.dec_CoM[dec_idx,1]):
                     self.prev_CoM[1] = self.dec_CoM[dec_idx,1]
+                    np.copyto(self.prev_posterior, self._local_posterior_buffer[dec_idx,:,:])
 
                 # TODO: Maybe add something to discard low probability frames.
 
