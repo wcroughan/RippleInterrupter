@@ -13,6 +13,8 @@ import PositionAnalysis
 import StimHardware
 import ThreadExtension
 
+# Debugging plots
+
 # Size of the decoding window and the window size
 # Cut 1: We are only focusing on behavioral time-scale decoding. There will not
 # be a sliding window. We will just look at the posterior across disjoint
@@ -20,7 +22,7 @@ import ThreadExtension
 
 MODULE_IDENTIFIER = "[BayesianEstimator] "
 N_FRAMES_TO_UPDATE = 4
-DECODING_TIME_WINDOW = 0.2
+DECODING_TIME_WINDOW = 0.05
 POSTERIOR_BUFFER_SIZE = 10
 POSTERIOR_SMOOTHING_FACTOR = 0.8
 MIN_PLACE_CELL_FR = 5.0
@@ -102,8 +104,8 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
         # Remove the contributions in bins that have no firing from any cell..
         # This is a pain to deal with but it otherwise gets a very high
         # probability.
-        np.exp(-DECODING_TIME_WINDOW*np.sum(self._most_recent_pf, axis=0), \
-                out=self._pf_multiplier, where=np.max(self._most_recent_pf, axis=0)>SpikeAnalysis.EPSILON)
+        np.exp(-DECODING_TIME_WINDOW*np.sum(self._most_recent_pf[self._cluster_to_use,:,:], axis=0), \
+                out=self._pf_multiplier, where=np.max(self._most_recent_pf[self._cluster_to_use,:,:], axis=0)>SpikeAnalysis.EPSILON)
         # np.exp(-DECODING_TIME_WINDOW*np.sum(self._most_recent_pf, axis=0), \
         #         out=self._pf_multiplier)
 
@@ -114,14 +116,19 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
         np.multiply(DECODING_TIME_WINDOW, self._most_recent_pf, out=self._most_recent_pf)
 
         # After every N_FRAMES_TO_UPDATE, decoded data is sent out.
+        wall_time_start = time.perf_counter()
         down_time = 0.0
         elapsed_frames = 0
         while not self.req_stop():
             if self._spike_buffer.poll():
                 # Get the next spike
                 (spk_cl, spk_time) = self._spike_buffer.recv()
+                current_time = time.perf_counter() - wall_time_start
                 if spk_cl not in self._cluster_to_use:
                     continue
+                logging.info(MODULE_IDENTIFIER + "Spike received CL:%d [TS]:%d. Frame (%d, %d). Time %.2f"%\
+                        (spk_cl, spk_time, self._frame_start, self._frame_start + self.time_bin_width * POSTERIOR_BUFFER_SIZE,\
+                        current_time))
                 elapsed_frames += 1
 
                 # If the program has just started, reset the frame start time
