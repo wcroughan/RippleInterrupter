@@ -912,23 +912,26 @@ class CommandWindow(QMainWindow):
             print(err)
             return
 
-    def initPlaceFieldThreads(self):
-        """
-        Initialize thread needed for building and visualizing place fields.
-        """
+    def createPlaceFieldThread(self):
         try:
             if self.shared_place_fields is None:
                 self.shared_place_fields = RawArray(ctypes.c_double, self.n_units * PositionAnalysis.N_POSITION_BINS[0] * \
                         PositionAnalysis.N_POSITION_BINS[1])
             self.place_field_handler = SpikeAnalysis.PlaceFieldHandler(self.position_estimator,\
                     self.spike_listener, self.shared_place_fields)
-
-            # Update the active process list
-            self.active_processes.append(self.place_field_handler)
         except Exception as err:
             QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Unable to start Place Field thread(s).')
             print(err)
             return
+
+    def initPlaceFieldThreads(self):
+        """
+        Initialize thread needed for building and visualizing place fields.
+        """
+        self.createPlaceFieldThread()
+
+        # Update the active process list
+        self.active_processes.append(self.place_field_handler)
 
     def initBayesianEstimationThreads(self):
         """
@@ -936,6 +939,11 @@ class CommandWindow(QMainWindow):
         previously built place fields
         """
         try:
+            if self.place_field_handler is None:
+                # Only create the place field handler to load place fields. Do
+                # not activate the process to run in background.
+                self.createPlaceFieldThread()
+
             if self.shared_posterior_buffer is  None:
                 self.shared_posterior_buffer = RawArray(ctypes.c_double, PositionDecoding.POSTERIOR_BUFFER_SIZE * \
                         PositionAnalysis.N_POSITION_BINS[0] * PositionAnalysis.N_POSITION_BINS[1])

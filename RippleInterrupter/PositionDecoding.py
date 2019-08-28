@@ -22,11 +22,11 @@ import ThreadExtension
 
 MODULE_IDENTIFIER = "[BayesianEstimator] "
 N_FRAMES_TO_UPDATE = 4
-DECODING_TIME_WINDOW = 0.02
-POSTERIOR_BUFFER_SIZE = 10
+DECODING_TIME_WINDOW = 0.05
+POSTERIOR_BUFFER_SIZE = 16
 POSTERIOR_SMOOTHING_FACTOR = 0.8
-MIN_PLACE_CELL_FR = 5.0
-MAX_PLACE_CELL_FR = 30.0
+MIN_PLACE_CELL_FR = 1.0
+MAX_PLACE_CELL_FR = 20.0
 
 class BayesianEstimator(ThreadExtension.StoppableProcess):
     """
@@ -118,9 +118,10 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
         # After every N_FRAMES_TO_UPDATE, decoded data is sent out.
         wall_time_start = time.perf_counter()
         down_time = 0.0
-        elapsed_frames = 0
+        elapsed_frames = 0.0
         while not self.req_stop():
             if self._spike_buffer.poll():
+                down_time = 0.0
                 # Get the next spike
                 (spk_cl, spk_time) = self._spike_buffer.recv()
                 current_time = time.perf_counter() - wall_time_start

@@ -174,11 +174,12 @@ class GraphicsManager(Process):
     __N_SUBPLOT_COLS = int(3)
     __MAX_FIRING_RATE = 15.0
     __POSTERIOR_TIMEOUT = 0.1
+    __JUMP_DISTANCE = 4
     __RIPPLE_DETECTION_TIMEOUT = 0.1
     __RIPPLE_SMOOTHING_WINDOW = 2
-    __DECODED_SMOOTHING_COM_FACTOR = 0.5
+    __DECODED_SMOOTHING_COM_FACTOR = 0.1
     __DECODED_SMOOTHING_POSTERIOR_FACTOR = 0.01
-    __MIN_DISPLAY_POSTERIOR = 0.5
+    __MIN_DISPLAY_POSTERIOR = 0.2
 
     def __init__(self, ripple_buffers, calib_plot_buffers, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_thread, ripple_trigger_condition, calib_trigger_condition, \
@@ -760,7 +761,12 @@ class GraphicsManager(Process):
                         self.raw_CoM_grid[0]))
                 """
 
-                if (not math.isnan(self.dec_CoM[dec_idx,0])) and (not math.isnan(self.dec_CoM[dec_idx,1])):
+                # Check for jump distance
+                if (abs(self.dec_CoM[dec_idx,0] - self.prev_CoM[0]) > self.__JUMP_DISTANCE) or \
+                        (abs(self.dec_CoM[dec_idx,1] - self.prev_CoM[1]) > self.__JUMP_DISTANCE):
+                    self.dec_CoM[dec_idx,0] = float('nan')
+                    self.dec_CoM[dec_idx,1] = float('nan')
+                elif (not math.isnan(self.dec_CoM[dec_idx,0])) and (not math.isnan(self.dec_CoM[dec_idx,1])):
                     self.prev_CoM[0] = self.dec_CoM[dec_idx,0]
                     self.prev_CoM[1] = self.dec_CoM[dec_idx,1]
                     # np.copyto(self.prev_posterior, self._local_posterior_buffer[dec_idx,:,:])
@@ -971,7 +977,8 @@ class GraphicsManager(Process):
         if self._dec_ax is None:
             return
 
-        posterior_frame, = self._dec_ax.plot([], [], linestyle='None', marker='o', alpha=0.4, color='red', animated=True)
+        posterior_frame, = self._dec_ax.plot([], [], marker='o', markersize=3, alpha=0.6, \
+                color='red', animated=True)
         self._dec_frame.append(posterior_frame)
         """
         # See the posterior as an image
