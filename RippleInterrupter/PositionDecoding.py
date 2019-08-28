@@ -22,7 +22,7 @@ import ThreadExtension
 
 MODULE_IDENTIFIER = "[BayesianEstimator] "
 N_FRAMES_TO_UPDATE = 4
-DECODING_TIME_WINDOW = 0.05
+DECODING_TIME_WINDOW = 0.02
 POSTERIOR_BUFFER_SIZE = 10
 POSTERIOR_SMOOTHING_FACTOR = 0.8
 MIN_PLACE_CELL_FR = 5.0
@@ -171,7 +171,6 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
                     spike_field_contribution = np.multiply(self._probs_out[self._time_bin], self._most_recent_pf[spk_cl,:,:])
                     np.copyto(self._probs_out[self._time_bin], spike_field_contribution/np.sum(spike_field_contribution))
 
-                    """
                     # Uncomment to spread spikes to neighboring time bins as well
                     if self._time_bin > 1:
                         # Add spike to the previous time bin(s) as well
@@ -188,7 +187,6 @@ class BayesianEstimator(ThreadExtension.StoppableProcess):
 
                         # spike_field_contribution = np.multiply(self._probs_out[self._time_bin+2], self._most_recent_pf[spk_cl,:,:])
                         # np.copyto(self._probs_out[self._time_bin+2], spike_field_contribution/np.sum(spike_field_contribution))
-                    """
                 except IndexError as err:
                     print(MODULE_IDENTIFIER + "Incorrectly accessed posterior matrix at %d"%self._time_bin)
 
