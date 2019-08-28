@@ -129,19 +129,21 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                 np.copyto(self._bin_occupancy, np.reshape(place_field_data['arr_1'], self._bin_occupancy.shape))
 
                 # Do the Gaussian heroics
+                """
                 raw_place_fields = np.divide(self._nspks_in_bin, self._bin_occupancy + self._MIN_OCCUPANCY, \
                         where=self._bin_occupancy>self._MIN_OCCUPANCY)
                 for unit_id in range(raw_place_fields.shape[0]):
                     gaussian_filter(self._SMOOTHING_RESCALE_FACTOR * raw_place_fields[unit_id,:,:], \
                             sigma=[self._FIELD_SMOOTHING_FACTOR, self._FIELD_SMOOTHING_FACTOR], \
                             output=self._place_fields[unit_id,:,:])
+                print(np.max(np.max(raw_place_fields, axis=2), axis=1))
+                """
 
                 # No Gaussian heroics here
-                # np.divide(self._nspks_in_bin, self._bin_occupancy, where=self._bin_occupancy>self._MIN_OCCUPANCY,\
-                #         out=self._place_fields)
+                np.divide(self._nspks_in_bin, self._bin_occupancy, where=self._bin_occupancy>self._MIN_OCCUPANCY,\
+                        out=self._place_fields)
 
                 # Print the peak firing rate for each cell.
-                print(np.max(np.max(raw_place_fields, axis=2), axis=1))
                 print(np.max(np.max(self._place_fields, axis=2), axis=1))
                 occupancy_mask = self._place_fields < self._MIN_PLACE_FIELD_ACTIVATION
                 self._place_fields[occupancy_mask] = self._MIN_PLACE_FIELD_ACTIVATION

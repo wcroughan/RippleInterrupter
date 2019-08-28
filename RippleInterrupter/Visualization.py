@@ -173,12 +173,12 @@ class GraphicsManager(Process):
     __CLUSTERS_TO_PLOT = []
     __N_SUBPLOT_COLS = int(3)
     __MAX_FIRING_RATE = 15.0
-    __POSTERIOR_TIMEOUT = 0.5
-    __RIPPLE_DETECTION_TIMEOUT = 0.5
+    __POSTERIOR_TIMEOUT = 0.1
+    __RIPPLE_DETECTION_TIMEOUT = 0.1
     __RIPPLE_SMOOTHING_WINDOW = 2
-    __DECODED_SMOOTHING_COM_FACTOR = 0.8
+    __DECODED_SMOOTHING_COM_FACTOR = 0.5
     __DECODED_SMOOTHING_POSTERIOR_FACTOR = 0.01
-    __MIN_DISPLAY_POSTERIOR = 0.05
+    __MIN_DISPLAY_POSTERIOR = 0.5
 
     def __init__(self, ripple_buffers, calib_plot_buffers, spike_listener, position_estimator, \
             place_field_handler, ripple_trigger_thread, ripple_trigger_condition, calib_trigger_condition, \
@@ -237,6 +237,8 @@ class GraphicsManager(Process):
         elif n_features_to_show == 5:
             plot_grid = gridspec.GridSpec(3, 2)
             self._geometry = (900, 950)
+        else:
+            self._geometry = (700, 750)
 
         self.toolbar = NavigationToolbar(self.canvas, self.widget)
 
@@ -736,9 +738,11 @@ class GraphicsManager(Process):
                     continue
 
                 # Method 02
+                """
                 np.add((1.0 - self.__DECODED_SMOOTHING_POSTERIOR_FACTOR) * self._local_posterior_buffer[dec_idx,:,:], \
                         self.__DECODED_SMOOTHING_POSTERIOR_FACTOR * self.prev_posterior, \
                         out=self._local_posterior_buffer[dec_idx,:,:])
+                """
 
                 # Method 01: Smooth the calculated COM
                 self.dec_CoM[dec_idx,0] = np.sum(np.multiply(self._local_posterior_buffer[dec_idx,:,:], \
@@ -759,7 +763,7 @@ class GraphicsManager(Process):
                 if (not math.isnan(self.dec_CoM[dec_idx,0])) and (not math.isnan(self.dec_CoM[dec_idx,1])):
                     self.prev_CoM[0] = self.dec_CoM[dec_idx,0]
                     self.prev_CoM[1] = self.dec_CoM[dec_idx,1]
-                    np.copyto(self.prev_posterior, self._local_posterior_buffer[dec_idx,:,:])
+                    # np.copyto(self.prev_posterior, self._local_posterior_buffer[dec_idx,:,:])
 
                 # TODO: Maybe add something to discard low probability frames.
 
