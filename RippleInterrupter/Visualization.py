@@ -611,8 +611,8 @@ class GraphicsManager(Process):
             self._spk_pos_ax.cla()
             self._spk_pos_ax.set_xlabel("x (bin)")
             self._spk_pos_ax.set_ylabel("y (bin)")
-            self._spk_pos_ax.set_xlim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[0]))
-            self._spk_pos_ax.set_ylim((-0.5, 0.5+PositionAnalysis.N_POSITION_BINS[1]))
+            self._spk_pos_ax.set_xlim((0, -0.5+PositionAnalysis.N_POSITION_BINS[0]))
+            self._spk_pos_ax.set_ylim((0, -0.5+PositionAnalysis.N_POSITION_BINS[1]))
             self._spk_pos_ax.grid(True)
 
         if self._dec_ax is not None:
@@ -933,7 +933,7 @@ class GraphicsManager(Process):
             return
 
         spk_frame, = self._spk_pos_ax.plot([], [], linestyle='None', marker='o', \
-                markersize=2, alpha=0.4, animated=True)
+                markersize=4, alpha=0.4, animated=True)
         pos_frame, = self._spk_pos_ax.plot([], [], animated=True)
         vel_frame  = self._spk_pos_ax.text(0.5 * PositionAnalysis.N_POSITION_BINS[0], \
                 0.02 * PositionAnalysis.N_POSITION_BINS[1], 'speed = 0cm/s')

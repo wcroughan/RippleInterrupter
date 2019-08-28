@@ -29,11 +29,11 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
     Class for creating and updating place fields online
     """
     CLASS_IDENTIFIER = "[PlaceFieldHandler] "
-    _FIELD_SMOOTHING_FACTOR = 3
+    _FIELD_SMOOTHING_FACTOR = 1.0
+    _SMOOTHING_RESCALE_FACTOR = 2.0
     _MIN_PLACE_FIELD_ACTIVATION = 0.5 * EPSILON
     _MIN_OCCUPANCY = 0.0000001
     _ALLOWED_TIMESTAMPS_LAG = 12000
-    _SMOOTHING_RESCALE_FACTOR = 36.0
 
     def __init__(self, position_processor, spike_processor, shared_place_fields, write_spike_log=False):
     # def __init__(self, position_processor, spike_processor, place_fields):
@@ -132,7 +132,8 @@ class PlaceFieldHandler(ThreadExtension.StoppableProcess):
                 raw_place_fields = np.divide(self._nspks_in_bin, self._bin_occupancy + self._MIN_OCCUPANCY, \
                         where=self._bin_occupancy>self._MIN_OCCUPANCY)
                 for unit_id in range(raw_place_fields.shape[0]):
-                    gaussian_filter(self._SMOOTHING_RESCALE_FACTOR * raw_place_fields[unit_id,:,:], sigma=[3.0, 3.0], \
+                    gaussian_filter(self._SMOOTHING_RESCALE_FACTOR * raw_place_fields[unit_id,:,:], \
+                            sigma=[self._FIELD_SMOOTHING_FACTOR, self._FIELD_SMOOTHING_FACTOR], \
                             output=self._place_fields[unit_id,:,:])
 
                 # No Gaussian heroics here
