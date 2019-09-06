@@ -7,4 +7,5 @@
 *.swp
 *.trodesClusters
 *.ripple_events
+Data/
 ripple_interruption_out__*.txt

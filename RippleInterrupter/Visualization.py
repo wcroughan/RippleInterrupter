@@ -36,6 +36,7 @@ import PositionAnalysis
 import PositionDecoding
 import RippleDefinitions as RiD
 
+USER_MESSAGE_IDENTIFIER = "[UserMessage] "
 MODULE_IDENTIFIER = "[GraphicsHandler] "
 ANIMATION_INTERVAL = 20
 
@@ -528,10 +529,13 @@ class GraphicsManager(Process):
         self.tetrode_selection.addItems(tetrode_id_strings)
 
     def LogUserMessage(self):
-        pass
+        # TODO: Make sure that hte b
+        user_text = self.user_message.toPlainText()
+        logging.info(USER_MESSAGE_IDENTIFIER + user_text)
+        self.ClearUserMessage()
 
     def ClearUserMessage(self):
-        pass
+        self.user_message.setPlainText("")
 
     # Saving Images
     def saveDisplay(self):
