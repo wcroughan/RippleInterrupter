@@ -34,6 +34,8 @@ def read_cluster_file(filename=None, tetrodes=None):
     if filename is None:
         filename = QtHelperUtils.get_open_file_name(file_format="Cluster File (*.trodesClusters)", \
                 message="Select Cluster file")
+        if not filename:
+            return None
 
     try:
         cluster_tree = ET.parse(filename)

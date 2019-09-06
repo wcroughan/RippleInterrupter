@@ -363,11 +363,11 @@ class RippleDetector(ThreadExtension.StoppableProcess):
                         ripple_unseen_LFP = False
                         # Copy data over for visualization
                         if len(self._local_lfp_buffer) == RiD.LFP_BUFFER_LENGTH:
-                            logging.info(MODULE_IDENTIFIER + "%.2fs: Peak ripple power in frame %.2f"%(curr_time, np.max(self._ripple_power_buffer)))
                             with self._show_trigger:
                                 np.copyto(self._raw_lfp_buffer, np.asarray(self._local_lfp_buffer).T)
                                 np.copyto(self._ripple_power_buffer, np.asarray(self._local_ripple_power_buffer).T)
                                 self._show_trigger.notify()
+                            # logging.debug(MODULE_IDENTIFIER + "%.2fs: Peak ripple power in frame %.2f"%(curr_time, np.max(self._ripple_power_buffer)))
                             if __debug__:
                                 print(MODULE_IDENTIFIER + "%.2fs: Peak ripple power in frame %.2f"%(curr_time, np.max(self._ripple_power_buffer)))
                                 

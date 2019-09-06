@@ -33,6 +33,7 @@ MODULE_IDENTIFIER = "[OnlineInterruption] "
 # User selection choices for what they want to see on the screen
 
 # Configuration for looking at spikes and fields
+"""
 DEFAULT_LFP_CHOICE      = False
 DEFAULT_SPIKES_CHOICE   = True
 DEFAULT_POSITION_CHOICE = True
@@ -40,16 +41,15 @@ DEFAULT_FIELD_CHOICE    = True
 DEFAULT_STIMULATION_CHOICE = False
 DEFAULT_CALIBRATION_CHOICE = False
 DEFAULT_BAYESIAN_CHOICE = True
+"""
 
 # Configuration for LFP and adjusting
-"""
 DEFAULT_LFP_CHOICE      = True
 DEFAULT_SPIKES_CHOICE   = False
 DEFAULT_POSITION_CHOICE = False
 DEFAULT_FIELD_CHOICE    = False
 DEFAULT_STIMULATION_CHOICE = False
 DEFAULT_CALIBRATION_CHOICE = False
-"""
 
 # Choices in functionality
 DEFAULT_SERIAL_ENABLED = False
@@ -764,11 +764,14 @@ class CommandWindow(QMainWindow):
             if self.tetrodes_of_interest is None:
                 self.tetrodes_of_interest = list(self.cluster_identity_map.keys())
         else:
-            print("Warning: Unable to read cluster file. Using default map.")
-            self.n_units = 1
+            logging.info(MODULE_IDENTIFIER + "Unable to read cluster file. Using default map [64 tetrodes].")
+            print("Using default cluster map.")
+            self.n_units = 64
             self.cluster_identity_map = dict()
-            self.cluster_identity_map[2] = {1: 0}
-            self.cluster_identity_map[14] = {}
+            self.tetrodes_of_interest = list()
+            for tet_idx in range(1,65):
+                self.cluster_identity_map[tet_idx] = {0: tet_idx-1}
+                self.tetrodes_of_interest.append(tet_idx)
 
         if __debug__:
             QtHelperUtils.display_information(MODULE_IDENTIFIER + 'Read cluster identity map.')

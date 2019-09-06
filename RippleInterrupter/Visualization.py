@@ -787,6 +787,7 @@ class GraphicsManager(Process):
         Fetch raw LFP data and ripple power data.
         """
         logging.info(MODULE_IDENTIFIER + "Ripple frame pipe opened.")
+        ripple_triggered = False
         while self._keep_running.is_set():
             with self._lfp_lock:
                 with self._ripple_trigger_condition:
@@ -794,7 +795,8 @@ class GraphicsManager(Process):
                     if ripple_triggered:
                         np.copyto(self._local_lfp_buffer, self._shared_raw_lfp_buffer)
                         np.copyto(self._local_ripple_power_buffer, self._shared_ripple_power_buffer)
-                logging.info(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
+                if ripple_triggered:
+                    logging.info(MODULE_IDENTIFIER + "Peak ripple power in frame %.2f"%np.max(self._shared_ripple_power_buffer))
             time.sleep(self.__RIPPLE_DETECTION_TIMEOUT)
         logging.info(MODULE_IDENTIFIER + "Ripple frame pipe closed.")
 
