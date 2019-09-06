@@ -390,8 +390,8 @@ class GraphicsManager(Process):
                     PositionAnalysis.N_POSITION_BINS[1]), dtype='float')
             self.dec_CoM = np.zeros((PositionDecoding.POSTERIOR_BUFFER_SIZE,2), dtype='float')
             self.peak_posterior = np.zeros(PositionDecoding.POSTERIOR_BUFFER_SIZE, dtype='float')
-            self.raw_CoM_grid = np.meshgrid(np.linspace(1,PositionAnalysis.N_POSITION_BINS[1], PositionAnalysis.N_POSITION_BINS[1]), \
-                    np.linspace(1,PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[0]))
+            self.raw_CoM_grid = np.meshgrid(np.linspace(0,PositionAnalysis.N_POSITION_BINS[1]-1, PositionAnalysis.N_POSITION_BINS[1]), \
+                    np.linspace(0,PositionAnalysis.N_POSITION_BINS[0]-1, PositionAnalysis.N_POSITION_BINS[0]))
             self._shared_posterior = np.reshape(np.frombuffer(shared_posterior, dtype='double'), \
                 (PositionDecoding.POSTERIOR_BUFFER_SIZE, PositionAnalysis.N_POSITION_BINS[0], PositionAnalysis.N_POSITION_BINS[1]))
             self._thread_list.append(threading.Thread(name="PosteriorFetcher", daemon=True, \

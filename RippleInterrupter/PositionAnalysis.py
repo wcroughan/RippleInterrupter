@@ -27,7 +27,6 @@ class PositionEstimator(ThreadExtension.StoppableThread):
 
     # Min/Max position values in x and y to be used for binning
     # For Open Field
-    """
     __P_MIN_X = 100
     __P_MIN_Y = -100
     __P_MAX_X = 1300
@@ -39,6 +38,7 @@ class PositionEstimator(ThreadExtension.StoppableThread):
     __P_MIN_Y = 200
     __P_MAX_X = 1000
     __P_MAX_Y = 800
+    """
 
     __P_BIN_SIZE_X = (__P_MAX_X - __P_MIN_X)
     __P_BIN_SIZE_Y = (__P_MAX_Y - __P_MIN_Y)
