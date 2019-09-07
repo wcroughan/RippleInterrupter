@@ -331,6 +331,10 @@ class CommandWindow(QMainWindow):
             if saved_file:
                 self.statusBar().showMessage("Display snapshot saved to disk")
 
+    def saveAdjustingLog(self):
+        if self.graphical_interface is not None:
+            self.graphical_interface.autosaveAdjustingLog()
+
     def saveRippleStats(self):
         if self.ripple_detector is not None:
             # Save the current ripple stats to file
@@ -453,14 +457,17 @@ class CommandWindow(QMainWindow):
 
     # Setting plot areas
     def showBrainAtlas(self):
-        user_response, coordinates, view_selection = QtHelperUtils.BrainCoordinateWidget().exec_()
-        if user_response == QDialog.Accepted:
-            if 0 in view_selection:
-                self.brain_atlas.getCoronalImage(*coordinates)
-            if 1 in view_selection:
-                self.brain_atlas.getSagittalImage(*coordinates)
-            if 2 in view_selection:
-                self.brain_atlas.getHorizontalImage(*coordinates)
+        if self.graphical_interface is not None:
+            self.graphical_interface.showTetrodeInBrain()
+        else:
+            user_response, coordinates, view_selection = QtHelperUtils.BrainCoordinateWidget().exec_()
+            if user_response == QDialog.Accepted:
+                if 0 in view_selection:
+                    self.brain_atlas.getCoronalImage(*coordinates)
+                if 1 in view_selection:
+                    self.brain_atlas.getSagittalImage(*coordinates)
+                if 2 in view_selection:
+                    self.brain_atlas.getHorizontalImage(*coordinates)
 
     def plotBayesianEstimate(self):
         QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
@@ -513,6 +520,10 @@ class CommandWindow(QMainWindow):
         save_display_snapshot_action.triggered.connect(self.saveDisplaySnapshot)
         save_display_snapshot_action.setShortcut('Ctrl+S')
 
+        save_adjusting_log_action = QAction('&Adjusting', self)
+        save_adjusting_log_action.setStatusTip('Save current adjusting coordinates')
+        save_adjusting_log_action.triggered.connect(self.saveAdjustingLog)
+
         save_ripple_stats_action = QAction('&Ripple Stats', self)
         save_ripple_stats_action.setStatusTip('Save current SWR stats to file')
         save_ripple_stats_action.triggered.connect(self.saveRippleStats)
@@ -526,6 +537,7 @@ class CommandWindow(QMainWindow):
         save_bayesian_decoding_action.triggered.connect(self.saveBayesianDecoding)
 
         save_menu.addAction(save_display_snapshot_action)
+        save_menu.addAction(save_adjusting_log_action)
         save_menu.addAction(save_ripple_stats_action)
         save_menu.addAction(save_place_fields_action)
         save_menu.addAction(save_bayesian_decoding_action)
@@ -561,6 +573,7 @@ class CommandWindow(QMainWindow):
         plot_brain_atlas = output_menu.addAction('Brain &Atlas')
         plot_brain_atlas.setStatusTip('Show tetrode position in Brain Atlas')
         plot_brain_atlas.triggered.connect(self.showBrainAtlas)
+        plot_brain_atlas.setShortcut('Ctrl+A')
 
         plot_bayesian_estimate = output_menu.addAction('&Bayesian Estimate')
         plot_bayesian_estimate.setStatusTip('Plot bayesian estimate')

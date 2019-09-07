@@ -17,7 +17,7 @@ LINE_WIDTH = 2
 # Set the default coordinates to what you would use for hippocampus.
 DEFAULT_ML_COORDINATE = 2.7
 DEFAULT_AP_COORDINATE = -4.3
-DEFAULT_DV_COORDINATE = 0
+DEFAULT_DV_COORDINATE = 1.5
 ENCODING_SCHEME = 'utf-8'
 
 def fetchImage(image_url):

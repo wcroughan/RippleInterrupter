@@ -115,6 +115,7 @@ class BrainCoordinateWidget(QDialog):
         # ML data entry
         ml_label = QLabel("ML")
         self.ml_data = QLineEdit(self)
+        self.ml_data.setText(str(ml))
         ml_layout = QHBoxLayout()
         ml_layout.addWidget(ml_label)
         ml_layout.addWidget(self.ml_data)
@@ -122,6 +123,7 @@ class BrainCoordinateWidget(QDialog):
         # AP data entry
         ap_label = QLabel("AP")
         self.ap_data = QLineEdit(self)
+        self.ap_data.setText(str(ap))
         ap_layout = QHBoxLayout()
         ap_layout.addWidget(ap_label)
         ap_layout.addWidget(self.ap_data)
@@ -129,12 +131,15 @@ class BrainCoordinateWidget(QDialog):
         # DV data entry
         dv_label = QLabel("DV")
         self.dv_data = QLineEdit(self)
+        self.dv_data.setText(str(dv))
         dv_layout = QHBoxLayout()
         dv_layout.addWidget(dv_label)
         dv_layout.addWidget(self.dv_data)
 
         # View selection - Checkboxes
+        # Also have the coronal view be selected by default
         coronal_view = QCheckBox("Coronal", self)
+        coronal_view.setChecked(True)
         sagittal_view = QCheckBox("Sagittal", self)
         horizontal_view = QCheckBox("Horizontal", self)
         self.views = list()

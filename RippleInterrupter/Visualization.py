@@ -30,6 +30,9 @@ from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QGridLayout, QComboBox
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 
 # Local Imports
+import BrainAtlas
+import AdjustingLog
+import QtHelperUtils
 import Configuration
 import RippleAnalysis
 import PositionAnalysis
@@ -39,6 +42,7 @@ import RippleDefinitions as RiD
 USER_MESSAGE_IDENTIFIER = "[UserMessage] "
 MODULE_IDENTIFIER = "[GraphicsHandler] "
 ANIMATION_INTERVAL = 20
+SET_MODE_ADJUSTING = True
 
 def normalizeData(in_data):
     # TODO: Might need tiling of data if there are multiple dimensions
@@ -291,6 +295,10 @@ class GraphicsManager(Process):
         self.log_message.clicked.connect(self.LogUserMessage)
         self.clear_message.clicked.connect(self.ClearUserMessage)
 
+        # Brain Atlas interface
+        self.brain_atlas = BrainAtlas.WebAtlas()
+        self.adjusting_log = None
+
         # self.unit_selection.currentIndexChanged.connect(self.refresh)
         # Add next and prev buttons to look at individual cells.
         self.next_unit_button = QPushButton('Next')
@@ -538,8 +546,34 @@ class GraphicsManager(Process):
         self.initSpikeDeque()
 
     def setTetrodeList(self, tetrode_list):
+        # Start a new adjusting log for this tetrode list.
+        # TODO: Do the log stuff only if we are actively adjusting.
+        if SET_MODE_ADJUSTING:
+            self.adjusting_log = AdjustingLog.TetrodeLog(tetrode_list)
         tetrode_id_strings = [str(tet_id) for tet_id in tetrode_list]
         self.tetrode_selection.addItems(tetrode_id_strings)
+
+    def autosaveAdjustingLog(self):
+        if self.adjusting_log is not None:
+            logfile_name = time.strftime("AutoSave__AdjustingLog_%Y%m%d_%H%M%S.json") 
+            self.adjusting_log.writeDataFile(logfile_name)
+        else:
+            QtHelperUtils.display_warning("Adjusting log not initialized.")
+
+    def showTetrodeInBrain(self):
+        if self.adjusting_log is not None:
+            default_coordinates = self.adjusting_log.getCoordinates(int(self.tetrode_selection.currentText()))
+        else:
+            default_coordinates = list()
+
+        user_response, coordinates, view_selection = QtHelperUtils.BrainCoordinateWidget(*default_coordinates).exec_()
+        if user_response == QDialog.Accepted:
+            if 0 in view_selection:
+                self.brain_atlas.getCoronalImage(*coordinates)
+            if 1 in view_selection:
+                self.brain_atlas.getSagittalImage(*coordinates)
+            if 2 in view_selection:
+                self.brain_atlas.getHorizontalImage(*coordinates)
 
     def LogUserMessage(self):
         properties_tag = " -"
@@ -557,6 +591,11 @@ class GraphicsManager(Process):
         logging.info(USER_MESSAGE_IDENTIFIER + user_text + " [Tags:" + \
                 "T" + self.tetrode_selection.currentText() + properties_tag + "] " + \
                 tetrode_adjustment)
+
+        # If adjusting, update the tetrode's current position
+        if self.adjusting_log is not None:
+            self.adjusting_log.updateDepth(int(self.tetrode_selection.currentText()), \
+                    float(tetrode_adjustment))
         self.ClearUserMessage()
 
     def ClearUserMessage(self):
@@ -1055,4 +1094,5 @@ class GraphicsManager(Process):
         # Join all the fetcher threads.
         for p__thread in self._thread_list:
             p__thread.join()
+
         logging.info(MODULE_IDENTIFIER + "Terminated GUI and display pipes")
