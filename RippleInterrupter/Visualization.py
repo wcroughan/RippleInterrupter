@@ -560,6 +560,10 @@ class GraphicsManager(Process):
         self.ClearUserMessage()
 
     def ClearUserMessage(self):
+        self.cortical_activity_checkbox.setChecked(False):
+        self.white_matter_checkbox.setChecked(False):
+        self.sharp_wave_ripple_checkbox.setChecked(False):
+        self.hippocampal_cells_checkbox.setChecked(False):
         self.user_message.setPlainText("")
 
     # Saving Images
