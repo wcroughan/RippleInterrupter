@@ -56,7 +56,8 @@ class LFPListener(ThreadExtension.StoppableThread):
         if sg_client is not None:
             self._lfp_stream = sg_client.subscribeLFPData(TrodesInterface.LFP_SUBSCRIPTION_ATTRIBUTE, \
                     self._target_tetrodes)
-            self._lfp_stream.initialize()
+            init_success = self._lfp_stream.initialize()
+            # print(init_success)
             self._lfp_buffer = self._lfp_stream.create_numpy_array()
             logging.info(self.CLASS_IDENTIFIER + "Started LFP listener thread.")
         else:

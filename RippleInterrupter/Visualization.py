@@ -41,7 +41,7 @@ import RippleDefinitions as RiD
 
 USER_MESSAGE_IDENTIFIER = "[UserMessage] "
 MODULE_IDENTIFIER = "[GraphicsHandler] "
-FORCE_IMAGE_DISPLAY = False
+FORCE_IMAGE_DISPLAY = True
 ANIMATION_INTERVAL = 20
 SET_MODE_ADJUSTING = True
 
