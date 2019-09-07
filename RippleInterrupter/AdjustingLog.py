@@ -34,36 +34,65 @@ class TetrodeLog(object):
         if not data_loaded:
             print(MODULE_IDENTIFIER + "Starting entries at default value.")
             for t_num in self._tetrode_list:
-                self._current_placement[t_num] = [BrainAtlas.DEFAULT_ML_COORDINATE, \
+                t_str = str(t_num)
+                self._current_placement[t_str] = dict()
+                self._current_placement[t_str]['coord'] = [BrainAtlas.DEFAULT_ML_COORDINATE, \
                         BrainAtlas.DEFAULT_AP_COORDINATE, BrainAtlas.DEFAULT_DV_COORDINATE]
+                # Ideally we would want to keep this as a set but that is not
+                # writable to a JSON file directly.
+                self._current_placement[t_str]['tags'] = list()
+                self._current_placement[t_str]['messages'] = list()
 
     def getCoordinates(self, tetrode):
         """
         Get the current coordinates for a tetrode.
         """
+        if not self.tetrodeExists(tetrode):
+            return
+
+        return self._current_placement[tetrode]['coord']
+
+    def tetrodeExists(self, tetrode):
         if tetrode not in self._current_placement:
             logging.warning(MODULE_IDENTIFIER + "Tetrode not found in current placement entry.")
             print(MODULE_IDENTIFIER + "Couldn't find tetrode %d in database"%tetrode)
             # TODO: Maybe add a new entry for this in the future
+            return False
+        return True
+
+    def getTags(self, tetrode):
+        if not self.tetrodeExists(tetrode):
             return
 
-        return self._current_placement[tetrode]
+        return self._current_placement[tetrode]['tags']
+
+    def addTags(self, tetrode, new_tags):
+        if not self.tetrodeExists(tetrode):
+            return
+
+        for nt in new_tags:
+            if nt not in self._current_placement[tetrode]['tags']:
+                self._current_placement[tetrode]['tags'].append(nt)
+
+    def addMessage(self, tetrode, new_message):
+        if not self.tetrodeExists(tetrode):
+            return
+
+        self._current_placement[tetrode]['messages'].append(new_message)
 
     def updateDepth(self, tetrode, adjustment):
         """
         Update the depth of a given tetrode by the adjustment amount.
         """
-        if tetrode not in self._current_placement:
-            logging.warning(MODULE_IDENTIFIER + "Tetrode not found in current placement entry.")
-            print(MODULE_IDENTIFIER + "Couldn't find tetrode %d in database"%tetrode)
-            # TODO: Maybe add a new entry for this in the future
+        if not self.tetrodeExists(tetrode):
             return
-        initial_tetrode_depth = self._current_placement[tetrode][2]
-        self._current_placement[tetrode][2] += adjustment * TURN_MULTIPLICATION_FACTOR
-        logging.info(MODULE_IDENTIFIER + "T%d %.2f -> %.2f"%(tetrode, initial_tetrode_depth, \
-                self._current_placement[tetrode][2]))
-        print(MODULE_IDENTIFIER + "T%d %.2f -> %.2f"%(tetrode, initial_tetrode_depth, \
-                self._current_placement[tetrode][2]))
+
+        initial_tetrode_depth = self._current_placement[tetrode]['coord'][2]
+        self._current_placement[tetrode]['coord'][2] += adjustment * TURN_MULTIPLICATION_FACTOR
+        logging.info(MODULE_IDENTIFIER + "T%s %.2f -> %.2f"%(tetrode, initial_tetrode_depth, \
+                self._current_placement[tetrode]['coord'][2]))
+        print(MODULE_IDENTIFIER + "T%s %.2f -> %.2f"%(tetrode, initial_tetrode_depth, \
+                self._current_placement[tetrode]['coord'][2]))
 
     def writeDataFile(self, output_filename=None):
         """
@@ -81,7 +110,8 @@ class TetrodeLog(object):
                 json.dump(self._current_placement, output_file, indent=4, \
                         sort_keys=True, separators=(',', ': '))
                 output_file.close()
-            logging.info(MODULE_IDENTIFIER + "Log written to %s"output_filename)
+            logging.info(MODULE_IDENTIFIER + "Log written to %s"%output_filename)
+            print(MODULE_IDENTIFIER + "Log written to %s"%output_filename)
         except Exception as err:
             logging.error(MODULE_IDENTIFIER + "Unable to write data to file.")
             print(err)
@@ -100,7 +130,8 @@ class TetrodeLog(object):
 
         try:
             with open(data_filename, 'r') as data_file:
-                self._current_placement = json.loads(data_file)
+                self._current_placement = json.load(data_file)
+                # print(self._current_placement)
             # TODO: Check that all the tetrodes in the current list are there in this database
             data_loaded = True
         except Exception as err:

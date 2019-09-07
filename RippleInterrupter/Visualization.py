@@ -308,7 +308,8 @@ class GraphicsManager(Process):
 
         # Selecting individual tetrodes
         self.tetrode_selection = QComboBox()
-        # self.tetrode_selection.currentIndexChanged.connect(self.refresh)
+        self.tetrode_selection.currentIndexChanged.connect(self.ClearUserMessage)
+
         # Add next and prev buttons to look at individual cells.
         self.next_tet_button = QPushButton('Next')
         self.next_tet_button.clicked.connect(self.NextTetrode)
@@ -560,11 +561,16 @@ class GraphicsManager(Process):
         else:
             QtHelperUtils.display_warning("Adjusting log not initialized.")
 
-    def showTetrodeInBrain(self):
+    def showTetrodeInBrain(self, force=False):
         if self.adjusting_log is not None:
-            default_coordinates = self.adjusting_log.getCoordinates(int(self.tetrode_selection.currentText()))
+            default_coordinates = self.adjusting_log.getCoordinates(self.tetrode_selection.currentText())
         else:
             default_coordinates = list()
+
+        if force:
+            if default_coordinates:
+                self.brain_atlas.getCoronalImage(*default_coordinates)
+            return
 
         user_response, coordinates, view_selection = QtHelperUtils.BrainCoordinateWidget(*default_coordinates).exec_()
         if user_response == QDialog.Accepted:
@@ -577,14 +583,19 @@ class GraphicsManager(Process):
 
     def LogUserMessage(self):
         properties_tag = " -"
+        tag_list = list()
         if self.cortical_activity_checkbox.isChecked():
             properties_tag += "C"
+            tag_list.append('C')
         if self.white_matter_checkbox.isChecked():
             properties_tag += "W"
+            tag_list.append('W')
         if self.sharp_wave_ripple_checkbox.isChecked():
             properties_tag += "S"
+            tag_list.append('S')
         if self.hippocampal_cells_checkbox.isChecked():
             properties_tag += "H"
+            tag_list.append('H')
         properties_tag += "-"
         tetrode_adjustment = self.adjusting_dist.text()
         user_text = self.user_message.toPlainText()
@@ -594,16 +605,42 @@ class GraphicsManager(Process):
 
         # If adjusting, update the tetrode's current position
         if self.adjusting_log is not None:
-            self.adjusting_log.updateDepth(int(self.tetrode_selection.currentText()), \
+            self.adjusting_log.updateDepth(self.tetrode_selection.currentText(), \
                     float(tetrode_adjustment))
+            self.adjusting_log.addTags(self.tetrode_selection.currentText(), \
+                    tag_list)
+            self.adjusting_log.addMessage(self.tetrode_selection.currentText(), \
+                    time.strftime('[%Y.%m.%d %H:%M:%S] ' + tetrode_adjustment + ' ' +  user_text))
         self.ClearUserMessage()
 
     def ClearUserMessage(self):
-        self.cortical_activity_checkbox.setChecked(False)
-        self.white_matter_checkbox.setChecked(False)
-        self.sharp_wave_ripple_checkbox.setChecked(False)
-        self.hippocampal_cells_checkbox.setChecked(False)
+        if self.adjusting_log is not None:
+            current_tags = self.adjusting_log.getTags(self.tetrode_selection.currentText())
+        else:
+            current_tags = []
+
+        if 'C' in current_tags:
+            self.cortical_activity_checkbox.setChecked(True)
+        else:
+            self.cortical_activity_checkbox.setChecked(False)
+
+        if 'W' in current_tags:
+            self.white_matter_checkbox.setChecked(True)
+        else:
+            self.white_matter_checkbox.setChecked(False)
+
+        if 'S' in current_tags:
+            self.sharp_wave_ripple_checkbox.setChecked(True)
+        else:
+            self.sharp_wave_ripple_checkbox.setChecked(False)
+
+        if 'H' in current_tags:
+            self.hippocampal_cells_checkbox.setChecked(True)
+        else:
+            self.hippocampal_cells_checkbox.setChecked(False)
+
         self.user_message.setPlainText("")
+        self.showTetrodeInBrain(force=True)
 
     # Saving Images
     def saveDisplay(self):

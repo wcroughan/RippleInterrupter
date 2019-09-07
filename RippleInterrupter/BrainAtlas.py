@@ -58,13 +58,13 @@ class WebAtlas(object):
         the image does the specified coordinate lie.
         """
         url_data = self.queryServer(ml, ap, dv)
-        coronal_image = fetchImage(url_data['coronal']['image_url'])
+        coronal_image = fetchImage(url_data['coronal']['image_url']).convert('RGB')
         coordinates = (url_data['coronal']['left'], url_data['coronal']['top'])
         if show:
             placement = Draw(coronal_image)
-            # placement.line([(coordinates[0], IMAGE_TOP), coordinates], fill=LINE_COLOR, width=LINE_WIDTH)
+            placement.line([(coordinates[0], IMAGE_TOP), coordinates], fill=(255, 0, 0), width=LINE_WIDTH)
             # TODO: Coloring breaks the drawing
-            placement.line([(coordinates[0], IMAGE_TOP), coordinates])
+            # placement.line([(coordinates[0], IMAGE_TOP), coordinates])
             coronal_image.show()
         return (coronal_image, coordinates)
 
@@ -78,8 +78,8 @@ class WebAtlas(object):
         coordinates = (url_data['coronal']['left'], url_data['coronal']['top'])
         if show:
             placement = Draw(sagittal_image)
-            # placement.line([(coordinates[0], IMAGE_TOP), coordinates], fill=LINE_COLOR, width=LINE_WIDTH)
-            placement.line([(coordinates[0], IMAGE_TOP), coordinates])
+            # placement.line([(coordinates[0], IMAGE_TOP), coordinates], fill=(0, 0, 225), width=LINE_WIDTH)
+            placement.line([(coordinates[0], IMAGE_TOP), coordinates], fill=0)
             sagittal_image.show()
         return (sagittal_image, coordinates)
 
