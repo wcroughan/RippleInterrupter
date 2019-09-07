@@ -46,6 +46,9 @@ class WebAtlas(object):
 
     def __init__(self):
         self._url_base = "http://labs.gaidi.ca/rat-brain-atlas/api.php?"
+        self.coronal_image = None
+        self.sagittal_image = None
+        self.horizontal_image = None
 
     def fetchCoordinatesAndShowImage(self):
         # Open a dialog box to get the correct corrdinates and show the
@@ -58,15 +61,15 @@ class WebAtlas(object):
         the image does the specified coordinate lie.
         """
         url_data = self.queryServer(ml, ap, dv)
-        coronal_image = fetchImage(url_data['coronal']['image_url']).convert('RGB')
+        self.coronal_image = fetchImage(url_data['coronal']['image_url']).convert('RGB')
         coordinates = (url_data['coronal']['left'], url_data['coronal']['top'])
         if show:
-            placement = Draw(coronal_image)
+            placement = Draw(self.coronal_image)
             placement.line([(coordinates[0], IMAGE_TOP), coordinates], fill=(255, 0, 0), width=LINE_WIDTH)
             # TODO: Coloring breaks the drawing
             # placement.line([(coordinates[0], IMAGE_TOP), coordinates])
-            coronal_image.show()
-        return (coronal_image, coordinates)
+            self.coronal_image.show(title="%2.2fum"%dv)
+        return (self.coronal_image, coordinates)
 
     def getSagittalImage(self, ml, ap, dv, show=True):
         """
@@ -74,14 +77,14 @@ class WebAtlas(object):
         the image does the specified coordinate lie.
         """
         url_data = self.queryServer(ml, ap, dv)
-        sagittal_image = fetchImage(url_data['sagittal']['image_url'])
-        coordinates = (url_data['coronal']['left'], url_data['coronal']['top'])
+        self.sagittal_image = fetchImage(url_data['sagittal']['image_url'])
+        coordinates = (url_data['sagittal']['left'], url_data['sagittal']['top'])
         if show:
-            placement = Draw(sagittal_image)
+            placement = Draw(self.sagittal_image)
             # placement.line([(coordinates[0], IMAGE_TOP), coordinates], fill=(0, 0, 225), width=LINE_WIDTH)
             placement.line([(coordinates[0], IMAGE_TOP), coordinates], fill=0)
-            sagittal_image.show()
-        return (sagittal_image, coordinates)
+            self.sagittal_image.show()
+        return (self.sagittal_image, coordinates)
 
     def getHorizontalImage(self, ml, ap, dv, show=True):
         """
@@ -89,13 +92,13 @@ class WebAtlas(object):
         the image does the specified coordinate lie.
         """
         url_data = self.queryServer(ml, ap, dv)
-        horizontal_image = fetchImage(url_data['horizontal']['image_url'])
-        coordinates = (url_data['coronal']['left'], url_data['coronal']['top'])
+        self.horizontal_image = fetchImage(url_data['horizontal']['image_url'])
+        coordinates = (url_data['horizontal']['left'], url_data['horizontal']['top'])
         if show:
-            placement = Draw(horizontal_image)
+            placement = Draw(self.horizontal_image)
             placement.point([coordinates])
-            horizontal_image.show()
-        return (horizontal_image, coordinates)
+            self.horizontal_image.show()
+        return (self.horizontal_image, coordinates)
 
     def queryServer(self, ml=DEFAULT_ML_COORDINATE, ap=DEFAULT_AP_COORDINATE, dv=DEFAULT_DV_COORDINATE):
         """

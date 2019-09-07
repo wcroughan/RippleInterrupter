@@ -41,6 +41,7 @@ import RippleDefinitions as RiD
 
 USER_MESSAGE_IDENTIFIER = "[UserMessage] "
 MODULE_IDENTIFIER = "[GraphicsHandler] "
+FORCE_IMAGE_DISPLAY = False
 ANIMATION_INTERVAL = 20
 SET_MODE_ADJUSTING = True
 
@@ -640,7 +641,8 @@ class GraphicsManager(Process):
             self.hippocampal_cells_checkbox.setChecked(False)
 
         self.user_message.setPlainText("")
-        self.showTetrodeInBrain(force=True)
+        self.adjusting_dist.clear()
+        self.showTetrodeInBrain(force=FORCE_IMAGE_DISPLAY)
 
     # Saving Images
     def saveDisplay(self):
