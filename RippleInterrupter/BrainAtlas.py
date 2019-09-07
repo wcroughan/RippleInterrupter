@@ -5,11 +5,15 @@ might be interested in.
 
 from urllib.request import urlopen
 from PIL import Image
+from PIL.ImageDraw import Draw
 import io
 import json
 import logging
 
 MODULE_IDENTIFIER = "[BrainAtlas] "
+IMAGE_TOP = 50
+LINE_COLOR = (0, 255, 0)
+LINE_WIDTH = 2
 # Set the default coordinates to what you would use for hippocampus.
 DEFAULT_ML_COORDINATE = 2.7
 DEFAULT_AP_COORDINATE = -4.3
@@ -57,6 +61,10 @@ class WebAtlas(object):
         coronal_image = fetchImage(url_data['coronal']['image_url'])
         coordinates = (url_data['coronal']['left'], url_data['coronal']['top'])
         if show:
+            placement = Draw(coronal_image)
+            # placement.line([(coordinates[0], IMAGE_TOP), coordinates], fill=LINE_COLOR, width=LINE_WIDTH)
+            # TODO: Coloring breaks the drawing
+            placement.line([(coordinates[0], IMAGE_TOP), coordinates])
             coronal_image.show()
         return (coronal_image, coordinates)
 
@@ -69,6 +77,9 @@ class WebAtlas(object):
         sagittal_image = fetchImage(url_data['sagittal']['image_url'])
         coordinates = (url_data['coronal']['left'], url_data['coronal']['top'])
         if show:
+            placement = Draw(sagittal_image)
+            # placement.line([(coordinates[0], IMAGE_TOP), coordinates], fill=LINE_COLOR, width=LINE_WIDTH)
+            placement.line([(coordinates[0], IMAGE_TOP), coordinates])
             sagittal_image.show()
         return (sagittal_image, coordinates)
 
@@ -81,6 +92,8 @@ class WebAtlas(object):
         horizontal_image = fetchImage(url_data['horizontal']['image_url'])
         coordinates = (url_data['coronal']['left'], url_data['coronal']['top'])
         if show:
+            placement = Draw(horizontal_image)
+            placement.point([coordinates])
             horizontal_image.show()
         return (horizontal_image, coordinates)
 
