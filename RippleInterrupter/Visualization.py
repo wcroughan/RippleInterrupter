@@ -25,7 +25,7 @@ import matplotlib.animation as animation
 
 # Creating windows using PyQt
 from PyQt5.QtWidgets import QMainWindow, QAction, qApp, QApplication, QDialog, QFileDialog, QMessageBox
-from PyQt5.QtWidgets import QPushButton, QSlider, QRadioButton, QLabel, QInputDialog, QTextEdit
+from PyQt5.QtWidgets import QPushButton, QSlider, QRadioButton, QLabel, QInputDialog, QTextEdit, QLineEdit, QCheckBox
 from PyQt5.QtWidgets import QHBoxLayout, QVBoxLayout, QGridLayout, QComboBox
 from PyQt5.QtCore import QThread, pyqtSignal, Qt
 
@@ -281,6 +281,11 @@ class GraphicsManager(Process):
         self.unit_selection = QComboBox()
         self.user_message = QTextEdit()
         self.user_message.resize(300, 100)
+        self.adjusting_dist = QLineEdit()
+        self.cortical_activity_checkbox = QCheckBox("Cortex")
+        self.white_matter_checkbox = QCheckBox("White Matter")
+        self.sharp_wave_ripple_checkbox = QCheckBox("SWR")
+        self.hippocampal_cells_checkbox = QCheckBox("HPC")
         self.log_message = QPushButton('Log')
         self.clear_message = QPushButton('Clear')
         self.log_message.clicked.connect(self.LogUserMessage)
@@ -489,8 +494,15 @@ class GraphicsManager(Process):
         vbox_tetrode_buttons.addWidget(self.prev_tet_button)
 
         # Add a block for user to add comments
+        checkbox_selection = QVBoxLayout()
+        checkbox_selection.addWidget(self.cortical_activity_checkbox)
+        checkbox_selection.addWidget(self.white_matter_checkbox)
+        checkbox_selection.addWidget(self.sharp_wave_ripple_checkbox)
+        checkbox_selection.addWidget(self.hippocampal_cells_checkbox)
+
         message_button_box = QHBoxLayout()
         message_button_box.addStretch(1)
+        message_button_box.addWidget(self.adjusting_dist)
         message_button_box.addWidget(self.log_message)
         message_button_box.addWidget(self.clear_message)
         message_button_box.addStretch(1)
@@ -502,6 +514,7 @@ class GraphicsManager(Process):
 
         # Put the tetrode and unit buttons together
         hbox_unit_and_tet_controls = QHBoxLayout()
+        hbox_unit_and_tet_controls.addLayout(checkbox_selection)
         hbox_unit_and_tet_controls.addLayout(vbox_user_message)
         hbox_unit_and_tet_controls.addLayout(vbox_unit_buttons)
         hbox_unit_and_tet_controls.addLayout(vbox_tetrode_buttons)
@@ -529,9 +542,21 @@ class GraphicsManager(Process):
         self.tetrode_selection.addItems(tetrode_id_strings)
 
     def LogUserMessage(self):
-        # TODO: Make sure that hte b
+        properties_tag = " -"
+        if self.cortical_activity_checkbox.isChecked():
+            properties_tag += "C"
+        if self.white_matter_checkbox.isChecked():
+            properties_tag += "W"
+        if self.sharp_wave_ripple_checkbox.isChecked():
+            properties_tag += "S"
+        if self.hippocampal_cells_checkbox.isChecked():
+            properties_tag += "H"
+        properties_tag += "-"
+        tetrode_adjustment = self.adjusting_dist.text()
         user_text = self.user_message.toPlainText()
-        logging.info(USER_MESSAGE_IDENTIFIER + user_text)
+        logging.info(USER_MESSAGE_IDENTIFIER + user_text + " [Tags:" + \
+                "T" + self.tetrode_selection.currentText() + properties_tag + "] " + \
+                tetrode_adjustment)
         self.ClearUserMessage()
 
     def ClearUserMessage(self):

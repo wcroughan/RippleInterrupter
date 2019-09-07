@@ -748,7 +748,10 @@ class CommandWindow(QMainWindow):
         layout_geometry = self.graphical_interface.getGeometry()
         self.setGeometry(100, 100, layout_geometry[0], layout_geometry[1])
         self.setCentralWidget(self.graphical_interface.widget)
-        self.statusBar().showMessage('Connected to SpikeGadgets. Press Ctrl+T to stream.')
+        if self.sg_client is not None:
+            self.statusBar().showMessage('Connected to SpikeGadgets. Press Ctrl+T to stream.')
+        else:
+            self.statusBar().showMessage('Not connected to SpikeGadgets.')
 
     def loadClusterFile(self, cluster_filename=None):
         """
