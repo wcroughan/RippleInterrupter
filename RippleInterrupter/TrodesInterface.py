@@ -30,9 +30,10 @@ class SGClient(tn.AbstractModuleClient):
         tn.AbstractModuleClient.__init__(self, name, connection, port)
         if (self.initialize() != 0):
             error_message = "Could not connect to Trodes. Aborting!"
-            logging.debug(MODULE_IDENTIFIER + error_message)
+            logging.info(MODULE_IDENTIFIER + error_message)
             raise Exception(error_message)
-        logging.debug(MODULE_IDENTIFIER + "Initialized connection to Trodes.")
+        else:
+            logging.info(MODULE_IDENTIFIER + "Initialized connection to Trodes.")
 
     def recv_quit(self):
         self.recvquit = True

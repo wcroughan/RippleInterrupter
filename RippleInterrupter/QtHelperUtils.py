@@ -23,7 +23,7 @@ def display_warning(info):
     msg.setText(info)
     msg.setWindowTitle('Warning!')
     msg.setStandardButtons(QMessageBox.Ok)
-    msg.exec_()
+    return msg.exec_()
 
 def display_information(info):
     """

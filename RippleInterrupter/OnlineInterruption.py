@@ -50,6 +50,7 @@ DEFAULT_POSITION_CHOICE = False
 DEFAULT_FIELD_CHOICE    = False
 DEFAULT_STIMULATION_CHOICE = False
 DEFAULT_CALIBRATION_CHOICE = False
+DEFAULT_BAYESIAN_CHOICE = False
 
 # Choices in functionality
 DEFAULT_SERIAL_ENABLED = False
@@ -465,7 +466,8 @@ class CommandWindow(QMainWindow):
                 self.stopThreads()
 
             try:
-                self.sg_client.closeConnections()
+                if self.sg_client is not None:
+                    self.sg_client.closeConnections()
             except Exception as err:
                 print(MODULE_IDENTIFIER + "Unable to close connection to Trodes. Not that it won't throw seg fault in your face anyways!")
                 print(err)
@@ -706,9 +708,14 @@ class CommandWindow(QMainWindow):
         try:
             self.sg_client = TrodesInterface.SGClient("ReplayInterruption")
         except Exception as err:
-            QtHelperUtils.display_warning('Unable to connect to Trodes!')
             print(err)
-            return
+            self.sg_client = None
+            user_response = QtHelperUtils.display_information(\
+                    'Unable to connect to Trodes! Would you like to continue?')
+
+            # Ask the user if they would like to continue
+            if user_response == QMessageBox.Cancel:
+                return
 
             # Get a list of all the units that we have in the data-set
         session_unit_list = list()

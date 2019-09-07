@@ -53,11 +53,16 @@ class LFPListener(ThreadExtension.StoppableThread):
 
         # Data streams
         # Try opening a new connection
-        self._lfp_stream = sg_client.subscribeLFPData(TrodesInterface.LFP_SUBSCRIPTION_ATTRIBUTE, \
-                self._target_tetrodes)
-        self._lfp_stream.initialize()
-        self._lfp_buffer = self._lfp_stream.create_numpy_array()
-        logging.info(self.CLASS_IDENTIFIER + "Started LFP listener thread.")
+        if sg_client is not None:
+            self._lfp_stream = sg_client.subscribeLFPData(TrodesInterface.LFP_SUBSCRIPTION_ATTRIBUTE, \
+                    self._target_tetrodes)
+            self._lfp_stream.initialize()
+            self._lfp_buffer = self._lfp_stream.create_numpy_array()
+            logging.info(self.CLASS_IDENTIFIER + "Started LFP listener thread.")
+        else:
+            self._lfp_stream = None
+            self._lfp_buffer = None
+            logging.info(self.CLASS_IDENTIFIER + "Couldn't attach LFP listener to client.")
 
     def get_n_tetrodes(self):
         return self._n_tetrodes
@@ -73,6 +78,9 @@ class LFPListener(ThreadExtension.StoppableThread):
         """
         Start fetching LFP frames.
         """
+        if self._lfp_stream is None:
+            return
+
         if __debug__:
             code_profiler = cProfile.Profile()
             profile_prefix = "lfp_listener_profile"
@@ -559,7 +567,9 @@ def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
             if (iter_idx >= N_DATA_SAMPLES):
                 break
 
-    client.closeConnections()
+    if client is not None:
+        client.closeConnections()
+
     print("Collected raw LFP Data. Visualizing.")
     power_mean, power_std = Visualization.visualizeLFP(timestamps, raw_lfp_buffer, ripple_power, \
             ripple_filtered_lfp, ripple_events, do_animation=False)
