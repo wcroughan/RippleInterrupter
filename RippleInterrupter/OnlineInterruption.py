@@ -16,6 +16,7 @@ from PyQt5 import QtCore
 
 # Local imports
 import Logger
+import BrainAtlas
 import SerialPort
 import QtHelperUtils
 import Configuration
@@ -296,6 +297,9 @@ class CommandWindow(QMainWindow):
         self.bayesian_estimator  = None
         self.graphical_interface = None
 
+        # Brain Atlas interface
+        self.brain_atlas = BrainAtlas.WebAtlas()
+
         # Put all the processes in a list so that we don't have to deal with
         # each of them by name when starting/stopping streaming.
         self.active_processes    = list()
@@ -448,6 +452,16 @@ class CommandWindow(QMainWindow):
         QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
 
     # Setting plot areas
+    def showBrainAtlas(self):
+        user_response, coordinates, view_selection = QtHelperUtils.BrainCoordinateWidget().exec_()
+        if user_response == QDialog.Accepted:
+            if 0 in view_selection:
+                self.brain_atlas.getCoronalImage(*coordinates)
+            if 1 in view_selection:
+                self.brain_atlas.getSagittalImage(*coordinates)
+            if 2 in view_selection:
+                self.brain_atlas.getHorizontalImage(*coordinates)
+
     def plotBayesianEstimate(self):
         QtHelperUtils.display_warning(MODULE_IDENTIFIER + 'Functionality not implemented!')
 
@@ -544,6 +558,10 @@ class CommandWindow(QMainWindow):
 
         # =============== PLOT MENU =============== 
         output_menu = menu_bar.addMenu('&Output')
+        plot_brain_atlas = output_menu.addAction('Brain &Atlas')
+        plot_brain_atlas.setStatusTip('Show tetrode position in Brain Atlas')
+        plot_brain_atlas.triggered.connect(self.showBrainAtlas)
+
         plot_bayesian_estimate = output_menu.addAction('&Bayesian Estimate')
         plot_bayesian_estimate.setStatusTip('Plot bayesian estimate')
         plot_bayesian_estimate.triggered.connect(self.plotBayesianEstimate)

@@ -8,7 +8,7 @@ import math
 import argparse
 from PyQt5.QtWidgets import QApplication, QMessageBox, QWidget, QFileDialog
 from PyQt5.QtWidgets import QCheckBox, QPushButton, QComboBox, QLabel, QDialog, QListWidget
-from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QDialogButtonBox, QGridLayout
+from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QDialogButtonBox, QGridLayout, QLineEdit
 from PyQt5.QtCore import Qt
 
 USE_QT_FOR_FILEIO = False
@@ -102,6 +102,77 @@ class RippleSelectionMenuWidget(QDialog):
     def getIdxs(self):
         return self._sel_reference_idx, self._sel_baseline_idx
 
+class BrainCoordinateWidget(QDialog):
+
+    """
+    Dialog box to pick the correct brain coordinates and viewing plane.
+    """
+
+    def __init__(self, ml=0.0, ap=0.0, dv=0.0):
+        QDialog.__init__(self)
+        self.setWindowTitle("Select coordinates and viewing plane.")
+
+        # ML data entry
+        ml_label = QLabel("ML")
+        self.ml_data = QLineEdit(self)
+        ml_layout = QHBoxLayout()
+        ml_layout.addWidget(ml_label)
+        ml_layout.addWidget(self.ml_data)
+
+        # AP data entry
+        ap_label = QLabel("AP")
+        self.ap_data = QLineEdit(self)
+        ap_layout = QHBoxLayout()
+        ap_layout.addWidget(ap_label)
+        ap_layout.addWidget(self.ap_data)
+
+        # DV data entry
+        dv_label = QLabel("DV")
+        self.dv_data = QLineEdit(self)
+        dv_layout = QHBoxLayout()
+        dv_layout.addWidget(dv_label)
+        dv_layout.addWidget(self.dv_data)
+
+        # View selection - Checkboxes
+        coronal_view = QCheckBox("Coronal", self)
+        sagittal_view = QCheckBox("Sagittal", self)
+        horizontal_view = QCheckBox("Horizontal", self)
+        self.views = list()
+        self.views.append(coronal_view)
+        self.views.append(sagittal_view)
+        self.views.append(horizontal_view)
+
+        view_selection = QHBoxLayout()
+        view_selection.addWidget(coronal_view)
+        view_selection.addWidget(sagittal_view)
+        view_selection.addWidget(horizontal_view)
+
+        self.button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.button_box.accepted.connect(self.accept)
+        self.button_box.rejected.connect(self.reject)
+
+        g_layout = QVBoxLayout()
+        g_layout.addLayout(ml_layout)
+        g_layout.addLayout(ap_layout)
+        g_layout.addLayout(dv_layout)
+        g_layout.addLayout(view_selection)
+        g_layout.addWidget(self.button_box, alignment=Qt.AlignCenter)
+        self.setLayout(g_layout)
+
+    def exec_(self, *args, **kwargs):
+        """
+        Overloading the exec_() function to get both the messagebox result,
+        as well as the selected checkboxes.
+        """
+        ok = QDialog.exec_(self, *args, *kwargs)
+        ml_coord = float(self.ml_data.text())
+        ap_coord = float(self.ap_data.text())
+        dv_coord = float(self.dv_data.text())
+        accepted_idxs = list()
+        for idx, chk in enumerate(self.views):
+            if chk.isChecked():
+                accepted_idxs.append(idx)
+        return ok, [ml_coord, ap_coord, dv_coord], accepted_idxs
 
 class ListDisplayWidget(QDialog):
 
