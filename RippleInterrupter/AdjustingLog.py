@@ -48,27 +48,38 @@ class TetrodeLog(object):
         Get the current coordinates for a tetrode.
         """
         if not self.tetrodeExists(tetrode):
-            return
+            return [0, 0, 0]
 
         return self._current_placement[tetrode]['coord']
 
     def tetrodeExists(self, tetrode):
         if tetrode not in self._current_placement:
             logging.warning(MODULE_IDENTIFIER + "Tetrode not found in current placement entry.")
-            print(MODULE_IDENTIFIER + "Couldn't find tetrode %d in database"%tetrode)
+            print(MODULE_IDENTIFIER + "Couldn't find tetrode %s in database"%tetrode)
             # TODO: Maybe add a new entry for this in the future
             return False
         return True
 
     def getTags(self, tetrode):
         if not self.tetrodeExists(tetrode):
-            return
+            return []
 
         return self._current_placement[tetrode]['tags']
 
+    def printMessages(self, tetrode):
+        if not self.tetrodeExists(tetrode):
+            return []
+
+        print("--------------------------------")
+        logging.info("T%s, depth %.2f"%(tetrode, self._current_placement[tetrode]['coord'][2]))
+        # Print current depth
+        for msg in self._current_placement[tetrode]['messages']:
+            print(msg)
+        print("--------------------------------")
+
     def addTags(self, tetrode, new_tags):
         if not self.tetrodeExists(tetrode):
-            return
+            return []
 
         for nt in new_tags:
             if nt not in self._current_placement[tetrode]['tags']:
