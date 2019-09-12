@@ -1,0 +1,189 @@
+{
+    "43": {
+        "coord": [
+            1.5,
+            -4.2,
+            1.0
+        ],
+        "messages": [
+            "Drive T11"
+        ],
+        "tags": []
+    },
+    "44": {
+        "coord": [
+            1.9,
+            -4.4,
+            1.0
+        ],
+        "messages": [
+            "Drive T12"
+        ],
+        "tags": []
+    },
+    "45": {
+        "coord": [
+            2.4,
+            -4.2,
+            1.0
+        ],
+        "messages": [
+            "Drive T13"
+        ],
+        "tags": []
+    },
+    "46": {
+        "coord": [
+            2.3,
+            -4.7,
+            1.0
+        ],
+        "messages": [
+            "Drive T14"
+        ],
+        "tags": []
+    },
+    "47": {
+        "coord": [
+            2.6,
+            -4.7,
+            1.0
+        ],
+        "messages": [
+            "Drive T15"
+        ],
+        "tags": []
+    },
+    "48": {
+        "coord": [
+            2.9,
+            -5.1,
+            1.0
+        ],
+        "messages": [
+            "Drive T16"
+        ],
+        "tags": []
+    },
+    "49": {
+        "coord": [
+            3.3,
+            -5.0,
+            1.0
+        ],
+        "messages": [
+            "Drive T17"
+        ],
+        "tags": []
+    },
+    "50": {
+        "coord": [
+            3.2,
+            -4.8,
+            1.0
+        ],
+        "messages": [
+            "Drive T18"
+        ],
+        "tags": []
+    },
+    "51": {
+        "coord": [
+            3.3,
+            -4.4,
+            1.0
+        ],
+        "messages": [
+            "Drive T19"
+        ],
+        "tags": []
+    },
+    "52": {
+        "coord": [
+            3.5,
+            -4.9,
+            1.0
+        ],
+        "messages": [
+            "Drive T20"
+        ],
+        "tags": []
+    },
+    "53": {
+        "coord": [
+            2.6,
+            -4.4,
+            1.0
+        ],
+        "messages": [
+            "Drive T21"
+        ],
+        "tags": []
+    },
+    "54": {
+        "coord": [
+            3.6,
+            -4.3,
+            1.0
+        ],
+        "messages": [
+            "Drive T22"
+        ],
+        "tags": []
+    },
+    "55": {
+        "coord": [
+            3.7,
+            -4.6,
+            1.0
+        ],
+        "messages": [
+            "Drive T23"
+        ],
+        "tags": []
+    },
+    "56": {
+        "coord": [
+            3.8,
+            -4.3,
+            1.0
+        ],
+        "messages": [
+            "Drive T24"
+        ],
+        "tags": []
+    },
+    "57": {
+        "coord": [
+            3.5,
+            -4.0,
+            1.0
+        ],
+        "messages": [
+            "Drive T25"
+        ],
+        "tags": []
+    },
+    "58": {
+        "coord": [
+            3.4,
+            -3.8,
+            1.0
+        ],
+        "messages": [
+            "Drive T26"
+        ],
+        "tags": []
+    },
+    "59": {
+        "coord": [
+            2.6,
+            -3.3,
+            1.0
+        ],
+        "messages": [
+            "Drive T27"
+        ],
+        "tags": []
+    },
+}
