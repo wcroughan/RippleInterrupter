@@ -41,7 +41,8 @@ import RippleDefinitions as RiD
 
 USER_MESSAGE_IDENTIFIER = "[UserMessage] "
 MODULE_IDENTIFIER = "[GraphicsHandler] "
-FORCE_IMAGE_DISPLAY = True
+VERIFY_BRAIN_COORDINATES = False
+FORCE_IMAGE_DISPLAY = False
 ANIMATION_INTERVAL = 20
 SET_MODE_ADJUSTING = True
 
@@ -229,7 +230,10 @@ class GraphicsManager(Process):
 
         # The layout of the application can be different based on what features
         # are being requested
-        if n_features_to_show == 1:
+        print(n_features_to_show)
+        if n_features_to_show == 0:
+            self._geometry = (700, 250)
+        elif n_features_to_show == 1:
             plot_grid = gridspec.GridSpec(1, 1)
             self._geometry = (700, 750)
         elif n_features_to_show == 2:
@@ -599,6 +603,10 @@ class GraphicsManager(Process):
             tag_list.append('H')
         properties_tag += "-"
         tetrode_adjustment = self.adjusting_dist.text()
+        # If no adjustment was made -- Let's say just a message has been logged, set the value to 0
+        if not tetrode_adjustment:
+            tetrode_adjustment = "0"
+
         user_text = self.user_message.toPlainText()
         logging.info(USER_MESSAGE_IDENTIFIER + user_text + " [Tags:" + \
                 "T" + self.tetrode_selection.currentText() + properties_tag + "] " + \
@@ -617,6 +625,7 @@ class GraphicsManager(Process):
     def ClearUserMessage(self):
         if self.adjusting_log is not None:
             current_tags = self.adjusting_log.getTags(self.tetrode_selection.currentText())
+            current_messages = self.adjusting_log.printMessages(self.tetrode_selection.currentText())
         else:
             current_tags = []
 
@@ -642,7 +651,8 @@ class GraphicsManager(Process):
 
         self.user_message.setPlainText("")
         self.adjusting_dist.clear()
-        self.showTetrodeInBrain(force=FORCE_IMAGE_DISPLAY)
+        if FORCE_IMAGE_DISPLAY:
+            self.showTetrodeInBrain(force=VERIFY_BRAIN_COORDINATES)
 
     # Saving Images
     def saveDisplay(self):

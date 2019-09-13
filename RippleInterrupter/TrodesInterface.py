@@ -19,7 +19,6 @@ class SGClient(tn.AbstractModuleClient):
     """
 
     timestamps = []
-    recvquit = False
 
     def __init__(self, name, connection="tcp://127.0.0.1", port=49152):
         """
@@ -29,19 +28,10 @@ class SGClient(tn.AbstractModuleClient):
         # Call the parent class constructor
         tn.AbstractModuleClient.__init__(self, name, connection, port)
         if (self.initialize() != 0):
-            error_message = "Could not connect to Trodes. Aborting!"
+            self.recv_quit()
+            self.closeConnections()
+            error_message = "Could not connect to Trodes!"
             logging.info(MODULE_IDENTIFIER + error_message)
             raise Exception(error_message)
         else:
             logging.info(MODULE_IDENTIFIER + "Initialized connection to Trodes.")
-
-    def recv_quit(self):
-        self.recvquit = True
-
-    def recv_event(self, origin, event, msg):
-        if origin == "CameraModule.2" and event == "2Dpos":
-            self.recvquit = True
-
-        print(origin)
-        print(event)
-        print(msg)
