@@ -8,4 +8,5 @@
 *.trodesClusters
 *.ripple_events
 Data/
+Logs/
 ripple_interruption_out__*.txt

@@ -583,7 +583,8 @@ def getRippleStatistics(tetrodes, analysis_time=4, show_ripples=False, \
 
 def main():
     # tetrodes_to_be_analyzed = [2,14]
-    tetrodes_to_be_analyzed = [3,23]
+    # tetrodes_to_be_analyzed = [3,23]
+    tetrodes_to_be_analyzed = [3,4]
     if len(sys.argv) > 2:
         stim_time = float(sys.argv[2])
     else:

@@ -70,6 +70,7 @@ def read_cluster_file(filename=None, tetrodes=None):
         ntrode = ntrode_list[t_i-1]
         n_clusters_on_ntrode = 0
         tetrode_idx = ntrode.get('nTrodeIndex')
+        tetrode_num = ntrode.get('nTrodeID')
         if len(list(ntrode)) == 0:
             # Has no clusters on it
             continue
@@ -82,9 +83,9 @@ def read_cluster_file(filename=None, tetrodes=None):
             cluster_idx_to_id_map[int(local_cluster_idx)] = raw_cluster_idx
             raw_cluster_idx += 1
             n_clusters_on_ntrode += 1
-        n_trode_to_cluster_idx_map[t_i] = cluster_idx_to_id_map
+        n_trode_to_cluster_idx_map[tetrode_idx] = cluster_idx_to_id_map
         if n_clusters_on_ntrode == 0:
-            n_trode_to_cluster_idx_map.pop(ntrode, None)
+            n_trode_to_cluster_idx_map.pop(tetrode_idx, None)
 
     # Final value of raw_cluster_idx is a proxy for the total number of units we have
     logging.info(MODULE_IDENTIFIER + "Cluster map...\n%s"% n_trode_to_cluster_idx_map)

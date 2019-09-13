@@ -71,7 +71,7 @@ class TetrodeLog(object):
             return []
 
         print("--------------------------------")
-        logging.info("T%s, depth %.2f"%(tetrode, self._current_placement[tetrode]['coord'][2]))
+        print("T%s, depth %.2f"%(tetrode, self._current_placement[tetrode]['coord'][2]))
         # Print current depth
         for msg in self._current_placement[tetrode]['messages']:
             print(msg)

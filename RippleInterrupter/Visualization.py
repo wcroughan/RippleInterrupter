@@ -619,7 +619,8 @@ class GraphicsManager(Process):
             self.adjusting_log.addTags(self.tetrode_selection.currentText(), \
                     tag_list)
             self.adjusting_log.addMessage(self.tetrode_selection.currentText(), \
-                    time.strftime('[%Y.%m.%d %H:%M:%S] ' + tetrode_adjustment + ' ' +  user_text))
+                    time.strftime('[%Y.%m.%d %H:%M:%S] ' + properties_tag + " " + \
+                    tetrode_adjustment + ' ' +  user_text))
         self.ClearUserMessage()
 
     def ClearUserMessage(self):
