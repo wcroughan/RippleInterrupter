@@ -69,7 +69,7 @@ def read_cluster_file(filename=None, tetrodes=None):
         # Offset by 1 because Trodes tetrodes start with 1!
         ntrode = ntrode_list[t_i-1]
         n_clusters_on_ntrode = 0
-        tetrode_idx = ntrode.get('nTrodeIndex')
+        tetrode_idx = 1 + int(ntrode.get('nTrodeIndex'))
         tetrode_num = ntrode.get('nTrodeID')
         if len(list(ntrode)) == 0:
             # Has no clusters on it
