@@ -36,7 +36,7 @@ STAT_ADJUSTMENT_DATA_PTS = int(STAT_ADJUSTMENT_PERIOD * LFP_FREQUENCY)
 
 # Custom constants
 LFP_ANIMATION_INTERVAL = 5     # Animation Frame rate (this is the delay between frames)
-RIPPLE_POWER_THRESHOLD = 5     # Multiplicative factor for calling something a ripple
+RIPPLE_POWER_THRESHOLD = 4.0   # Multiplicative factor for calling something a ripple
 MOVE_VELOCITY_THRESOLD = 5.0
 
 # Plotting and aesthetics
